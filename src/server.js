@@ -60,8 +60,8 @@ app.use(
   })
 );
 
-// Serve Static Frontend Assets
-app.use(express.static(PUBLIC_DIR));
+// Serve Static Frontend Assets (disable automatic index.html on root so landing page can be served)
+app.use(express.static(PUBLIC_DIR, { index: false }));
 
 // ====================================================================
 // HEALTH-CHECK ENDPOINT

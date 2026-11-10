@@ -702,7 +702,7 @@ async function getUserNotifications(userId, limit = 30) {
   const sql = `
     SELECT * FROM notifications 
     WHERE user_id = $1 
-    ORDER BY created_at DESC 
+    ORDER BY COALESCE(sent_at, NOW()) DESC 
     LIMIT $2
   `;
   const res = await query(sql, [userId, limit]);

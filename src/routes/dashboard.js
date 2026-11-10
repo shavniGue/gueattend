@@ -75,7 +75,10 @@ router.get('/student', requireAuth, async (req, res) => {
     const monthlyAttendance = await db.getMonthlyAttendance(student.id, currentMonth, currentYear);
 
     // 7. Telegram Status
-    const tgRes = await db.query('SELECT chat_id, username FROM telegram_accounts WHERE user_id = $1', [req.session.userId]);
+    const tgRes = await db.query(
+      'SELECT telegram_chat_id AS chat_id, telegram_username AS username FROM telegram_accounts WHERE user_id = $1',
+      [req.session.userId]
+    );
     const isTgConnected = Boolean(tgRes.rows.length > 0 && tgRes.rows[0].chat_id);
 
     // 8. Notifications
