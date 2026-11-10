@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GUeAttend | Faculty Attendance & Academics Portal</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👨‍🏫</text></svg>">
+</head>
+<body>
+
+  <div class="app-container">
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo" style="background: var(--accent); color: #fff;">FAC</div>
+        <div class="brand-text">
+          <h2>GUeAttend</h2>
+          <span>Faculty Portal</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-category">Teaching</div>
+        <a class="nav-item active" onclick="switchFacultyTab('markTab')">
+          <span class="nav-icon">📝</span>
+          <span>Mark Attendance</span>
+        </a>
+        <a class="nav-item" onclick="switchFacultyTab('correctionsTab')">
+          <span class="nav-icon">⚖️</span>
+          <span>Review Corrections</span>
+        </a>
+        <a class="nav-item" onclick="switchFacultyTab('classesTab')">
+          <span class="nav-icon">📚</span>
+          <span>My Assigned Classes</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtnFac" style="background:none; border:none; color:#cbd5e1; cursor:pointer;" onclick="logout()">Logout 🚪</button>
+      </div>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <div class="university-title">
+            <h1>Faculty Portal • Graphic Era University</h1>
+            <p>Attendance Marking & Student Academic Performance</p>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span id="facNameDisplay" style="font-weight: 600; font-size: 13px;">Dr. Rajesh Sharma</span>
+          <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+      </header>
+
+      <div class="app-content">
+
+        <!-- TAB 1: MARK ATTENDANCE -->
+        <section id="markTab" class="view-panel active">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <span class="card-title">📝 Mark Class Attendance</span>
+            </div>
+            <div class="card-body">
+              <div class="month-filter-bar">
+                <div>
+                  <label class="form-label">Subject & Section</label>
+                  <select id="facClassSelect" class="form-select">
+                    <option value="">Select an assigned class...</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Date</label>
+                  <input type="date" id="attDateInput" class="form-input">
+                </div>
+                <div>
+                  <label class="form-label">Period</label>
+                  <select id="attPeriodSelect" class="form-select">
+                    <option value="1">Period 1 (09:00 - 09:55)</option>
+                    <option value="2">Period 2 (09:55 - 10:50)</option>
+                    <option value="3">Period 3 (11:05 - 12:00)</option>
+                    <option value="4">Period 4 (12:00 - 12:55)</option>
+                    <option value="5">Period 5 (13:45 - 14:40)</option>
+                    <option value="6">Period 6 (14:40 - 15:35)</option>
+                  </select>
+                </div>
+                <div style="align-self: flex-end;">
+                  <button id="loadRosterBtn" class="btn btn-primary">Load Student Roster</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Roster Table -->
+          <div class="card" id="rosterCard" style="display: none;">
+            <div class="card-header">
+              <span class="card-title">👥 Student Roster (<span id="rosterCount">0</span> Students)</span>
+              <div>
+                <button class="btn btn-secondary" onclick="markAll('present')">All Present</button>
+                <button class="btn btn-secondary" onclick="markAll('absent')">All Absent</button>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Roll No</th>
+                      <th>Student ID</th>
+                      <th>Student Name</th>
+                      <th>Attendance Status</th>
+                      <th>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody id="studentRosterTbody"></tbody>
+                </table>
+              </div>
+              <div style="padding: 16px; display: flex; justify-content: flex-end;">
+                <button id="submitAttendanceBtn" class="btn btn-primary" style="padding: 10px 24px;">Submit Attendance to Supabase</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: REVIEW CORRECTIONS -->
+        <section id="correctionsTab" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚖️ Pending Attendance Correction Requests</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Class Date</th>
+                      <th>Subject</th>
+                      <th>Requested Status</th>
+                      <th>Reason</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="facultyCorrectionsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: ASSIGNED CLASSES -->
+        <section id="classesTab" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📚 Faculty Subject Allocation</span>
+            </div>
+            <div class="card-body" id="facultyClassesContainer">
+              <p style="color: var(--text-muted);">Loading assigned courses...</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let assignedClasses = [];
+    let currentRoster = [];
+
+    async function initFaculty() {
+      // Set default date to today
+      document.getElementById('attDateInput').value = new Date().toISOString().split('T')[0];
+
+      try {
+        const resp = await fetch('/api/faculty/assigned-classes');
+        const data = await resp.json();
+        if (data.success) {
+          assignedClasses = data.classes;
+          document.getElementById('facNameDisplay').textContent = data.faculty.full_name;
+
+          const sel = document.getElementById('facClassSelect');
+          sel.innerHTML = '<option value="">Select an assigned class...</option>';
+          data.classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = JSON.stringify({ sectionId: c.section_id, subjectId: c.subject_id });
+            opt.textContent = `${c.subject_code} - ${c.subject_name} (${c.section_name})`;
+            sel.appendChild(opt);
+          });
+
+          // Render classes tab
+          const container = document.getElementById('facultyClassesContainer');
+          let html = '<div class="widget-grid-top">';
+          data.classes.forEach(c => {
+            html += `
+              <div class="card" style="padding: 16px;">
+                <div style="font-size: 11px; color: var(--gold); font-weight: 700; text-transform: uppercase;">${c.course_name}</div>
+                <div style="font-size: 15px; font-weight: 700; color: var(--primary); margin: 4px 0;">${c.subject_name} (${c.subject_code})</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Section: <strong>${c.section_name}</strong> | Semester: ${c.semester_number}</div>
+              </div>
+            `;
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      loadCorrections();
+    }
+
+    document.getElementById('loadRosterBtn').addEventListener('click', async () => {
+      const val = document.getElementById('facClassSelect').value;
+      if (!val) return alert('Please choose a class.');
+      const { sectionId } = JSON.parse(val);
+
+      try {
+        const resp = await fetch(`/api/faculty/students?sectionId=${sectionId}`);
+        const data = await resp.json();
+        if (data.success) {
+          currentRoster = data.students;
+          document.getElementById('rosterCount').textContent = data.students.length;
+          document.getElementById('rosterCard').style.display = 'block';
+
+          const tbody = document.getElementById('studentRosterTbody');
+          tbody.innerHTML = '';
+          data.students.forEach(s => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${s.roll_number || '-'}</td>
+              <td><strong>${s.student_id}</strong></td>
+              <td>${s.full_name}</td>
+              <td>
+                <select class="form-select status-select" data-student-id="${s.id}">
+                  <option value="present" selected>Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="approved_leave">Approved Leave</option>
+                </select>
+              </td>
+              <td>
+                <input type="text" class="form-input remarks-input" data-student-id="${s.id}" placeholder="Optional note">
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        alert('Failed to load roster.');
+      }
+    });
+
+    function markAll(status) {
+      document.querySelectorAll('.status-select').forEach(s => s.value = status);
+    }
+
+    document.getElementById('submitAttendanceBtn').addEventListener('click', async () => {
+      const val = document.getElementById('facClassSelect').value;
+      if (!val) return alert('Select a class.');
+      const { sectionId, subjectId } = JSON.parse(val);
+      const classDate = document.getElementById('attDateInput').value;
+      const periodNumber = parseInt(document.getElementById('attPeriodSelect').value, 10);
+
+      const studentStatuses = [];
+      document.querySelectorAll('.status-select').forEach(sel => {
+        const studentId = sel.getAttribute('data-student-id');
+        const status = sel.value;
+        const remarksInput = document.querySelector(`.remarks-input[data-student-id="${studentId}"]`);
+        studentStatuses.push({
+          studentId,
+          status,
+          remarks: remarksInput ? remarksInput.value : '',
+        });
+      });
+
+      try {
+        const resp = await fetch('/api/faculty/attendance/mark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sectionId,
+            subjectId,
+            classDate,
+            periodNumber,
+            studentStatuses,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert('✓ Attendance marked and synchronized into Supabase PostgreSQL.');
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Submission failed.');
+      }
+    });
+
+    async function loadCorrections() {
+      try {
+        const resp = await fetch('/api/faculty/corrections');
+        const data = await resp.json();
+        const tbody = document.getElementById('facultyCorrectionsTbody');
+        tbody.innerHTML = '';
+        if (data.success && data.corrections.length > 0) {
+          data.corrections.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${c.student_name} (${c.student_id})</td>
+              <td>${c.class_date}</td>
+              <td>${c.subject_name} (${c.subject_code})</td>
+              <td><span class="badge-status badge-${c.new_status}">${c.new_status}</span></td>
+              <td>${c.reason}</td>
+              <td>
+                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${c.id}', 'approve')">Approve</button>
+                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${c.id}', 'reject')">Reject</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No pending corrections.</td></tr>';
+        }
+      } catch (err) {}
+    }
+
+    async function handleCorrection(id, action) {
+      if (!confirm(`Are you sure you want to ${action} this request?`)) return;
+      try {
+        const resp = await fetch(`/api/faculty/corrections/${id}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        const data = await resp.json();
+        alert(data.message || 'Done.');
+        loadCorrections();
+      } catch (err) {
+        alert('Failed to process action.');
+      }
+    }
+
+    function switchFacultyTab(tabId) {
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    }
+
+    window.addEventListener('DOMContentLoaded', initFaculty);
+  </script>
+</body>
+</html>
+

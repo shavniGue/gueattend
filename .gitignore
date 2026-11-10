@@ -1,0 +1,27 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Local runtime & session storage
+data/
+data/*
+!data/.gitkeep
+logs/
+*.log
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Build & scratch
+dist/
+coverage/
+.cache/
+

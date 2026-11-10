@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GUeAttend | Student ERP & Smart Attendance Portal</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- ==========================================
+         SIDEBAR NAVIGATION
+         ========================================== -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">GEU</div>
+        <div class="brand-text">
+          <h2>GUeAttend</h2>
+          <span>University ERP</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-category">Main</div>
+        <a class="nav-item active" data-view="dashboardView">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </a>
+        <a class="nav-item" data-view="attendanceView">
+          <span class="nav-icon">📝</span>
+          <span>Attendance</span>
+        </a>
+        <a class="nav-item" data-view="timetableView">
+          <span class="nav-icon">🗓️</span>
+          <span>Time Table</span>
+        </a>
+        <a class="nav-item" data-view="academicView">
+          <span class="nav-icon">📚</span>
+          <span>Academic</span>
+        </a>
+        <a class="nav-item" data-view="examView">
+          <span class="nav-icon">📝</span>
+          <span>Exam</span>
+        </a>
+
+        <div class="nav-category">Finance & Campus</div>
+        <a class="nav-item" data-view="feeView">
+          <span class="nav-icon">💳</span>
+          <span>Fee</span>
+        </a>
+        <a class="nav-item" data-view="grievanceView">
+          <span class="nav-icon">⚖️</span>
+          <span>Grievance</span>
+        </a>
+        <a class="nav-item" data-view="circularView">
+          <span class="nav-icon">📢</span>
+          <span>Circular</span>
+        </a>
+        <a class="nav-item" data-view="hostelView">
+          <span class="nav-icon">🏢</span>
+          <span>Hostel</span>
+        </a>
+        <a class="nav-item" data-view="placementView">
+          <span class="nav-icon">💼</span>
+          <span>Placement</span>
+        </a>
+
+        <div class="nav-category">Personal</div>
+        <a class="nav-item" data-view="profileView">
+          <span class="nav-icon">👤</span>
+          <span>Profile</span>
+        </a>
+        <a class="nav-item" data-view="notificationsView">
+          <span class="nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a>
+        <a class="nav-item" data-view="settingsView">
+          <span class="nav-icon">⚙️</span>
+          <span>Telegram & Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span>Session: <strong id="sidebarSessionText">2026-2027</strong></span>
+        <button id="logoutBtnSidebar" style="background:none; border:none; color:#cbd5e1; cursor:pointer;" title="Sign out">🚪</button>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <main class="app-main">
+      <!-- TOP NAVIGATION BAR -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+          <div class="university-title">
+            <h1>Graphic Era (Deemed to be University)</h1>
+            <p>GUeAttend • Unified Student Life Cycle & Attendance System</p>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <span class="badge-session" id="topbarSessionBadge">Academic Session 2026-2027</span>
+          <div class="topbar-date" id="topbarCurrentDate">
+            <span>📅</span> <span id="currentDateDisplay">Nov 10, 2026</span>
+          </div>
+
+          <div class="topbar-actions">
+            <a href="https://t.me/gue_attendance_bot" target="_blank" class="action-btn" title="Open Telegram Bot" style="color: #0284c7;">
+              ✈️
+            </a>
+            <div class="action-btn" id="notifBellBtn" title="Notifications">
+              🔔
+              <span class="unread-dot" id="unreadBadge" style="display: none;"></span>
+            </div>
+
+            <div class="user-profile-chip" id="userProfileChip" title="View Profile">
+              <div class="user-avatar" id="navAvatar">ST</div>
+              <div class="user-meta">
+                <div class="name" id="navUserName">Loading...</div>
+                <div class="role" id="navUserRole">Student</div>
+              </div>
+            </div>
+
+            <button id="logoutBtn" class="btn btn-secondary" style="padding: 6px 12px;" title="Logout">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT PANELS -->
+      <div class="app-content">
+
+        <!-- =========================================================
+             VIEW 1: DASHBOARD (9 Core Widgets)
+             ========================================================= -->
+        <section id="dashboardView" class="view-panel active">
+          <!-- Student Information Banner -->
+          <div class="student-banner">
+            <div class="banner-profile">
+              <div class="banner-avatar" id="bannerAvatar">ST</div>
+              <div class="banner-details">
+                <h2 id="bannerStudentName">Loading Student Information...</h2>
+                <div class="banner-chips">
+                  <span class="info-chip" id="bannerStudentId">ID: --</span>
+                  <span class="info-chip" id="bannerEnrollment">Enrollment: --</span>
+                  <span class="info-chip" id="bannerCourse">Course: --</span>
+                  <span class="info-chip" id="bannerSemSec">Sem 5 | Sec G4</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="banner-stats">
+              <div class="stat-circle">
+                <div class="stat-val" id="bannerOverallAttendance">0.0%</div>
+                <div class="stat-lbl">Overall Attendance</div>
+              </div>
+              <div class="stat-circle">
+                <div class="stat-val" id="bannerClassesTodayCount">0</div>
+                <div class="stat-lbl">Classes Today</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Row: Widgets 1, 2, 3 -->
+          <div class="widget-grid-top">
+            <!-- Widget 1: Classes Today -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📖 Classes Today</span>
+                <span class="badge-status badge-present" id="classesTodayCountBadge">0 Scheduled</span>
+              </div>
+              <div class="card-body" id="classesTodayContainer">
+                <p style="color: var(--text-muted);">Loading today schedule...</p>
+              </div>
+            </div>
+
+            <!-- Widget 2: Right Now -->
+            <div class="card live-period-card">
+              <div class="card-header">
+                <span class="card-title">🔴 Right Now</span>
+                <span class="live-badge">Live Class</span>
+              </div>
+              <div class="card-body" id="rightNowContainer">
+                <p style="color: var(--text-muted); font-size: 13px;">No class active at this moment.</p>
+              </div>
+            </div>
+
+            <!-- Widget 3: Up Next -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">⏳ Up Next</span>
+                <span style="font-size: 12px; color: var(--text-muted);">Upcoming</span>
+              </div>
+              <div class="card-body" id="upNextContainer">
+                <p style="color: var(--text-muted); font-size: 13px;">No upcoming classes for today.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Grid Row: Today's Attendance + Course Progress & Substitutions -->
+          <div class="widget-grid-main">
+            <!-- Widget 6: Today's Attendance Table -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📋 Today's Attendance</span>
+                <span style="font-size: 12px; color: var(--text-muted);" id="todayAttendanceDate">--</span>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Period</th>
+                        <th>Duration</th>
+                        <th>Subject</th>
+                        <th>Code</th>
+                        <th>Faculty Name</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="todayAttendanceTbody">
+                      <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading attendance records...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side Widgets: Widget 5 Substitution + Widget 7 Course Progress -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Widget 5: Class Substitution Alerts -->
+              <div class="card">
+                <div class="card-header">
+                  <span class="card-title">🔄 Class Substitution</span>
+                </div>
+                <div class="card-body" id="substitutionAlertsContainer">
+                  <p style="color: var(--text-muted); font-size: 12.5px;">No class substitutions scheduled for today.</p>
+                </div>
+              </div>
+
+              <!-- Widget 7: Course Progress -->
+              <div class="card">
+                <div class="card-header">
+                  <span class="card-title">📈 Course Progress</span>
+                </div>
+                <div class="card-body" id="courseProgressContainer">
+                  <p style="color: var(--text-muted); font-size: 12.5px;">Loading syllabus progress...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Widget 8 Month Register + Widget 9 Lecture Plan -->
+          <div class="widget-grid-main">
+            <!-- Widget 8: Month Register Preview -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📅 Month Register (Live Attendance)</span>
+                <button class="btn btn-secondary" style="font-size: 12px;" onclick="switchView('attendanceView')">Full Register →</button>
+              </div>
+              <div class="card-body">
+                <div class="register-legend">
+                  <div class="legend-item"><span class="legend-dot present"></span> Present</div>
+                  <div class="legend-item"><span class="legend-dot absent"></span> Absent</div>
+                  <div class="legend-item"><span class="legend-dot leave"></span> Approved Leave</div>
+                </div>
+                <div id="dashboardMonthRegisterContainer">
+                  <p style="color: var(--text-muted);">Loading monthly attendance summary...</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Widget 9: Lecture Plan -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📝 Lecture Plan</span>
+                <button class="btn btn-secondary" style="font-size: 12px;" onclick="switchView('academicView')">Details →</button>
+              </div>
+              <div class="card-body" id="dashboardLecturePlanContainer">
+                <p style="color: var(--text-muted); font-size: 12.5px;">Loading lecture topics...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 2: FULL ATTENDANCE & MONTH REGISTER
+             ========================================================= -->
+        <section id="attendanceView" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <span class="card-title">📊 Subject-wise Attendance & 75% Shortage Tracker</span>
+              <button class="btn btn-primary" onclick="requestCorrectionModal()">Request Correction</button>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Subject Code</th>
+                      <th>Subject Name</th>
+                      <th>Total Marked</th>
+                      <th>Present</th>
+                      <th>Absent</th>
+                      <th>Leave</th>
+                      <th>Percentage</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fullAttendanceSummaryTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Month Register View with Filters -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🗓️ Historical Month Register</span>
+              <div class="month-filter-bar" style="margin: 0;">
+                <select id="monthSelect" class="form-select">
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11" selected>November</option>
+                  <option value="12">December</option>
+                </select>
+                <select id="yearSelect" class="form-select">
+                  <option value="2026" selected>2026</option>
+                  <option value="2025">2025</option>
+                </select>
+                <button id="viewMonthBtn" class="btn btn-primary">View Register</button>
+              </div>
+            </div>
+            <div class="card-body" id="monthRegisterFullBody">
+              <p style="color: var(--text-muted);">Select month and year to view attendance records.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 3: TIME TABLE (Monday - Saturday Grid)
+             ========================================================= -->
+        <section id="timetableView" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🗓️ Master Weekly Time Table (Mon - Sat)</span>
+              <span id="timetableSectionBadge" class="badge-status badge-present">Section G4</span>
+            </div>
+            <div class="card-body" style="padding: 16px;">
+              <div class="table-responsive">
+                <div class="timetable-grid" id="masterTimetableGrid">
+                  <!-- Generated via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 4: ACADEMIC (Lecture Plans, Syllabus, Notes)
+             ========================================================= -->
+        <section id="academicView" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <span class="card-title">📖 Lecture Plans & Covered Topics</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Week</th>
+                      <th>Subject</th>
+                      <th>Topic Planned</th>
+                      <th>Planned Date</th>
+                      <th>Status</th>
+                      <th>Faculty</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lecturePlanTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="widget-grid-main">
+            <!-- Study Materials -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📁 Study Materials & Handouts</span>
+              </div>
+              <div class="card-body" id="studyMaterialsContainer">
+                <p style="color: var(--text-muted);">Loading course materials...</p>
+              </div>
+            </div>
+
+            <!-- Assignments -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">📝 Assignments</span>
+              </div>
+              <div class="card-body" id="assignmentsContainer">
+                <p style="color: var(--text-muted);">Loading assignments...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 5: EXAMINATIONS & RESULTS
+             ========================================================= -->
+        <section id="examView" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <span class="card-title">📝 Upcoming Examination Schedules & Admit Card</span>
+              <span id="admitCardBadge" class="badge-status badge-present">Admit Card: Verified</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Exam Name</th>
+                      <th>Subject Code</th>
+                      <th>Subject Name</th>
+                      <th>Date</th>
+                      <th>Timing</th>
+                      <th>Classroom</th>
+                    </tr>
+                  </thead>
+                  <tbody id="examScheduleTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🎓 Semester Results & Performance Transcript</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Semester</th>
+                      <th>SGPA</th>
+                      <th>CGPA</th>
+                      <th>Credits Earned</th>
+                      <th>Status</th>
+                      <th>Backlogs</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 6: FEES & RECEIPTS
+             ========================================================= -->
+        <section id="feeView" class="view-panel">
+          <div class="widget-grid-top">
+            <div class="card stat-circle" style="text-align: left; background: var(--surface);">
+              <div style="font-size: 12px; color: var(--text-muted);">Total Semester Fees</div>
+              <div class="stat-val" style="color: var(--primary);" id="feeTotalAmount">₹ 0.00</div>
+            </div>
+            <div class="card stat-circle" style="text-align: left; background: var(--surface);">
+              <div style="font-size: 12px; color: var(--text-muted);">Amount Paid</div>
+              <div class="stat-val" style="color: var(--success);" id="feeAmountPaid">₹ 0.00</div>
+            </div>
+            <div class="card stat-circle" style="text-align: left; background: var(--surface);">
+              <div style="font-size: 12px; color: var(--text-muted);">Outstanding Balance</div>
+              <div class="stat-val" style="color: var(--danger);" id="feeBalanceDue">₹ 0.00</div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 24px;">
+            <div class="card-header">
+              <span class="card-title">🧾 Verified Payment Receipts</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Receipt Number</th>
+                      <th>Payment Date</th>
+                      <th>Amount</th>
+                      <th>Method</th>
+                      <th>Transaction Reference</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feeReceiptsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 7: GRIEVANCE DESK
+             ========================================================= -->
+        <section id="grievanceView" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <span class="card-title">⚖️ Submit Student Grievance</span>
+            </div>
+            <div class="card-body">
+              <form id="grievanceForm">
+                <div class="form-group">
+                  <label class="form-label">Category</label>
+                  <select id="grvCategory" class="form-select" style="width: 100%;">
+                    <option value="academic">Academic / Teaching</option>
+                    <option value="examination">Examination & Marks</option>
+                    <option value="hostel">Hostel & Living</option>
+                    <option value="canteen">Canteen & Mess</option>
+                    <option value="fee">Fees & Accounts</option>
+                    <option value="general">General Campus</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Subject</label>
+                  <input type="text" id="grvSubject" class="form-input" style="width: 100%;" placeholder="Brief summary of grievance" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Detailed Description</label>
+                  <textarea id="grvDescription" class="form-input" style="width: 100%; height: 90px;" placeholder="Provide specific details, dates, or affected equipment..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit to Grievance Committee</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📜 My Submitted Grievances</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Category</th>
+                      <th>Subject</th>
+                      <th>Status</th>
+                      <th>Submitted Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="grievancesTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 8: CIRCULARS & NOTICES
+             ========================================================= -->
+        <section id="circularView" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📢 Official University Circulars & Memos</span>
+            </div>
+            <div class="card-body" id="circularsListContainer">
+              <p style="color: var(--text-muted);">Loading circulars...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 9: HOSTEL PORTAL
+             ========================================================= -->
+        <section id="hostelView" class="view-panel">
+          <div class="card" id="hostelCard">
+            <div class="card-header">
+              <span class="card-title">🏢 Hostel Allotment Details</span>
+            </div>
+            <div class="card-body" id="hostelDetailsBody">
+              <p style="color: var(--text-muted);">Loading hostel details...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 10: PLACEMENT CELL
+             ========================================================= -->
+        <section id="placementView" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">💼 Active Campus Placement Drives</span>
+            </div>
+            <div class="card-body" id="placementsContainer">
+              <p style="color: var(--text-muted);">Loading active placement opportunities...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 11: STUDENT PROFILE
+             ========================================================= -->
+        <section id="profileView" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">👤 Student Official University Profile</span>
+            </div>
+            <div class="card-body" id="fullProfileBody">
+              <p style="color: var(--text-muted);">Loading full student profile...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 12: NOTIFICATIONS
+             ========================================================= -->
+        <section id="notificationsView" class="view-panel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🔔 University Notifications & Alerts Feed</span>
+            </div>
+            <div class="card-body" id="fullNotificationsList">
+              <p style="color: var(--text-muted);">Loading notifications...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 13: TELEGRAM BOT & SETTINGS
+             ========================================================= -->
+        <section id="settingsView" class="view-panel">
+          <div class="card" style="max-width: 650px;">
+            <div class="card-header">
+              <span class="card-title">✈️ Telegram Bot Integration (@gue_attendance_bot)</span>
+            </div>
+            <div class="card-body">
+              <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 13.5px;">
+                Link your student account to receive real-time attendance alerts, today's schedule, and instant queries right inside Telegram.
+              </p>
+
+              <div id="telegramStatusBox" style="padding: 14px; background: var(--surface-alt); border-radius: var(--radius-sm); margin-bottom: 20px;">
+                Loading Telegram status...
+              </div>
+
+              <div id="telegramActionBox">
+                <button id="genTgTokenBtn" class="btn btn-primary">Generate 1-Click Link Code</button>
+                <div id="tgTokenOutput" style="display: none; margin-top: 16px; padding: 14px; background: var(--gold-light); border-radius: var(--radius-sm);">
+                  <div style="font-weight: 700; color: #92400e; margin-bottom: 4px;">Linking Code:</div>
+                  <div id="tgTokenCode" style="font-family: monospace; font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #78350f;">------</div>
+                  <p style="font-size: 12px; color: #92400e; margin-top: 6px;">Send this code to <strong>@gue_attendance_bot</strong> via <code>/login &lt;code&gt;</code> or tap below:</p>
+                  <a id="tgDeepLinkBtn" href="#" target="_blank" class="btn btn-primary" style="margin-top: 10px; background-color: #0284c7;">Open in Telegram 🚀</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GUeAttend | Unified University ERP Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body class="login-wrapper">
+
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-header-logo">
+        <span>GEU</span>
+      </div>
+      <h1>GUeAttend</h1>
+      <p>Graphic Era University ERP & Smart Attendance Portal</p>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="loginAlert" class="alert-box alert-danger"></div>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="form-group">
+        <label class="form-label" for="identifier">User ID / Email / Enrollment No</label>
+        <div class="input-with-icon">
+          <input type="text" id="identifier" placeholder="e.g. 24030110 or student@geu.ac.in" required autofocus>
+          <span class="input-icon-btn">👤</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-with-icon">
+          <input type="password" id="password" placeholder="Enter your password" required>
+          <button type="button" id="togglePasswordBtn" class="input-icon-btn" title="Toggle password visibility">👁️</button>
+        </div>
+      </div>
+
+      <!-- CAPTCHA -->
+      <div class="form-group">
+        <label class="form-label">Security Verification (CAPTCHA)</label>
+        <div class="captcha-box">
+          <div id="captchaDisplay" class="captchaDisplay captcha-display">----</div>
+          <button type="button" id="refreshCaptchaBtn" class="btn btn-secondary" title="Refresh CAPTCHA">🔄</button>
+        </div>
+        <input type="text" id="captchaAnswer" class="form-input" style="width: 100%;" placeholder="Enter characters shown above" required autocomplete="off">
+        <input type="hidden" id="captchaId">
+      </div>
+
+      <button type="submit" id="submitBtn" class="login-btn">
+        <span id="btnText">Sign In to ERP</span>
+        <span id="btnSpinner" style="display: none;">⏳ Authenticating...</span>
+      </button>
+
+      <div class="login-footer-links">
+        <a href="/forgot">Forgot Password?</a>
+        <a href="https://t.me/gue_attendance_bot" target="_blank" rel="noopener">Telegram Bot</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Client-side authentication handler
+    const form = document.getElementById('loginForm');
+    const identifierInput = document.getElementById('identifier');
+    const passwordInput = document.getElementById('password');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const captchaDisplay = document.getElementById('captchaDisplay');
+    const captchaIdInput = document.getElementById('captchaId');
+    const captchaAnswerInput = document.getElementById('captchaAnswer');
+    const alertBox = document.getElementById('loginAlert');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+
+    // Toggle Password Visibility
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPass = passwordInput.type === 'password';
+      passwordInput.type = isPass ? 'text' : 'password';
+      togglePasswordBtn.textContent = isPass ? '🙈' : '👁️';
+    });
+
+    // Fetch CAPTCHA
+    async function loadCaptcha() {
+      try {
+        const resp = await fetch('/api/auth/captcha');
+        const data = await resp.json();
+        if (data.success) {
+          captchaDisplay.textContent = data.captchaText;
+          captchaIdInput.value = data.captchaId;
+          captchaAnswerInput.value = '';
+        }
+      } catch (err) {
+        captchaDisplay.textContent = 'ERROR';
+      }
+    }
+
+    document.getElementById('refreshCaptchaBtn').addEventListener('click', loadCaptcha);
+    loadCaptcha();
+
+    // Form Submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline';
+      submitBtn.disabled = true;
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: identifierInput.value.trim(),
+            password: passwordInput.value,
+            captchaId: captchaIdInput.value,
+            captchaAnswer: captchaAnswerInput.value.trim(),
+          }),
+        });
+
+        const data = await resp.json();
+
+        if (data.success) {
+          window.location.href = data.redirectUrl || '/dashboard';
+        } else {
+          alertBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
+          alertBox.style.display = 'block';
+          loadCaptcha();
+        }
+      } catch (err) {
+        alertBox.textContent = 'Unable to connect to university ERP server. Please try again.';
+        alertBox.style.display = 'block';
+      } finally {
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GUeAttend | Password Assistance</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body class="login-wrapper">
+
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-header-logo">
+        <span>GEU</span>
+      </div>
+      <h1>Password Recovery</h1>
+      <p>Enter your university email to reset your account password</p>
+    </div>
+
+    <div id="alertBox" class="alert-box"></div>
+
+    <form id="forgotForm">
+      <div class="form-group">
+        <label class="form-label" for="email">University Registered Email</label>
+        <div class="input-with-icon">
+          <input type="email" id="email" placeholder="student@geu.ac.in" required autofocus>
+          <span class="input-icon-btn">✉️</span>
+        </div>
+      </div>
+
+      <button type="submit" id="submitBtn" class="login-btn">
+        <span>Request Password Reset</span>
+      </button>
+
+      <div class="login-footer-links" style="justify-content: center; margin-top: 24px;">
+        <a href="/login">← Return to Login</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('forgotForm');
+    const alertBox = document.getElementById('alertBox');
+    const emailInput = document.getElementById('email');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailInput.value.trim() }),
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          alertBox.className = 'alert-box alert-success';
+          alertBox.textContent = data.message || 'Password reset link sent to your registered address.';
+          alertBox.style.display = 'block';
+          form.reset();
+        } else {
+          alertBox.className = 'alert-box alert-danger';
+          alertBox.textContent = data.error || 'Failed to request reset.';
+          alertBox.style.display = 'block';
+        }
+      } catch (err) {
+        alertBox.className = 'alert-box alert-danger';
+        alertBox.textContent = 'Connection error. Please try again.';
+        alertBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
+
