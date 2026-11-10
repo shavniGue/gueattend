@@ -13,7 +13,6 @@ const FileStore = require('session-file-store')(session);
 const db = require('./database/db');
 const { checkSupabaseHealth } = require('./database/supabase');
 const { checkFirebaseHealth } = require('./config/firebase');
-const { initTelegramBot } = require('./services/telegram-bot');
 const { requireAuth, requireAdmin, requireFaculty } = require('./middleware/auth');
 
 // Route modules (Pure Attendance & Timetable Features)
@@ -23,8 +22,11 @@ const attendanceRoutes = require('./routes/attendance');
 const timetableRoutes = require('./routes/timetable');
 const notificationRoutes = require('./routes/notifications');
 const telegramRoutes = require('./routes/telegram');
+const qumsRoutes = require('./routes/qums');
 const facultyRoutes = require('./routes/faculty');
 const adminRoutes = require('./routes/admin');
+const { initTelegram, sendTelegramAlert } = require('./telegram');
+const { initAutonomousSchedulers } = require('./scheduler');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -108,6 +110,9 @@ app.get('/', (req, res) => {
 app.get('/login', sendPage('login.html'));
 app.get('/forgot', sendPage('forgot.html'));
 app.get('/dashboard', requireAuth, sendPage('index.html'));
+app.get('/qums-setup', requireAuth, sendPage('qums-setup.html'));
+app.get('/telegram-setup', requireAuth, sendPage('telegram-setup.html'));
+app.get('/attendance-calculator-guide', sendPage('attendance-calculator-guide.html'));
 app.get('/faculty', requireFaculty, sendPage('faculty.html'));
 app.get('/admin', requireAdmin, sendPage('admin.html'));
 
@@ -120,6 +125,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/telegram', telegramRoutes);
+app.use('/api/qums', qumsRoutes);
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/admin', adminRoutes);
 
@@ -142,8 +148,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Initialize Telegram Bot Service
-initTelegramBot();
+// Initialize Telegram Bot & Autonomous Schedulers
+if (process.env.NODE_ENV !== 'test') {
+  initTelegram();
+  initAutonomousSchedulers(sendTelegramAlert);
+}
 
 if (require.main === module) {
   app.listen(PORT, () => {

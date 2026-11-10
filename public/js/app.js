@@ -242,23 +242,22 @@ function setupEventListeners() {
 
   // QUMS Setup Modal triggers
   const navQums = document.getElementById('navQumsBtn');
-  const openQums = document.getElementById('openQumsLink');
   if (navQums) navQums.addEventListener('click', () => openModal('qumsModal'));
-  if (openQums) openQums.addEventListener('click', () => openModal('qumsModal'));
 
-  // Disconnect QUMS button
+  // Disconnect QUMS button (Logout)
   const disconnectQumsBtn = document.getElementById('disconnectQumsBtn');
   if (disconnectQumsBtn) {
-    disconnectQumsBtn.addEventListener('click', () => {
-      alert('QUMS connection is managed by university SSO. To change credentials, use Open QUMS Setup.');
+    disconnectQumsBtn.addEventListener('click', async () => {
+      if (confirm('Disconnect QUMS session?')) {
+        await fetch('/api/qums/disconnect', { method: 'POST' });
+        loadDashboardData();
+      }
     });
   }
 
   // Telegram Modal triggers
   const navTg = document.getElementById('navTelegramBtn');
-  const openTg = document.getElementById('openTgLink');
   if (navTg) navTg.addEventListener('click', openTelegramModal);
-  if (openTg) openTg.addEventListener('click', openTelegramModal);
 
   // Disconnect Telegram button
   const disconnectTgBtn = document.getElementById('disconnectTgBtn');

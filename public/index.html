@@ -18,9 +18,10 @@
 
     <nav class="nav-links">
       <a href="/dashboard" class="nav-link active">Dashboard</a>
-      <a id="navQumsBtn" class="nav-link">QUMS Setup</a>
-      <a id="navTelegramBtn" class="nav-link">Telegram</a>
-      <a id="navTimetableBtn" class="nav-link">Timetable</a>
+      <a href="/qums-setup" class="nav-link">QUMS Setup</a>
+      <a href="/telegram-setup" class="nav-link">Telegram</a>
+      <a id="navTimetableBtn" class="nav-link" style="cursor: pointer;">Timetable</a>
+      <a href="/attendance-calculator-guide" class="nav-link">Calculator Guide</a>
       <a id="navAdminLink" href="/admin" class="nav-link" style="display: none;">Admin</a>
     </nav>
 
@@ -58,9 +59,9 @@
           </div>
         </div>
         <div class="mini-card-links">
-          <button id="openQumsLink">Open QUMS Setup</button>
+          <a href="/qums-setup" id="openQumsLink" style="color: var(--primary); text-decoration: none; font-size: 12px; font-weight: 600;">Open QUMS Setup</a>
           <span>•</span>
-          <button id="disconnectQumsBtn">Disconnect</button>
+          <button id="disconnectQumsBtn">Logout</button>
         </div>
       </div>
 
@@ -73,7 +74,7 @@
           </div>
         </div>
         <div class="mini-card-links">
-          <button id="openTgLink">Open Telegram settings</button>
+          <a href="/telegram-setup" id="openTgLink" style="color: var(--primary); text-decoration: none; font-size: 12px; font-weight: 600;">Open Telegram settings</a>
           <span>•</span>
           <button id="disconnectTgBtn">Disconnect</button>
         </div>
