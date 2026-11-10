@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "migrate": "node src/database/migrate.js",
+    "make-admin": "node scripts/make-admin.mjs",
     "test": "node test/run-tests.js"
   },
   "engines": {

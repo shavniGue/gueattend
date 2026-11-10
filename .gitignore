@@ -4,6 +4,10 @@
 .env.*.local
 *.pem
 *.key
+*service-account*.json
+*service_account*.json
+google-services.json
+firebase-adminsdk*.json
 
 # Dependencies
 node_modules/

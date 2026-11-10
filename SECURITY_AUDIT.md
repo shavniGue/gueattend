@@ -90,3 +90,4 @@ Logs capture `user_id`, `action`, `resource`, `details` (JSONB), `ip_address`, a
 ### Conclusion
 
 GUeAttend fulfills all security mandates outlined in the university specification. The architecture is resilient, privacy-compliant, and ready for deployment.
+
