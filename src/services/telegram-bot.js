@@ -1,6 +1,6 @@
 /**
  * Telegram Bot Integration Service
- * GUeAttend Unified University ERP
+ * gueattend - Smart Attendance & Timetable System
  *
  * Bot Name: GUE Attendance Bot
  * Username: @gue_attendance_bot
@@ -52,18 +52,18 @@ function registerBotCommands(botInstance) {
     }
 
     const welcome = 
-      `🎓 *Welcome to GUeAttend Bot!*\n` +
-      `*Official Smart Attendance & ERP Assistant for Graphic Era University*\n\n` +
+      `🎓 *Welcome to gueattend Bot!*\n` +
+      `*Smart Attendance & Timetable Assistant for Graphic Era University*\n\n` +
       `To connect your student account:\n` +
-      `1. Log into your GUeAttend web portal.\n` +
-      `2. Go to *Settings → Telegram Bot* and generate a linking code.\n` +
+      `1. Log into your gueattend web portal.\n` +
+      `2. Go to *Telegram & Alerts* and generate a linking code.\n` +
       `3. Send the command: \`/login <YOUR_CODE>\` here.\n\n` +
       `*Available Commands:*\n` +
       `📊 /attendance - View your overall & subject-wise attendance\n` +
+      `🎯 /bunk - 75% Criteria status & Safe bunk margin\n` +
       `📅 /today - View today's classes & marked attendance\n` +
       `🗓 /timetable - View your complete weekly schedule\n` +
       `🗓 /month - View your current monthly attendance\n` +
-      `📢 /notices - View latest university circulars\n` +
       `❓ /help - View assistance & command list`;
 
     botInstance.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
@@ -77,7 +77,7 @@ function registerBotCommands(botInstance) {
     if (!token) {
       botInstance.sendMessage(
         chatId,
-        `⚠️ *Missing Linking Code*\nPlease use: \`/login <CODE>\`\n\nGenerate your code at *GUeAttend Portal → Settings → Telegram Bot*.`,
+        `⚠️ *Missing Linking Code*\nPlease use: \`/login <CODE>\`\n\nGenerate your code at *gueattend Portal → Telegram & Alerts*.`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -94,7 +94,7 @@ function registerBotCommands(botInstance) {
     if (!account || !account.student_id) {
       botInstance.sendMessage(
         chatId,
-        `🔒 *Account Not Linked*\nPlease connect your GUeAttend account first using \`/login <code>\`.\nOpen your dashboard to obtain your linking code.`,
+        `🔒 *Account Not Linked*\nPlease connect your gueattend account first using \`/login <code>\`.\nOpen your dashboard to obtain your linking code.`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -104,27 +104,61 @@ function registerBotCommands(botInstance) {
       const summary = await db.getAttendanceSummary(account.student_id);
 
       let text = 
-        `📊 *GUeAttend – Attendance Summary*\n` +
+        `📊 *gueattend – Attendance Summary*\n` +
         `👤 *Student:* ${account.full_name}\n` +
         `🆔 *Enrollment:* ${account.enrollment_number || '-'}\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📈 *Overall Attendance:* *${summary.overallPercentage}%*\n` +
-        `✅ *Present:* ${summary.totalPresent}  |  ❌ *Absent:* ${summary.totalAbsent}  |  ⚪ *Unmarked:* ${summary.totalUnmarked}\n\n`;
+        `✅ *Present:* ${summary.totalPresent}  |  ❌ *Absent:* ${summary.totalAbsent}  |  ⚪ *Unmarked:* ${summary.totalUnmarked}\n` +
+        `🎯 *Status:* *${summary.bunkMargin?.message || 'On Track'}*\n\n`;
 
       if (summary.shortageAlert) {
-        text += `⚠️ *ATTENDANCE SHORTAGE ALERT*\nYour overall attendance is below the mandatory 75% university requirement!\n\n`;
+        text += `⚠️ *ATTENDANCE SHORTAGE ALERT*\nYour overall attendance is below 75%!\n\n`;
       }
 
       text += `*Subject-wise Breakdown:*\n`;
       for (const s of summary.subjects) {
         const icon = parseFloat(s.percentage) >= 75.0 ? '🟢' : '🔴';
-        text += `${icon} *${s.subject_code}* (${s.percentage}%)\n   ${s.subject_name}\n   Present: ${s.present_classes}/${s.marked_classes}\n\n`;
+        text += `${icon} *${s.subject_code}* (${s.percentage}%)\n   ${s.subject_name}\n   Present: ${s.present_classes}/${s.marked_classes} | ${s.bunkMargin?.message || ''}\n\n`;
       }
 
       botInstance.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     } catch (err) {
       console.error('[telegram] /attendance error:', err.message);
       botInstance.sendMessage(chatId, '❌ Could not retrieve attendance. Please try again later.');
+    }
+  });
+
+  // 4. /bunk command (Signature QAttend feature)
+  botInstance.onText(/\/bunk/, async (msg) => {
+    const chatId = msg.chat.id;
+    const account = await db.getTelegramAccount(chatId);
+
+    if (!account || !account.student_id) {
+      botInstance.sendMessage(chatId, `🔒 Account not linked. Use \`/login <code>\` first.`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    try {
+      const summary = await db.getAttendanceSummary(account.student_id);
+
+      let text = 
+        `🎯 *75% Attendance & Bunk Margin (gueattend)*\n` +
+        `👤 *Student:* ${account.full_name}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📈 *Overall Attendance:* *${summary.overallPercentage}%*\n` +
+        `💡 *Status:* *${summary.bunkMargin?.message}*\n\n` +
+        `*Subject Details:*\n`;
+
+      for (const s of summary.subjects) {
+        const icon = parseFloat(s.percentage) >= 75.0 ? '✅' : '⚠️';
+        text += `${icon} *${s.subject_code}* (${s.percentage}%): ${s.bunkMargin?.message}\n`;
+      }
+
+      botInstance.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('[telegram] /bunk error:', err.message);
+      botInstance.sendMessage(chatId, '❌ Could not compute bunk margin.');
     }
   });
 
@@ -174,7 +208,7 @@ function registerBotCommands(botInstance) {
       const weekly = await db.getStudentWeeklyTimetable(account.student_id);
       const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-      let text = `🗓 *Weekly Timetable – GUeAttend*\n👤 *Student:* ${account.full_name}\nSection: ${account.section_name || 'G4'}\n━━━━━━━━━━━━━━━━━━━━\n`;
+      let text = `🗓 *Weekly Timetable – gueattend*\n👤 *Student:* ${account.full_name}\nSection: ${account.section_name || 'G4'}\n━━━━━━━━━━━━━━━━━━━━\n`;
 
       for (let d = 1; d <= 6; d++) {
         const dayClasses = weekly.filter((w) => w.day_of_week === d);
@@ -222,7 +256,7 @@ function registerBotCommands(botInstance) {
         `✅ *Present:* ${presentCount} classes\n` +
         `❌ *Absent:* ${absentCount} classes\n` +
         `📚 *Total Conducted:* ${records.length} periods\n\n` +
-        `_Log into the GUeAttend web portal to view full calendar & subject-wise details._`;
+        `_Log into the gueattend web portal to view full calendar & subject-wise details._`;
 
       botInstance.sendMessage(chatId, text, { parse_mode: 'Markdown' });
     } catch (err) {
@@ -231,39 +265,17 @@ function registerBotCommands(botInstance) {
     }
   });
 
-  // 7. /notices command
-  botInstance.onText(/\/notices/, async (msg) => {
-    const chatId = msg.chat.id;
-    try {
-      const circulars = await db.getCirculars('students', 4);
-
-      let text = `📢 *Latest University Notices & Circulars*\n━━━━━━━━━━━━━━━━━━━━\n`;
-      if (circulars.length === 0) {
-        text += `No active circulars at this moment.`;
-      } else {
-        for (const c of circulars) {
-          text += `📌 *${c.title}*\n_${c.circular_number}_ • ${c.category.toUpperCase()}\n${c.content.slice(0, 160)}...\n\n`;
-        }
-      }
-
-      botInstance.sendMessage(chatId, text, { parse_mode: 'Markdown' });
-    } catch (err) {
-      console.error('[telegram] /notices error:', err.message);
-      botInstance.sendMessage(chatId, '❌ Could not retrieve notices.');
-    }
-  });
-
-  // 8. /help command
+  // 7. /help command
   botInstance.onText(/\/help/, (msg) => {
     const text = 
-      `❓ *GUeAttend Bot Help & Guide*\n\n` +
+      `❓ *gueattend Bot Help & Guide*\n\n` +
       `Commands:\n` +
       `• /attendance - Check overall % and subject-wise breakdown\n` +
+      `• /bunk - 75% Criteria status & Safe bunk margin\n` +
       `• /today - Today's timetable and marked attendance\n` +
       `• /timetable - Weekly classes schedule\n` +
       `• /month - View current monthly register summary\n` +
-      `• /notices - University circulars and examination alerts\n` +
-      `• /login <code> - Connect your GUeAttend account\n\n` +
+      `• /login <code> - Connect your gueattend account\n\n` +
       `*Support:* Contact your department ERP administrator.`;
     botInstance.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
   });
@@ -277,9 +289,10 @@ async function handleLinkAccount(chatId, token, from) {
     const msg = 
       `🎉 *Account Connected Successfully!*\n\n` +
       `Welcome, *${user.full_name}*!\n` +
-      `Your GUeAttend student account is now linked to this Telegram chat.\n\n` +
+      `Your gueattend student account is now linked to this Telegram chat.\n\n` +
       `You can now use:\n` +
       `• /attendance to check your live attendance\n` +
+      `• /bunk to check your 75% bunk margin\n` +
       `• /today to check today's classes\n` +
       `• /timetable for your weekly timetable`;
 

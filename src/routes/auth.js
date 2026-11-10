@@ -1,6 +1,6 @@
 /**
  * Authentication Routes
- * GUeAttend Unified University ERP
+ * gueattend Unified University ERP
  */
 
 const express = require('express');

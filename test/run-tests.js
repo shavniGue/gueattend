@@ -1,7 +1,7 @@
 /**
- * GUeAttend - Comprehensive Master Integration Test Suite
- * Validates Authentication, Attendance, Timetable, Academics, Exams, Fees,
- * Telegram Bot, External Sync, and Database Constraints.
+ * gueattend - Smart Attendance & Timetable Integration Test Suite
+ * Validates Authentication, Attendance, 75% Bunk Margin Calculator,
+ * Dynamic Timetables, Telegram Bot, and Data Integrity.
  */
 
 require('dotenv').config();
@@ -46,7 +46,7 @@ function check(name, fn) {
 
 async function runTestSuite() {
   console.log('===============================================================');
-  console.log('🎓 GUeAttend - Master Integration Test Suite');
+  console.log('🎓 gueattend - Smart Attendance & Timetable Test Suite');
   console.log('===============================================================\n');
 
   // -------------------------------------------------------------
@@ -186,78 +186,40 @@ async function runTestSuite() {
   });
 
   // -------------------------------------------------------------
-  // SECTION 5: ACADEMICS, LECTURE PLANS & COURSE PROGRESS
+  // SECTION 5: 75% BUNK MARGIN & SHORTAGE CALCULATOR
   // -------------------------------------------------------------
-  console.log('\n--- 5. Academics, Lecture Plans & Course Progress ---');
+  console.log('\n--- 5. 75% Attendance & Bunk Margin Calculator ---');
 
-  await checkAsync('Lecture plans contain planned topics and completion status', async () => {
-    const plans = await db.getLecturePlans('sec_btech_cse_5_g4');
-    assert.ok(Array.isArray(plans));
-    assert.ok(plans.length > 0, 'Lecture plans must exist.');
-    const completed = plans.filter((p) => p.completion_status === 'completed');
-    assert.ok(completed.length > 0, 'Completed topics must exist.');
+  await checkAsync('Attendance summary contains calculated 75% bunk margin', async () => {
+    const summary = await db.getAttendanceSummary('stu_1');
+    assert.ok(summary.bunkMargin, 'Summary must include bunkMargin calculation.');
+    assert.ok(typeof summary.bunkMargin.canBunk === 'number', 'canBunk must be a number.');
+    assert.ok(typeof summary.bunkMargin.mustAttend === 'number', 'mustAttend must be a number.');
+    assert.ok(summary.bunkMargin.message, 'A user-facing status message must be provided.');
   });
 
-  await checkAsync('Course progress computes percentage based on completed topics', async () => {
-    const progress = await db.getCourseProgress('sec_btech_cse_5_g4');
-    assert.ok(Array.isArray(progress));
-    assert.ok(progress.length > 0);
-    for (const p of progress) {
-      assert.ok(p.subject_code);
-      assert.ok(typeof parseFloat(p.progress_percentage) === 'number');
+  await checkAsync('Safe bunk calculation when attendance is above 75%', async () => {
+    const summary = await db.getAttendanceSummary('stu_1');
+    if (summary.overallPercentage >= 75.0) {
+      assert.strictEqual(summary.bunkMargin.isShortage, false);
+      assert.strictEqual(summary.bunkMargin.mustAttend, 0);
+      assert.ok(summary.bunkMargin.canBunk >= 0);
+    }
+  });
+
+  await checkAsync('Subject-wise bunk margin and criteria calculation', async () => {
+    const summary = await db.getAttendanceSummary('stu_1');
+    assert.ok(summary.subjects.length > 0);
+    for (const sub of summary.subjects) {
+      assert.ok(sub.bunkMargin, 'Each subject must have bunkMargin.');
+      assert.ok(typeof sub.bunkMargin.message === 'string');
     }
   });
 
   // -------------------------------------------------------------
-  // SECTION 6: EXAMINATIONS & RESULTS
+  // SECTION 6: TELEGRAM BOT INTEGRATION & ACCOUNT LINKING
   // -------------------------------------------------------------
-  console.log('\n--- 6. Examinations, Marks & Semester Results ---');
-
-  await checkAsync('Exam schedules return subject timings and classroom', async () => {
-    const schedules = await db.getExamSchedules('sem_btech_cse_5');
-    assert.ok(Array.isArray(schedules));
-    assert.ok(schedules.length > 0, 'Exam schedules must exist.');
-    assert.ok(schedules[0].exam_date);
-    assert.ok(schedules[0].start_time);
-  });
-
-  await checkAsync('Semester results return SGPA, CGPA and credit totals', async () => {
-    const results = await db.getStudentResults('stu_1');
-    assert.ok(Array.isArray(results));
-    assert.ok(results.length > 0, 'Prior semester results must exist.');
-    const r = results[0];
-    assert.strictEqual(parseFloat(r.sgpa), 8.64);
-    assert.strictEqual(parseFloat(r.cgpa), 8.52);
-    assert.strictEqual(r.result_status, 'pass');
-  });
-
-  // -------------------------------------------------------------
-  // SECTION 7: FEES & RECEIPTS
-  // -------------------------------------------------------------
-  console.log('\n--- 7. Fees Ledger & Verified Payment Receipts ---');
-
-  await checkAsync('Student fees return tuition, exam, hostel breakup', async () => {
-    const fees = await db.getStudentFees('stu_1');
-    assert.ok(Array.isArray(fees));
-    assert.ok(fees.length > 0);
-    const f = fees[0];
-    assert.strictEqual(parseFloat(f.total_due), 132000.0);
-    assert.strictEqual(f.status, 'paid');
-  });
-
-  await checkAsync('Payment receipts contain receipt number and transaction reference', async () => {
-    const receipts = await db.getPaymentReceipts('stu_1');
-    assert.ok(Array.isArray(receipts));
-    assert.ok(receipts.length > 0);
-    const r = receipts[0];
-    assert.strictEqual(r.receipt_number, 'GEU-FEE-2026-09812');
-    assert.strictEqual(r.payment_status, 'completed');
-  });
-
-  // -------------------------------------------------------------
-  // SECTION 8: TELEGRAM BOT INTEGRATION
-  // -------------------------------------------------------------
-  console.log('\n--- 8. Telegram Bot Integration & Account Linking ---');
+  console.log('\n--- 6. Telegram Bot Integration & Account Linking ---');
 
   await checkAsync('Telegram linking token generation and expiry', async () => {
     const studentUser = await db.getUserByEmail('karan.kumar@geu.ac.in');
@@ -286,9 +248,9 @@ async function runTestSuite() {
   });
 
   // -------------------------------------------------------------
-  // SECTION 9: EXTERNAL DATA INTEGRATION & VALIDATION
+  // SECTION 7: EXTERNAL DATA INTEGRATION & VALIDATION
   // -------------------------------------------------------------
-  console.log('\n--- 9. External Data Fetching & Sync Service ---');
+  console.log('\n--- 7. External Data Fetching & Sync Service ---');
 
   check('Payload validator accepts compliant attendance objects', () => {
     const valid = validateAttendanceRecord({

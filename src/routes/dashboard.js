@@ -1,17 +1,17 @@
 /**
  * Student Dashboard Aggregator API Route
- * GUeAttend Unified University ERP
+ * gueattend - Smart Attendance & Timetable System
  *
- * Implements the 9 Core Dashboard Widgets inspired by Graphic Era University Cyborg Portal:
- *   1. Classes Today
+ * Implements the core QAttend Dashboard widgets:
+ *   1. Classes Today & Timetable
  *   2. Right Now (active period card with live time progress)
  *   3. Up Next (next scheduled lecture)
- *   4. Today's Timetable
- *   5. Class Substitution Alerts
- *   6. Today's Attendance Table
- *   7. Course Progress
- *   8. Month Register
- *   9. Lecture Plan
+ *   4. Class Substitutions
+ *   5. Today's Attendance Table (Period, Status)
+ *   6. Overall Attendance & 75% Bunk Margin Calculator
+ *   7. Subject-wise Attendance Breakdown
+ *   8. Month Register (Calendar attendance)
+ *   9. Notifications Feed
  */
 
 const express = require('express');
@@ -66,27 +66,16 @@ router.get('/student', requireAuth, async (req, res) => {
     // 4. Today's Attendance
     const todayAttendance = await db.getTodayAttendance(student.id, todayStr);
 
-    // 5. Overall and Subject-wise Attendance Summary
+    // 5. Overall and Subject-wise Attendance Summary (includes 75% Bunk Margins)
     const attendanceSummary = await db.getAttendanceSummary(student.id);
 
-    // 6. Course Progress
-    const courseProgress = await db.getCourseProgress(student.section_id);
-
-    // 7. Lecture Plans
-    const lecturePlans = await db.getLecturePlans(student.section_id);
-    const todayTopics = lecturePlans.filter((p) => {
-      const d = p.planned_date instanceof Date ? p.planned_date.toISOString().split('T')[0] : String(p.planned_date);
-      return d === todayStr;
-    });
-
-    // 8. Month Register (current month)
+    // 6. Month Register (current month)
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     const monthlyAttendance = await db.getMonthlyAttendance(student.id, currentMonth, currentYear);
 
-    // 9. Notifications & Recent Circulars
+    // 7. Notifications
     const notifications = await db.getUserNotifications(req.session.userId, 5);
-    const circulars = await db.getCirculars('students', 5);
 
     res.json({
       success: true,
@@ -115,15 +104,6 @@ router.get('/student', requireAuth, async (req, res) => {
         classSubstitutions: substitutions,
         todayAttendance,
         attendanceSummary,
-        courseProgress,
-        lecturePlan: {
-          total: lecturePlans.length,
-          todayTopics,
-          completedCount: lecturePlans.filter((p) => p.completion_status === 'completed').length,
-          pendingCount: lecturePlans.filter((p) => p.completion_status === 'pending').length,
-          droppedCount: lecturePlans.filter((p) => p.completion_status === 'dropped').length,
-          allTopics: lecturePlans,
-        },
         monthRegister: {
           month: currentMonth,
           year: currentYear,
@@ -133,7 +113,6 @@ router.get('/student', requireAuth, async (req, res) => {
       },
       feed: {
         notifications,
-        circulars,
       },
     });
   } catch (err) {

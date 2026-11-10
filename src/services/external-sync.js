@@ -1,6 +1,6 @@
 /**
  * Modular External ERP Data Integration Service
- * GUeAttend Unified University ERP
+ * gueattend Unified University ERP
  *
  * Implements authorized synchronization layer:
  *   External API / Source -> Validation -> Normalization -> Supabase PostgreSQL

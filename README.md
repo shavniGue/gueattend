@@ -1,30 +1,43 @@
-# GUeAttend – Unified University ERP & Smart Attendance System
+# gueattend – Smart University Attendance & Timetable System
 
-[![Build & Test Status](https://img.shields.io/badge/integration--tests-25%2F25%20passing-10b981.svg)]()
+[![Build & Test Status](https://img.shields.io/badge/integration--tests-22%2F22%20passing-10b981.svg)]()
 [![Database](https://img.shields.io/badge/database-Supabase%20PostgreSQL-3ecf8e.svg)]()
 [![Security](https://img.shields.io/badge/security-RLS%20%2B%20bcrypt-blue.svg)]()
 [![Bot](https://img.shields.io/badge/telegram-@gue__attendance__bot-0088cc.svg)](https://t.me/gue_attendance_bot)
 
-**GUeAttend** is an enterprise-grade university Enterprise Resource Planning (ERP) and Smart Attendance Management system designed for students, faculty members, and administrators. 
+**gueattend** is a focused smart attendance and timetable platform inspired by the proven, streamlined utility of **QAttend** for Graphic Era University.
 
-Inspired by the information hierarchy and design of **Graphic Era University's Cyborg ERP / Student Portal**, GUeAttend consolidates attendance tracking, dynamic timetables, academic course progress, examination records, fees management, grievances redressal, university circulars, hostel allocations, placement drives, and automated Telegram bot notifications into **one single, unified platform**.
+Instead of heavy administrative ERP bloat, **gueattend** focuses purely on what students and professors need every single day:
+- **Live Attendance Tracking & Percentage**
+- **75% Mandatory Attendance & Bunk Margin Calculator** (exact classes safe to miss or needed to attend)
+- **Today's Classes & Live Lecture Tracker** (Right Now progress, Up Next)
+- **Today's Attendance Table** (Period-by-period status: Present, Absent, Not Marked)
+- **Master Weekly Timetable** (Monday through Saturday)
+- **Monthly Attendance Calendar & Date-wise Register**
+- **Automated Telegram Bot Alerts** via `@gue_attendance_bot`
+- **Fast Faculty Attendance Marking**
 
 ---
 
-## 🏛️ Key Architectural Principles
+## 🏛️ Core Principles
 
-1. **Strictly ONE Unified ERP:**
-   - No "Old" vs "New" ERP duality.
-   - Unified authentication, single relational PostgreSQL database schema, and distinct role-based dashboard views (`/dashboard`, `/faculty`, `/admin`).
+1. **Focused on Attendance & Timetable (QAttend Philosophy):**
+   - No unnecessary administrative bloat (fees, exams, grievances, hostels, placements removed).
+   - Fast, instant load times on both mobile and desktop.
+   - Clean, readable Graphic Era student portal aesthetic.
 
 2. **Supabase PostgreSQL as Primary Source of Truth:**
-   - All university entities (Users, Students, Faculty, Timetable, Attendance Sessions & Records, Exams, Fees, Grievances, Circulars) reside in **Supabase PostgreSQL**.
-   - Row Level Security (RLS) policies enforce strict data isolation between students and administrative entities.
+   - All attendance sessions, marked records, students, and timetable entries reside in **Supabase PostgreSQL**.
+   - Preserves pre-existing university attendance records.
 
 3. **Strict Attendance Calculation Standard:**
    $$\text{Attendance Percentage} = \left(\frac{\text{Present Classes}}{\text{Total Marked Classes}}\right) \times 100$$
    $$\text{Total Marked Classes} = \text{Present} + \text{Absent} + \text{Approved Leave}$$
    *Unmarked classes are strictly never counted as absent.*
+
+4. **75% Bunk Margin Calculation:**
+   - **Safe to Bunk (when $\ge 75\%$):** $\lfloor \frac{\text{Present} - 0.75 \times \text{Total}}{0.75} \rfloor$ classes can be missed without falling below 75%.
+   - **Must Attend (when $< 75\%$):** $\lceil \frac{0.75 \times \text{Total} - \text{Present}}{0.25} \rceil$ consecutive classes required to restore 75%.
 
 4. **Zero Client-Side Secret Exposure:**
    - Supabase Service Role keys, Telegram bot tokens, database credentials, and session secrets are managed strictly through server-side environment variables.

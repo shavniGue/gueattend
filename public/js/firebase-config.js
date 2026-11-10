@@ -1,5 +1,5 @@
 /**
- * Firebase Client Configuration for GUeAttend
+ * Firebase Client Configuration for gueattend
  * Project ID: gueattend
  * Used exclusively for auxiliary client features: Push notifications, Storage attachments, Analytics.
  */

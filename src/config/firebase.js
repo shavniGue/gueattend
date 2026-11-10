@@ -1,5 +1,5 @@
 /**
- * Firebase Admin Service Configuration for GUeAttend
+ * Firebase Admin Service Configuration for gueattend
  *
  * Dedicated strictly to auxiliary features:
  *   - Push notifications

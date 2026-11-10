@@ -1,6 +1,6 @@
 /**
  * Attendance Management & Month Register API Routes
- * GUeAttend Unified University ERP
+ * gueattend - Smart Attendance & Timetable System
  *
  * Mandatory Formula:
  *   Attendance % = (Present Classes / Total Marked Classes) * 100

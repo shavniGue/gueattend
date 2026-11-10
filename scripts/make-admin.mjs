@@ -1,8 +1,8 @@
 /**
- * GUeAttend - Assign Administrator Role
+ * gueattend - Assign Administrator Role
  * 
  * Configures administrator privileges for shavnikumarigue@gmail.com across:
- * 1. Supabase PostgreSQL (GUeAttend ERP primary source of truth)
+ * 1. Supabase PostgreSQL (gueattend primary source of truth)
  * 2. Firebase Authentication (Custom User Claims: role: 'admin', admin: true)
  */
 
@@ -17,7 +17,7 @@ import { getAuth } from 'firebase-admin/auth';
 const TARGET_EMAIL = process.argv[2] || 'shavnikumarigue@gmail.com';
 
 console.log('====================================================');
-console.log(` GUeAttend ERP - Administrator Role Setup`);
+console.log(` gueattend - Administrator Role Setup`);
 console.log(` Target Account: ${TARGET_EMAIL}`);
 console.log('====================================================\n');
 
@@ -195,8 +195,9 @@ async function run() {
   await syncSupabaseAdmin();
   await syncFirebaseAdmin();
   console.log('====================================================');
-  console.log(' GUeAttend Admin Role Setup Complete');
+  console.log(' gueattend Admin Role Setup Complete');
   console.log('====================================================');
 }
 
 run();
+

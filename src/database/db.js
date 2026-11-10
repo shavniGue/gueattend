@@ -1,5 +1,5 @@
 /**
- * Database Access Module for GUeAttend (Supabase PostgreSQL)
+ * Database Access Module for gueattend (Supabase PostgreSQL)
  * Provides centralized connection management, transactions, and domain queries.
  */
 
@@ -64,11 +64,6 @@ async function checkDatabaseHealth() {
         'timetable',
         'attendance_sessions',
         'attendance_records',
-        'examinations',
-        'marks',
-        'student_fees',
-        'grievances',
-        'circulars',
         'telegram_accounts',
       ];
 
@@ -376,15 +371,43 @@ async function getAttendanceSummary(studentId) {
   let totalLeave = 0;
   let totalUnmarked = 0;
 
+  function calcBunkMargin(present, total) {
+    if (total === 0) {
+      return { canBunk: 0, mustAttend: 0, isShortage: false, message: 'No classes marked yet' };
+    }
+    const pct = (present / total) * 100;
+    if (pct >= 75.0) {
+      const canBunk = Math.floor((present - 0.75 * total) / 0.75);
+      return {
+        canBunk: Math.max(0, canBunk),
+        mustAttend: 0,
+        isShortage: false,
+        message: canBunk > 0 ? `Can bunk ${canBunk} class${canBunk > 1 ? 'es' : ''}` : 'On track',
+      };
+    } else {
+      const mustAttend = Math.ceil((0.75 * total - present) / 0.25);
+      return {
+        canBunk: 0,
+        mustAttend: Math.max(1, mustAttend),
+        isShortage: true,
+        message: `Must attend next ${mustAttend} class${mustAttend > 1 ? 'es' : ''}`,
+      };
+    }
+  }
+
   for (const s of subjects) {
-    totalMarked += parseInt(s.marked_classes, 10);
-    totalPresent += parseInt(s.present_classes, 10);
+    const p = parseInt(s.present_classes, 10);
+    const m = parseInt(s.marked_classes, 10);
+    totalMarked += m;
+    totalPresent += p;
     totalAbsent += parseInt(s.absent_classes, 10);
     totalLeave += parseInt(s.leave_classes, 10);
     totalUnmarked += parseInt(s.unmarked_classes, 10);
+    s.bunkMargin = calcBunkMargin(p, m);
   }
 
   const overallPercentage = totalMarked > 0 ? Number(((totalPresent / totalMarked) * 100).toFixed(2)) : 0.0;
+  const overallBunkMargin = calcBunkMargin(totalPresent, totalMarked);
 
   return {
     overallPercentage,
@@ -394,6 +417,7 @@ async function getAttendanceSummary(studentId) {
     totalLeave,
     totalUnmarked,
     shortageAlert: overallPercentage < 75.0 && totalMarked > 0,
+    bunkMargin: overallBunkMargin,
     subjects,
   };
 }

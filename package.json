@@ -1,7 +1,7 @@
 {
   "name": "gueattend",
   "version": "1.0.0",
-  "description": "GUeAttend - Unified University ERP & Smart Attendance System",
+  "description": "gueattend - Smart University Attendance & Timetable System",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

@@ -1,6 +1,6 @@
 /**
  * Telegram Account Integration API Routes
- * GUeAttend Unified University ERP
+ * gueattend Unified University ERP
  */
 
 const express = require('express');

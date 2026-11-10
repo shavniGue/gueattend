@@ -1,6 +1,6 @@
 /**
  * Authentication and Role-Based Access Control (RBAC) Middleware
- * GUeAttend Unified University ERP
+ * gueattend Unified University ERP
  */
 
 const db = require('../database/db');
@@ -13,7 +13,7 @@ function requireAuth(req, res, next) {
     if (req.xhr || req.headers.accept?.includes('json') || req.path.startsWith('/api/')) {
       return res.status(401).json({
         success: false,
-        error: 'Authentication required. Please log in to GUeAttend.',
+        error: 'Authentication required. Please log in to gueattend.',
         code: 'UNAUTHORIZED',
       });
     }

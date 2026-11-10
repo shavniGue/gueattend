@@ -1,5 +1,5 @@
 /**
- * GUeAttend - Unified University ERP & Smart Attendance System
+ * gueattend - Smart University Attendance & Timetable System
  * Core Server Application
  */
 
@@ -16,18 +16,11 @@ const { checkFirebaseHealth } = require('./config/firebase');
 const { initTelegramBot } = require('./services/telegram-bot');
 const { requireAuth, requireAdmin, requireFaculty } = require('./middleware/auth');
 
-// Route modules
+// Route modules (Pure Attendance & Timetable Features)
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const attendanceRoutes = require('./routes/attendance');
 const timetableRoutes = require('./routes/timetable');
-const academicRoutes = require('./routes/academic');
-const examRoutes = require('./routes/examinations');
-const feeRoutes = require('./routes/fees');
-const grievanceRoutes = require('./routes/grievances');
-const circularRoutes = require('./routes/circulars');
-const hostelRoutes = require('./routes/hostel');
-const placementRoutes = require('./routes/placement');
 const notificationRoutes = require('./routes/notifications');
 const telegramRoutes = require('./routes/telegram');
 const facultyRoutes = require('./routes/faculty');
@@ -84,7 +77,7 @@ app.get('/health', async (req, res) => {
 
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? 'healthy' : 'degraded',
-    application: 'GUeAttend Unified University ERP',
+    application: 'gueattend smart attendance system',
     timestamp: new Date().toISOString(),
     database: dbHealth,
     supabase: supabaseHealth,
@@ -125,13 +118,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/timetable', timetableRoutes);
-app.use('/api/academic', academicRoutes);
-app.use('/api/examinations', examRoutes);
-app.use('/api/fees', feeRoutes);
-app.use('/api/grievances', grievanceRoutes);
-app.use('/api/circulars', circularRoutes);
-app.use('/api/hostel', hostelRoutes);
-app.use('/api/placement', placementRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/faculty', facultyRoutes);
@@ -162,7 +148,7 @@ initTelegramBot();
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`=======================================================`);
-    console.log(`🎓 GUeAttend - Unified University ERP`);
+    console.log(`🎓 gueattend - Smart Attendance & Timetable System`);
     console.log(`🚀 Server operational at: http://localhost:${PORT}`);
     console.log(`🔒 Mode: ${process.env.NODE_ENV || 'development'}`);
     console.log(`=======================================================`);
