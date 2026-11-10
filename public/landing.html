@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gueattend – Track. Alert. Stay Updated.</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+
+  <!-- Top Navbar (Matching Image 2) -->
+  <nav class="site-navbar">
+    <a href="/" class="brand-wrapper">
+      <div class="brand-icon">🎓</div>
+      <div class="brand-title">gueattend</div>
+    </a>
+
+    <div class="nav-links">
+      <a href="#home" class="nav-link active">Home</a>
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#how-it-works" class="nav-link">How It Works</a>
+      <a href="#calculator" class="nav-link">Calculator Guide</a>
+      <a href="#about" class="nav-link">About</a>
+      <a href="#faq" class="nav-link">FAQ</a>
+      <a href="#contact" class="nav-link">Contact</a>
+    </div>
+
+    <div class="nav-right">
+      <button class="theme-pill-btn" id="themeToggleBtn" title="Change Theme Palette">🎨 Theme</button>
+      <a href="/login" class="nav-link" style="color: #ffffff; font-weight: 700;">Login</a>
+      <a href="/login" class="btn-hero-primary" style="padding: 7px 16px; font-size: 13px;">Register</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section (Matching Image 2) -->
+  <header class="landing-hero" id="home">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-pill">QUMS ATTENDANCE + TELEGRAM ALERTS</div>
+        <h1 class="hero-title">gueattend</h1>
+        <div class="hero-tagline">Track. Alert. Stay Updated.</div>
+        <p class="hero-desc">
+          gueattend helps students monitor their attendance and receive important attendance and academic notifications through Telegram — using their own QUMS data.
+        </p>
+
+        <div class="hero-cta-group">
+          <a href="/login" class="btn-hero-primary">Get Started</a>
+          <a href="/login" class="btn-hero-secondary">Login</a>
+        </div>
+
+        <div class="hero-security-note">
+          🔒 Free to use • Your QUMS password is stored encrypted • One Telegram chat per account
+        </div>
+      </div>
+
+      <!-- Mockup Card (Image 2 right side) -->
+      <div class="hero-mockup-card">
+        <div class="mockup-header">Hello, Student 👋</div>
+        <div class="mockup-stats-row">
+          <div class="mockup-stat-box">
+            <div class="mockup-stat-val">82%</div>
+            <div class="mockup-stat-lbl">Overall</div>
+          </div>
+          <div class="mockup-stat-box">
+            <div class="mockup-stat-val">6</div>
+            <div class="mockup-stat-lbl">Subjects</div>
+          </div>
+          <div class="mockup-stat-box">
+            <div class="mockup-stat-val" style="color: var(--danger);">1</div>
+            <div class="mockup-stat-lbl">Below 75%</div>
+          </div>
+        </div>
+
+        <div class="mockup-list">
+          <div class="mockup-item">
+            <span>Data Structures</span>
+            <span class="status-tag ok">OK</span>
+          </div>
+          <div class="mockup-item">
+            <span>Operating Systems</span>
+            <span class="status-tag attention">Attention</span>
+          </div>
+          <div class="mockup-item">
+            <span>Telegram Bot Alerts</span>
+            <span class="status-tag ok">Connected</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 14px; text-align: center;">
+          Sample preview — real values come live from your university account.
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- What is gueattend? Section (Matching Image 2) -->
+  <section class="landing-features" id="features">
+    <h2 class="features-heading">What is gueattend?</h2>
+    <p class="features-desc">
+      gueattend is a student attendance tracker. It connects with your QUMS account and monitors your academic updates, so you do not have to keep logging in to the portal to check them yourself.
+    </p>
+
+    <div class="feature-cards-grid">
+      <div class="feature-box">
+        <div style="font-size: 28px; margin-bottom: 10px;">⚡</div>
+        <h4>Instant Attendance Sync</h4>
+        <p>Live subject-wise metrics computed according to university regulations with unmarked classes never counted as absent.</p>
+      </div>
+
+      <div class="feature-box">
+        <div style="font-size: 28px; margin-bottom: 10px;">🎯</div>
+        <h4>75% Bunk Margin Calculator</h4>
+        <p>Know exactly how many classes you can safely miss while staying above 75%, or how many consecutive lectures you must attend.</p>
+      </div>
+
+      <div class="feature-box">
+        <div style="font-size: 28px; margin-bottom: 10px;">✈️</div>
+        <h4>Telegram Bot Notifications</h4>
+        <p>Receive routine daily timetables, immediate class updates when marked by professors, and shortage alerts right on Telegram.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="text-align: center; padding: 40px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted);">
+    © 2026 gueattend • Smart University Attendance Portal • Built for Graphic Era University students.
+  </footer>
+
+  <script>
+    // Theme toggle
+    const themes = ['emerald', 'indigo', 'cyan'];
+    let currentThemeIdx = 0;
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+        document.documentElement.setAttribute('data-theme', themes[currentThemeIdx]);
+        btn.textContent = `🎨 ${themes[currentThemeIdx].toUpperCase()}`;
+      });
+    }
+  </script>
+</body>
+</html>

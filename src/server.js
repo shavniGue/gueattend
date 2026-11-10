@@ -102,7 +102,7 @@ app.get('/', (req, res) => {
     if (req.session.role === 'faculty') return res.redirect('/faculty');
     return res.redirect('/dashboard');
   }
-  res.redirect('/login');
+  res.sendFile(path.join(PUBLIC_DIR, 'landing.html'));
 });
 
 app.get('/login', sendPage('login.html'));

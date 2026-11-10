@@ -373,24 +373,34 @@ async function getAttendanceSummary(studentId) {
 
   function calcBunkMargin(present, total) {
     if (total === 0) {
-      return { canBunk: 0, mustAttend: 0, isShortage: false, message: 'No classes marked yet' };
+      return {
+        canBunk: 0,
+        mustAttend: 0,
+        isShortage: false,
+        message: 'No classes marked yet',
+        guidance: 'Abhi koi class mark nahi hui.',
+      };
     }
     const pct = (present / total) * 100;
     if (pct >= 75.0) {
       const canBunk = Math.floor((present - 0.75 * total) / 0.75);
+      const safe = Math.max(0, canBunk);
       return {
-        canBunk: Math.max(0, canBunk),
+        canBunk: safe,
         mustAttend: 0,
         isShortage: false,
-        message: canBunk > 0 ? `Can bunk ${canBunk} class${canBunk > 1 ? 'es' : ''}` : 'On track',
+        message: safe > 0 ? `Can bunk ${safe} class${safe > 1 ? 'es' : ''}` : 'On track (0 margin)',
+        guidance: `${safe} classes miss kar sakte ho aur fir bhi 75%+ rahega.`,
       };
     } else {
       const mustAttend = Math.ceil((0.75 * total - present) / 0.25);
+      const need = Math.max(1, mustAttend);
       return {
         canBunk: 0,
-        mustAttend: Math.max(1, mustAttend),
+        mustAttend: need,
         isShortage: true,
-        message: `Must attend next ${mustAttend} class${mustAttend > 1 ? 'es' : ''}`,
+        message: `Must attend next ${need} class${need > 1 ? 'es' : ''}`,
+        guidance: `${need} classes lagani padegi 75% lane ke liye.`,
       };
     }
   }
@@ -404,10 +414,16 @@ async function getAttendanceSummary(studentId) {
     totalLeave += parseInt(s.leave_classes, 10);
     totalUnmarked += parseInt(s.unmarked_classes, 10);
     s.bunkMargin = calcBunkMargin(p, m);
+    s.guidance = s.bunkMargin.guidance;
+    s.status = s.bunkMargin.isShortage ? 'ATTENTION' : 'OK';
+    s.attendedDisplay = `${p} / ${m}`;
+    s.percentageDisplay = `${s.percentage}%`;
   }
 
   const overallPercentage = totalMarked > 0 ? Number(((totalPresent / totalMarked) * 100).toFixed(2)) : 0.0;
   const overallBunkMargin = calcBunkMargin(totalPresent, totalMarked);
+  const below75Count = subjects.filter((x) => x.bunkMargin.isShortage).length;
+  const okCount = subjects.length - below75Count;
 
   return {
     overallPercentage,
@@ -418,6 +434,9 @@ async function getAttendanceSummary(studentId) {
     totalUnmarked,
     shortageAlert: overallPercentage < 75.0 && totalMarked > 0,
     bunkMargin: overallBunkMargin,
+    below75Count,
+    okCount,
+    totalSubjects: subjects.length,
     subjects,
   };
 }

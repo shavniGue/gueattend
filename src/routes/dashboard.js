@@ -74,13 +74,28 @@ router.get('/student', requireAuth, async (req, res) => {
     const currentYear = now.getFullYear();
     const monthlyAttendance = await db.getMonthlyAttendance(student.id, currentMonth, currentYear);
 
-    // 7. Notifications
+    // 7. Telegram Status
+    const tgRes = await db.query('SELECT chat_id, username FROM telegram_accounts WHERE user_id = $1', [req.session.userId]);
+    const isTgConnected = Boolean(tgRes.rows.length > 0 && tgRes.rows[0].chat_id);
+
+    // 8. Notifications
     const notifications = await db.getUserNotifications(req.session.userId, 5);
 
     res.json({
       success: true,
       currentDate: todayStr,
+      periodDisplay: '26/07/2026 - 09/11/2026',
       academicSession: student.session_name,
+      qumsStatus: {
+        connected: true,
+        label: 'Connected ✔',
+        lastSynced: student.updated_at || new Date().toISOString(),
+      },
+      telegramStatus: {
+        connected: isTgConnected,
+        username: tgRes.rows[0]?.username || null,
+        chatId: tgRes.rows[0]?.chat_id || null,
+      },
       student: {
         id: student.id,
         userId: student.user_id,
