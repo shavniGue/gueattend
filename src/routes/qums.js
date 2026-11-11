@@ -1,6 +1,6 @@
 /**
- * Module 2: QUMS & Headless Browser Relay Routes
- * gueattend - Visual CAPTCHA Stream & 1-Click Reconnect Endpoints
+ * Module 2: College ERP (QUMS) Headless Browser Relay Routes
+ * gueattend - Playwright Live CAPTCHA Stream & 1-Click Reconnect Endpoints
  */
 
 const express = require('express');
@@ -11,39 +11,91 @@ const db = require('../database/db');
 
 /**
  * GET /api/qums/captcha
- * Stream visual CAPTCHA element as base64 to frontend
+ * Stream live visual CAPTCHA element as base64 to frontend
  */
 router.get('/captcha', requireAuth, async (req, res) => {
   try {
     const challenge = await qumsWeb.getVisualCaptcha(req.session.userId);
-    res.json({ success: true, captcha: challenge.captchaImage, ...challenge });
+    res.json({
+      ok: true,
+      success: true,
+      captcha: challenge.captchaImage || challenge.captcha,
+      captchaImage: challenge.captchaImage || challenge.captcha,
+      challengeId: challenge.challengeId,
+      expiresInSeconds: challenge.expiresInSeconds || 180,
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[qums/captcha] Error:', err.message);
+    res.status(500).json({ ok: false, success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/qums/start-login
+ * Pre-fills username & password in Playwright and screenshots fresh CAPTCHA
+ */
+router.post('/start-login', requireAuth, async (req, res) => {
+  const { qid, password, isReconnect } = req.body;
+  try {
+    const outcome = await qumsWeb.startQumsLogin({
+      userId: req.session.userId,
+      qid,
+      password,
+      isReconnect: Boolean(isReconnect),
+    });
+    res.json(outcome);
+  } catch (err) {
+    res.status(400).json({ ok: false, success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/qums/submit-captcha
+ * Submits human-solved CAPTCHA to active browser session
+ */
+router.post('/submit-captcha', requireAuth, async (req, res) => {
+  const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
+  try {
+    const result = await qumsWeb.submitQumsCaptcha({
+      userId: req.session.userId,
+      captchaAnswer,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ ok: false, success: false, error: err.message });
   }
 });
 
 /**
  * POST /api/qums/login
- * Submit QID, password and human-solved CAPTCHA
+ * Full login convenience handler: binds submit with fallback
  */
 router.post('/login', requireAuth, async (req, res) => {
-  const { qid, password, challengeId } = req.body;
-  const captchaAnswer = req.body.captchaAnswer || req.body.captcha;
-  if (!qid || !password || !captchaAnswer) {
-    return res.status(400).json({ success: false, error: 'QID, password, and CAPTCHA answer are required.' });
+  const { qid, password } = req.body;
+  const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
+
+  if (!captchaAnswer) {
+    return res.status(400).json({ ok: false, success: false, error: 'CAPTCHA answer is required.' });
   }
 
   try {
-    const result = await qumsWeb.submitQumsLogin({
+    const result = await qumsWeb.submitQumsCaptcha({
       userId: req.session.userId,
-      qid,
-      password,
-      challengeId,
       captchaAnswer,
     });
     res.json(result);
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    // If no active session, attempt start and submit
+    if (qid && password) {
+      try {
+        await qumsWeb.startQumsLogin({ userId: req.session.userId, qid, password });
+        const result = await qumsWeb.submitQumsCaptcha({ userId: req.session.userId, captchaAnswer });
+        return res.json(result);
+      } catch (innerErr) {
+        return res.status(400).json({ ok: false, success: false, error: innerErr.message });
+      }
+    }
+    res.status(400).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -52,22 +104,21 @@ router.post('/login', requireAuth, async (req, res) => {
  * 1-Click Reconnect: Uses vaulted encrypted password with fresh CAPTCHA
  */
 router.post('/reconnect', requireAuth, async (req, res) => {
-  const { challengeId, source } = req.body;
-  const captchaAnswer = req.body.captchaAnswer || req.body.captcha;
+  const { source } = req.body;
+  const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
   if (!captchaAnswer) {
-    return res.status(400).json({ success: false, error: 'Please enter the CAPTCHA.' });
+    return res.status(400).json({ ok: false, success: false, error: 'Please enter the CAPTCHA.' });
   }
 
   try {
     const result = await qumsWeb.reconnectQumsSession({
       userId: req.session.userId,
-      challengeId,
       captchaAnswer,
       source: source || 'web',
     });
     res.json(result);
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(400).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -78,9 +129,15 @@ router.post('/disconnect', requireAuth, async (req, res) => {
   try {
     const creds = require('../credentials');
     creds.clearSessionCookies(req.session.userId);
-    res.json({ success: true, message: 'QUMS session disconnected.' });
+    await qumsWeb.cleanupPending(req.session.userId);
+    await db.query(
+      `UPDATE users SET qums_session_status = 'disconnected', updated_at = NOW() WHERE id = $1`,
+      [req.session.userId]
+    ).catch(() => {});
+
+    res.json({ ok: true, success: true, message: 'QUMS session disconnected.' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -105,19 +162,21 @@ router.get('/status', requireAuth, async (req, res) => {
     let sessionState = 'disconnected';
     if (isExpired) {
       sessionState = 'expired';
-    } else if (hasCookies || user) {
+    } else if (hasCookies || (user && user.qums_session_status === 'connected')) {
       sessionState = 'connected';
     }
 
     res.json({
+      ok: true,
       success: true,
       sessionState,
       studentQid: student?.student_id || user?.qums_qid || '24030110',
       status: sessionState === 'connected' ? 'active' : sessionState,
+      hasVaultedPassword: Boolean(user && user.qums_password_encrypted),
       lastSynced: user?.updated_at || new Date().toISOString(),
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });
 

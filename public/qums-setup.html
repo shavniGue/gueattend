@@ -252,12 +252,16 @@
           body: JSON.stringify({ qid, password, captcha }),
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.success || data.ok) {
           alert('✅ Connected successfully! Your live attendance has been synchronized.');
-          window.location.href = '/dashboard';
+          window.location.href = data.redirect || '/dashboard';
         } else {
           alert(`❌ Connection failed: ${data.error || 'Invalid credentials or CAPTCHA'}`);
-          loadCaptcha('setupCaptchaContainer');
+          if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
+            document.getElementById('setupCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+          } else {
+            loadCaptcha('setupCaptchaContainer');
+          }
           document.getElementById('setupCaptchaInput').value = '';
         }
       } catch (err) {
@@ -284,12 +288,16 @@
           body: JSON.stringify({ captcha }),
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.success || data.ok) {
           alert('✅ Session restored successfully!');
-          window.location.href = '/dashboard';
+          window.location.href = data.redirect || '/dashboard';
         } else {
           alert(`❌ Reconnect failed: ${data.error || 'Invalid CAPTCHA code'}`);
-          loadCaptcha('reconnectCaptchaContainer');
+          if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
+            document.getElementById('reconnectCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+          } else {
+            loadCaptcha('reconnectCaptchaContainer');
+          }
           document.getElementById('reconnectCaptchaInput').value = '';
         }
       } catch (err) {
@@ -312,3 +320,4 @@
   </script>
 </body>
 </html>
+

@@ -118,3 +118,4 @@ module.exports = {
   calculateSubject75Margin,
   analyzeSubjectsAttendance,
 };
+

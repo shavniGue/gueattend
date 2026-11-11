@@ -36,30 +36,80 @@ router.get('/captcha', (req, res) => {
 });
 
 /**
- * POST /api/auth/login
- * Unified multi-role login (Student, Faculty, Administrator)
+ * GET /api/auth/firebase-config
+ * Public Firebase Web config for client-side pre-warming (Tier 1)
  */
-router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too many login attempts. Please wait.' }), async (req, res) => {
-  const { identifier, password, captchaId, captchaAnswer } = req.body;
+router.get('/firebase-config', (req, res) => {
+  const { getFirebaseWebConfig } = require('../firebaseAuth');
+  res.json(getFirebaseWebConfig());
+});
 
-  if (!identifier || !password) {
-    return res.status(400).json({ success: false, error: 'User ID / Email and password are required.' });
+/**
+ * Core Login Handler (Supports Tier 1 Firebase idToken and Legacy Bcrypt Fallback)
+ */
+async function handleUserLogin(req, res) {
+  const { identifier, email, password, idToken, captchaId, captchaAnswer } = req.body;
+  const targetEmailOrId = email || identifier;
+
+  // 1. Tier 1: Firebase ID Token authentication (Google Firebase signed JWT)
+  if (idToken) {
+    try {
+      const { establishSessionFromIdToken } = require('../firebaseAuth');
+      const outcome = await establishSessionFromIdToken(req, res, idToken, password);
+
+      await db.recordAuditLog({
+        userId: outcome.user.id,
+        action: 'FIREBASE_TOKEN_LOGIN',
+        resource: 'auth:login',
+        details: { email: outcome.user.email, redirect: outcome.redirect },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      return res.json({
+        ok: true,
+        success: true,
+        redirect: outcome.redirect,
+        redirectUrl: outcome.redirect,
+        user: {
+          id: outcome.user.id,
+          email: outcome.user.email,
+          fullName: outcome.user.full_name,
+          role: outcome.user.role,
+        },
+      });
+    } catch (fbErr) {
+      console.warn('[auth/login] Firebase ID Token rejected:', fbErr.message);
+      if (fbErr.statusCode === 403) {
+        return res.status(403).json({ success: false, ok: false, error: fbErr.message });
+      }
+      // If no password provided, return error immediately
+      if (!password) {
+        return res.status(401).json({ success: false, ok: false, error: fbErr.message });
+      }
+      // Otherwise fallback to local password verification below
+    }
+  }
+
+  // 2. Legacy / Bcrypt Fallback
+  if (!targetEmailOrId || !password) {
+    return res.status(400).json({ success: false, ok: false, error: 'User ID / Email and password are required.' });
   }
 
   // Verify CAPTCHA if provided
   if (captchaId) {
     const record = captchaStore.get(captchaId);
     if (!record || Date.now() > record.expiresAt) {
-      return res.status(400).json({ success: false, error: 'CAPTCHA expired. Please reload the CAPTCHA.' });
+      return res.status(400).json({ success: false, ok: false, error: 'CAPTCHA expired. Please reload the CAPTCHA.' });
     }
     if (String(captchaAnswer || '').trim().toUpperCase() !== record.text) {
-      return res.status(400).json({ success: false, error: 'Incorrect CAPTCHA answer. Please try again.' });
+      return res.status(400).json({ success: false, ok: false, error: 'Incorrect CAPTCHA answer. Please try again.' });
     }
     captchaStore.delete(captchaId);
   }
 
   try {
-    const cleanId = String(identifier).trim().toLowerCase();
+    const cleanId = String(targetEmailOrId).trim().toLowerCase();
     let user = await db.getUserByEmail(cleanId);
 
     // If not found by email, check student_id / enrollment_number
@@ -89,12 +139,13 @@ router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too
     }
 
     if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid university credentials.' });
+      return res.status(401).json({ success: false, ok: false, error: 'Invalid university credentials.' });
     }
 
     if (!user.is_active || user.is_suspended) {
       return res.status(403).json({
         success: false,
+        ok: false,
         error: 'Your account has been deactivated or suspended. Please contact the university administrator.',
       });
     }
@@ -110,17 +161,25 @@ router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      return res.status(401).json({ success: false, error: 'Invalid university credentials.' });
+      return res.status(401).json({ success: false, ok: false, error: 'Invalid university credentials.' });
     }
 
     // Set Session
     req.session.userId = user.id;
     req.session.role = user.role;
 
-    // Determine redirect route based on role
+    // Determine redirect route based on role & ERP connection status
     let redirectUrl = '/dashboard';
-    if (user.role === 'admin') redirectUrl = '/admin';
-    if (user.role === 'faculty') redirectUrl = '/faculty';
+    if (user.role === 'admin') {
+      redirectUrl = '/admin';
+    } else if (user.role === 'faculty') {
+      redirectUrl = '/faculty';
+    } else {
+      const creds = require('../credentials');
+      const hasCookies = creds.loadSessionCookies(user.id);
+      const isConnected = user.qums_session_status === 'connected' || Boolean(hasCookies);
+      redirectUrl = isConnected ? '/dashboard' : '/qums-setup';
+    }
 
     await db.recordAuditLog({
       userId: user.id,
@@ -132,8 +191,10 @@ router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too
     });
 
     res.json({
+      ok: true,
       success: true,
       message: 'Login successful.',
+      redirect: redirectUrl,
       redirectUrl,
       user: {
         id: user.id,
@@ -144,9 +205,15 @@ router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too
     });
   } catch (err) {
     console.error('[auth/login] Login error:', err.message);
-    res.status(500).json({ success: false, error: 'Internal server error during authentication.' });
+    res.status(500).json({ success: false, ok: false, error: 'Internal server error during authentication.' });
   }
-});
+}
+
+/**
+ * POST /api/auth/login
+ * Unified multi-role login (Student, Faculty, Administrator)
+ */
+router.post('/login', rateLimit({ windowMs: 60000, maxRequests: 8, message: 'Too many login attempts. Please wait.' }), handleUserLogin);
 
 /**
  * GET /api/auth/me
@@ -282,5 +349,6 @@ router.post('/reset-password', rateLimit({ maxRequests: 5 }), async (req, res) =
   }
 });
 
+router.handleUserLogin = handleUserLogin;
 module.exports = router;
 

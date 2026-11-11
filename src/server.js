@@ -119,6 +119,7 @@ app.get('/admin', requireAdmin, sendPage('admin.html'));
 // ====================================================================
 // REST API ROUTES
 // ====================================================================
+app.post('/api/login', authRoutes.handleUserLogin);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/attendance', attendanceRoutes);

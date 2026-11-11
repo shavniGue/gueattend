@@ -68,7 +68,7 @@ async function checkSupabaseHealth() {
   // 1. Verify JWKS Endpoint
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const resp = await fetch(SUPABASE_JWKS_URL, { signal: controller.signal });
     clearTimeout(timeout);
     if (resp.ok) {

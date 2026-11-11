@@ -15,9 +15,11 @@ if (DATABASE_URL) {
   pool = new Pool({
     connectionString: DATABASE_URL,
     ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 30000,
+    max: 10,
+    idleTimeoutMillis: 15000,
     connectionTimeoutMillis: 15000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
   });
 
   pool.on('error', (err) => {
@@ -83,13 +85,28 @@ async function checkDatabaseHealth() {
 }
 
 /**
- * Helper to run query with error interception
+ * Helper to run query with error interception and automatic transient reconnection retry
  */
 async function query(text, params = []) {
   if (!pool) {
     throw new Error('Database connection pool is not initialized. Check DATABASE_URL.');
   }
-  return pool.query(text, params);
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    const isTransient = err.message && (
+      err.message.includes('ECONNRESET') ||
+      err.message.includes('ETIMEDOUT') ||
+      err.message.includes('Connection terminated') ||
+      err.message.includes('timeout') ||
+      err.code === '57P01'
+    );
+    if (isTransient) {
+      console.warn('[db] Retrying transient database pool query...');
+      return await pool.query(text, params);
+    }
+    throw err;
+  }
 }
 
 /**

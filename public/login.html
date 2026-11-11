@@ -61,8 +61,45 @@
     </form>
   </div>
 
-  <script>
-    // Client-side authentication handler
+  <script type="module">
+    // ====================================================================
+    // TIER 1: CLIENT-SIDE PRE-WARMING & FIREBASE WEB SDK v10
+    // ====================================================================
+    let firebaseState = {
+      app: null,
+      auth: null,
+      signInWithEmailAndPassword: null,
+      isReady: false,
+    };
+
+    /**
+     * Preload Firebase Web SDK in background immediately on page load
+     */
+    async function loadFirebase() {
+      if (firebaseState.isReady) return firebaseState;
+      try {
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+        const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+        
+        const res = await fetch('/api/auth/firebase-config');
+        if (res.ok) {
+          const config = await res.json();
+          firebaseState.app = initializeApp(config);
+          firebaseState.auth = getAuth(firebaseState.app);
+          firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
+          firebaseState.isReady = true;
+          console.log('[Tier 1] Firebase Web SDK pre-warmed & ready.');
+        }
+      } catch (err) {
+        console.warn('[Tier 1] Firebase client pre-warming note (falling back to direct auth):', err.message);
+      }
+      return firebaseState;
+    }
+
+    // Trigger pre-warming immediately
+    loadFirebase();
+
+    // UI elements
     const form = document.getElementById('loginForm');
     const identifierInput = document.getElementById('identifier');
     const passwordInput = document.getElementById('password');
@@ -100,7 +137,7 @@
     document.getElementById('refreshCaptchaBtn').addEventListener('click', loadCaptcha);
     loadCaptcha();
 
-    // Form Submission
+    // Form Submission (Tier 1 Login)
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       alertBox.style.display = 'none';
@@ -108,13 +145,36 @@
       btnSpinner.style.display = 'inline';
       submitBtn.disabled = true;
 
+      const rawId = identifierInput.value.trim();
+      const rawPassword = passwordInput.value;
+      const isEmail = rawId.includes('@');
+      let idToken = null;
+
+      // A. Client-Side Firebase Authentication (if email entered)
+      if (isEmail) {
+        try {
+          const fb = await loadFirebase();
+          if (fb && fb.auth && fb.signInWithEmailAndPassword) {
+            const credential = await fb.signInWithEmailAndPassword(fb.auth, rawId, rawPassword);
+            idToken = await credential.user.getIdToken();
+            console.log('[Tier 1] Firebase ID Token acquired securely.');
+          }
+        } catch (fbErr) {
+          console.warn('[Tier 1] Firebase client-side sign-in warning:', fbErr.message);
+          // Don't halt: fallback will send credentials for server-side verification
+        }
+      }
+
+      // B. Server-Side Token Verification & Legacy Bcrypt Fallback
       try {
-        const resp = await fetch('/api/auth/login', {
+        const resp = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            identifier: identifierInput.value.trim(),
-            password: passwordInput.value,
+            identifier: rawId,
+            email: isEmail ? rawId : undefined,
+            password: rawPassword,
+            idToken: idToken || undefined,
             captchaId: captchaIdInput.value,
             captchaAnswer: captchaAnswerInput.value.trim(),
           }),
@@ -122,15 +182,16 @@
 
         const data = await resp.json();
 
-        if (data.success) {
-          window.location.href = data.redirectUrl || '/dashboard';
+        if (data.ok || data.success) {
+          const target = data.redirect || data.redirectUrl || '/dashboard';
+          window.location.href = target;
         } else {
           alertBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
           alertBox.style.display = 'block';
           loadCaptcha();
         }
       } catch (err) {
-        alertBox.textContent = 'Unable to connect to university ERP server. Please try again.';
+        alertBox.textContent = 'Unable to connect to gueattend server. Please check your network.';
         alertBox.style.display = 'block';
       } finally {
         btnText.style.display = 'inline';
