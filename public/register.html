@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register | gueattend</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body class="login-wrapper">
+
+  <div class="login-card" style="max-width: 480px;">
+    <!-- Logo & Title -->
+    <div class="login-header">
+      <div class="login-header-logo">
+        <span>GEU</span>
+      </div>
+      <h1>Create Student Account</h1>
+      <p>Register for gueattend with your university email</p>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="registerAlert" class="alert-box alert-danger"></div>
+
+    <!-- State 1: Registration Form -->
+    <form id="registerForm" autocomplete="on">
+      <div class="form-group">
+        <label class="form-label" for="regFullName">Full Name</label>
+        <div class="input-with-icon">
+          <input type="text" id="regFullName" placeholder="e.g. Karan Kumar" required autofocus>
+          <span class="input-icon-btn">👤</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="regEmail">University Email Address</label>
+        <div class="input-with-icon">
+          <input type="email" id="regEmail" placeholder="e.g. student@geu.ac.in" required>
+          <span class="input-icon-btn">📧</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">A verification link will be sent to this email.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="regPassword">Set Password</label>
+        <div class="input-with-icon">
+          <input type="password" id="regPassword" placeholder="Minimum 6 characters" minlength="6" required>
+          <button type="button" id="togglePasswordBtn" class="input-icon-btn" title="Toggle password visibility">👁️</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="regConfirmPassword">Confirm Password</label>
+        <div class="input-with-icon">
+          <input type="password" id="regConfirmPassword" placeholder="Re-enter your password" minlength="6" required>
+        </div>
+      </div>
+
+      <!-- Direct submission: email verification handled via Firebase -->
+      <button type="submit" id="submitBtn" class="login-btn">
+        <span id="btnText">Create Account & Send Verification</span>
+        <span id="btnSpinner" style="display: none;">⏳ Creating Account...</span>
+      </button>
+
+      <div class="login-footer-links" style="justify-content: center; margin-top: 22px;">
+        <span>Already have an account?&nbsp;</span>
+        <a href="/login" style="font-weight: 700;">Sign In</a>
+      </div>
+    </form>
+
+    <!-- State 2: Verification Email Sent Card -->
+    <div id="verificationSentCard" style="display: none; text-align: center; padding: 10px 0;">
+      <div style="width: 64px; height: 64px; background: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+        ✉️
+      </div>
+      <h2 style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Verify Your Email</h2>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px;">
+        We have sent a verification email to:
+        <br><strong id="sentEmailDisplay" style="color: var(--primary); font-size: 15px;">student@geu.ac.in</strong>
+      </p>
+
+      <div style="background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-size: 13px; color: var(--text); text-align: left; margin-bottom: 22px;">
+        <div style="font-weight: 700; margin-bottom: 4px; color: var(--primary);">Next Steps:</div>
+        <ol style="margin-left: 18px; line-height: 1.5; color: var(--text-muted);">
+          <li>Open your inbox and look for the verification email from Firebase / gueattend.</li>
+          <li>Click the verification link to confirm your account.</li>
+          <li>Come back and log in with your verified credentials!</li>
+        </ol>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="/login" class="btn-primary" style="display: block; text-decoration: none; padding: 11px; font-size: 14px; font-weight: 700;">
+          Go to Login Screen 🚀
+        </a>
+        <button id="resendVerificationBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+          Didn't get the email? Resend Link
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    let firebaseState = {
+      app: null,
+      auth: null,
+      createUserWithEmailAndPassword: null,
+      sendEmailVerification: null,
+      currentUser: null,
+      isReady: false,
+    };
+
+    // Pre-warm Firebase Web SDK
+    async function initFirebase() {
+      if (firebaseState.isReady) return firebaseState;
+      try {
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+        const { getAuth, createUserWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+        
+        const res = await fetch('/api/auth/firebase-config');
+        if (res.ok) {
+          const config = await res.json();
+          firebaseState.app = initializeApp(config);
+          firebaseState.auth = getAuth(firebaseState.app);
+          firebaseState.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+          firebaseState.sendEmailVerification = sendEmailVerification;
+          firebaseState.isReady = true;
+          console.log('[Register] Firebase Web SDK initialized.');
+        }
+      } catch (err) {
+        console.warn('[Register] Firebase client init note:', err.message);
+      }
+      return firebaseState;
+    }
+
+    initFirebase();
+
+    // UI elements
+    const form = document.getElementById('registerForm');
+    const fullNameInput = document.getElementById('regFullName');
+    const emailInput = document.getElementById('regEmail');
+    const passwordInput = document.getElementById('regPassword');
+    const confirmPasswordInput = document.getElementById('regConfirmPassword');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const alertBox = document.getElementById('registerAlert');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const verificationCard = document.getElementById('verificationSentCard');
+    const sentEmailDisplay = document.getElementById('sentEmailDisplay');
+    const resendBtn = document.getElementById('resendVerificationBtn');
+
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPass = passwordInput.type === 'password';
+      passwordInput.type = isPass ? 'text' : 'password';
+      togglePasswordBtn.textContent = isPass ? '🙈' : '👁️';
+    });
+
+    // Form submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+
+      const fullName = fullNameInput.value.trim();
+      const email = emailInput.value.trim().toLowerCase();
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+
+      if (password !== confirmPassword) {
+        alertBox.textContent = 'Passwords do not match. Please re-enter.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      if (password.length < 6) {
+        alertBox.textContent = 'Password must be at least 6 characters long.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline';
+      submitBtn.disabled = true;
+
+      let firebaseUid = null;
+
+      try {
+        // 1. Create account in Firebase and send real verification email
+        const fb = await initFirebase();
+        if (fb && fb.auth && fb.createUserWithEmailAndPassword) {
+          try {
+            const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, password);
+            firebaseState.currentUser = cred.user;
+            firebaseUid = cred.user.uid;
+
+            if (fb.sendEmailVerification) {
+              await fb.sendEmailVerification(cred.user);
+              console.log('[Register] Verification email dispatched successfully.');
+            }
+          } catch (fbErr) {
+            console.warn('[Register] Firebase createUser note:', fbErr.message);
+            // If already in firebase, continue to check backend
+          }
+        }
+
+        // 2. Register student in backend Supabase database
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName,
+            email,
+            password,
+            firebaseUid,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success || data.ok) {
+          // Switch to verification pending state
+          form.style.display = 'none';
+          sentEmailDisplay.textContent = email;
+          verificationCard.style.display = 'block';
+        } else {
+          alertBox.textContent = data.error || 'Failed to create account. Please try again.';
+          alertBox.style.display = 'block';
+        }
+      } catch (err) {
+        alertBox.textContent = 'Error connecting to registration server. Please try again.';
+        alertBox.style.display = 'block';
+      } finally {
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Resend verification email
+    resendBtn.addEventListener('click', async () => {
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Sending...';
+      try {
+        if (firebaseState.currentUser && firebaseState.sendEmailVerification) {
+          await firebaseState.sendEmailVerification(firebaseState.currentUser);
+          alert('Verification email re-sent! Please check your inbox.');
+        } else {
+          await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailInput.value.trim().toLowerCase() }),
+          });
+          alert('Verification email re-sent! Please check your inbox.');
+        }
+      } catch (err) {
+        alert('Could not resend email right now. Please check your inbox or try logging in.');
+      } finally {
+        resendBtn.disabled = false;
+        resendBtn.textContent = "Didn't get the email? Resend Link";
+      }
+    });
+  </script>
+</body>
+</html>

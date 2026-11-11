@@ -42,11 +42,12 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
   if (!user) {
     // Auto-provision student account in Supabase
     const fullName = decodedToken.name || email.split('@')[0];
+    const newUserId = `usr_${require('crypto').randomUUID()}`;
     const newUserRes = await db.query(
-      `INSERT INTO users (email, full_name, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
-       VALUES ($1, $2, $3, 'student', $4, TRUE, FALSE, 'disconnected', NOW(), NOW())
+      `INSERT INTO users (id, email, full_name, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'student', $5, TRUE, FALSE, 'disconnected', NOW(), NOW())
        RETURNING *`,
-      [email, fullName, decodedToken.uid, Boolean(decodedToken.email_verified)]
+      [newUserId, email, fullName, decodedToken.uid, Boolean(decodedToken.email_verified)]
     );
     user = newUserRes.rows[0];
 
@@ -59,17 +60,27 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
       [user.id, studentQid]
     ).catch(() => {});
   } else {
-    // Update firebase UID
+    // Update firebase UID & verification status
+    const isVerifiedNow = Boolean(decodedToken.email_verified) || Boolean(user.email_verified);
     await db.query(
       `UPDATE users SET firebase_uid = $1, email_verified = $2, updated_at = NOW() WHERE id = $3`,
-      [decodedToken.uid, Boolean(decodedToken.email_verified), user.id]
+      [decodedToken.uid, isVerifiedNow, user.id]
     ).catch(() => {});
+    user.email_verified = isVerifiedNow;
   }
 
   // Check suspension status
   if (user.is_suspended) {
     const err = new Error('Your account has been suspended. Please contact the administrator.');
     err.statusCode = 403;
+    throw err;
+  }
+
+  // Check email verification status for students
+  if (user.role === 'student' && !decodedToken.email_verified && user.email_verified === false) {
+    const err = new Error('Please verify your email before logging in. Check your inbox for the verification link.');
+    err.statusCode = 403;
+    err.emailNotVerified = true;
     throw err;
   }
 

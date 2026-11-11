@@ -108,6 +108,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', sendPage('login.html'));
+app.get('/register', sendPage('register.html'));
 app.get('/forgot', sendPage('forgot.html'));
 app.get('/dashboard', requireAuth, sendPage('index.html'));
 app.get('/qums-setup', requireAuth, sendPage('qums-setup.html'));

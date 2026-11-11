@@ -1,17 +1,16 @@
 /* ====================================================================
    gueattend - Smart University Attendance & Timetable System
-   Fresh, High-Performance Modern Theme (Emerald & Deep Slate)
-   Inspired by QAttend layout with superior styling & multiple theme support
+   Unified University Royal Blue & Slate Navy Theme
    ==================================================================== */
 
-:root, [data-theme="emerald"] {
-  --primary: #059669;            /* Vibrant Emerald */
-  --primary-dark: #047857;
-  --primary-light: #10b981;
-  --primary-subtle: rgba(16, 185, 129, 0.12);
-  --nav-bg: #064e3b;             /* Deep Forest / Pine Emerald */
+:root {
+  --primary: #2563eb;            /* Vibrant Royal Blue */
+  --primary-dark: #1d4ed8;
+  --primary-light: #3b82f6;
+  --primary-subtle: rgba(37, 99, 235, 0.08);
+  --nav-bg: #0f172a;             /* Executive Slate Navy */
   --nav-text: #ffffff;
-  --bg: #f8fafc;                 /* Clean light slate background */
+  --bg: #f8fafc;                 /* Clean Slate Light */
   --surface: #ffffff;
   --surface-alt: #f1f5f9;
   --border: #e2e8f0;
@@ -27,7 +26,7 @@
   --danger: #ef4444;
   --danger-bg: #fee2e2;
   --danger-text: #b91c1c;
-  --table-header-bg: #065f46;
+  --table-header-bg: #1e3a8a;    /* Deep Royal Blue Header */
   --table-header-text: #ffffff;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
@@ -37,24 +36,9 @@
   --radius-lg: 14px;
 }
 
-[data-theme="indigo"] {
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --primary-light: #818cf8;
-  --primary-subtle: rgba(99, 102, 241, 0.12);
-  --nav-bg: #1e1b4b;
-  --nav-text: #ffffff;
-  --table-header-bg: #312e81;
-}
-
-[data-theme="cyan"] {
-  --primary: #0891b2;
-  --primary-dark: #0e7490;
-  --primary-light: #06b6d4;
-  --primary-subtle: rgba(6, 182, 212, 0.12);
-  --nav-bg: #164e63;
-  --nav-text: #ffffff;
-  --table-header-bg: #155e75;
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 75px;
 }
 
 * {
@@ -743,6 +727,176 @@ body {
   font-size: 13.5px;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* ====================================================================
+   LANDING PAGE SECTIONS (How It Works, About, FAQ, Contact)
+   ==================================================================== */
+
+.landing-section {
+  max-width: 1120px;
+  margin: 80px auto;
+  padding: 0 24px;
+}
+
+.section-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--primary-subtle);
+  padding: 4px 12px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.section-heading {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.section-desc {
+  font-size: 15px;
+  color: var(--text-muted);
+  max-width: 680px;
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+
+/* Steps (How It Works) */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.step-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.step-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--primary-light);
+}
+
+.step-number {
+  width: 38px;
+  height: 38px;
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.step-card h4 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.step-card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* FAQ Accordion */
+.faq-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 820px;
+}
+
+.faq-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.faq-question {
+  padding: 18px 22px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.faq-question:hover {
+  color: var(--primary);
+  background: var(--surface-alt);
+}
+
+.faq-answer {
+  padding: 0 22px 18px 22px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+  display: block;
+}
+
+/* Contact Cards */
+.contact-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.contact-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.contact-item {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.contact-item-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.contact-item-content h5 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.contact-item-content p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 /* ====================================================================

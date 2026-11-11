@@ -9,31 +9,30 @@
 </head>
 <body>
 
-  <!-- Top Navbar (Matching Image 2) -->
+  <!-- Top Navbar (Matching Image 2 with Working Anchor Links) -->
   <nav class="site-navbar">
-    <a href="/" class="brand-wrapper">
+    <a href="/#home" class="brand-wrapper">
       <div class="brand-icon">🎓</div>
       <div class="brand-title">gueattend</div>
     </a>
 
     <div class="nav-links">
-      <a href="#home" class="nav-link active">Home</a>
-      <a href="#features" class="nav-link">Features</a>
-      <a href="#how-it-works" class="nav-link">How It Works</a>
+      <a href="/#home" class="nav-link active">Home</a>
+      <a href="/#features" class="nav-link">Features</a>
+      <a href="/#how-it-works" class="nav-link">How It Works</a>
       <a href="/attendance-calculator-guide" class="nav-link">Calculator Guide</a>
-      <a href="#about" class="nav-link">About</a>
-      <a href="#faq" class="nav-link">FAQ</a>
-      <a href="#contact" class="nav-link">Contact</a>
+      <a href="/#about" class="nav-link">About</a>
+      <a href="/#faq" class="nav-link">FAQ</a>
+      <a href="/#contact" class="nav-link">Contact</a>
     </div>
 
     <div class="nav-right">
-      <button class="theme-pill-btn" id="themeToggleBtn" title="Change Theme Palette">🎨 Theme</button>
       <a href="/login" class="nav-link" style="color: #ffffff; font-weight: 700;">Login</a>
-      <a href="/login" class="btn-hero-primary" style="padding: 7px 16px; font-size: 13px;">Register</a>
+      <a href="/register" class="btn-hero-primary" style="padding: 7px 16px; font-size: 13px;">Register</a>
     </div>
   </nav>
 
-  <!-- Hero Section (Matching Image 2) -->
+  <!-- Hero Section (#home) (Matching Image 2) -->
   <header class="landing-hero" id="home">
     <div class="hero-inner">
       <div class="hero-left">
@@ -45,7 +44,7 @@
         </p>
 
         <div class="hero-cta-group">
-          <a href="/login" class="btn-hero-primary">Get Started</a>
+          <a href="/register" class="btn-hero-primary">Get Started</a>
           <a href="/login" class="btn-hero-secondary">Login</a>
         </div>
 
@@ -94,52 +93,233 @@
     </div>
   </header>
 
-  <!-- What is gueattend? Section (Matching Image 2) -->
-  <section class="landing-features" id="features">
-    <h2 class="features-heading">What is gueattend?</h2>
-    <p class="features-desc">
+  <!-- 1. Features Section (#features) -->
+  <section class="landing-section" id="features">
+    <div class="section-tag">Key Capabilities</div>
+    <h2 class="section-heading">What is gueattend?</h2>
+    <p class="section-desc">
       gueattend is a student attendance tracker. It connects with your QUMS account and monitors your academic updates, so you do not have to keep logging in to the portal to check them yourself.
     </p>
 
     <div class="feature-cards-grid">
       <div class="feature-box">
-        <div style="font-size: 28px; margin-bottom: 10px;">⚡</div>
+        <div style="font-size: 32px; margin-bottom: 12px;">⚡</div>
         <h4>Instant Attendance Sync</h4>
         <p>Live subject-wise metrics computed according to university regulations with unmarked classes never counted as absent.</p>
       </div>
 
       <div class="feature-box">
-        <div style="font-size: 28px; margin-bottom: 10px;">🎯</div>
-        <h4>75% Bunk Margin Calculator</h4>
-        <p>Know exactly how many classes you can safely miss while staying above 75%, or how many consecutive lectures you must attend.</p>
+        <div style="font-size: 32px; margin-bottom: 12px;">🎯</div>
+        <h4>75% Bunk Margin Intelligence</h4>
+        <p>Know exactly how many classes you can safely miss while staying above 75%, or how many consecutive lectures you must attend to avoid debarment.</p>
       </div>
 
       <div class="feature-box">
-        <div style="font-size: 28px; margin-bottom: 10px;">✈️</div>
+        <div style="font-size: 32px; margin-bottom: 12px;">✈️</div>
         <h4>Telegram Bot Notifications</h4>
-        <p>Receive routine daily timetables, immediate class updates when marked by professors, and shortage alerts right on Telegram.</p>
+        <p>Receive routine daily timetables at 8:30 AM, immediate period alerts when marked by faculty, and backdated change notices right on Telegram.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. How It Works Section (#how-it-works) -->
+  <section class="landing-section" id="how-it-works" style="background: var(--surface-alt); padding: 50px 24px; border-radius: var(--radius-lg);">
+    <div class="section-tag">Step-by-Step Flow</div>
+    <h2 class="section-heading">How It Works</h2>
+    <p class="section-desc">
+      Get set up in under 2 minutes. No complicated steps, no captcha on regular login, and seamless automation throughout the semester.
+    </p>
+
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <h4>Register with Email</h4>
+        <p>Enter your university email and set a password. No CAPTCHA needed on platform registration!</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <h4>Verify Your Email</h4>
+        <p>A secure verification link is sent via Firebase to your inbox. Click the link to activate your account.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <h4>Connect University ERP</h4>
+        <p>Enter your student ID & ERP password. Solve the live CAPTCHA streamed directly from <a href="https://student.geu.ac.in/N0j5Ha0" target="_blank" style="color: var(--primary);">geu.ac.in</a>.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">4</div>
+        <h4>Link Telegram Bot</h4>
+        <p>Tap the 1-click button to open @gue_attendance_bot. Get your morning timetable and live period alerts!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. About Section (#about) -->
+  <section class="landing-section" id="about">
+    <div class="section-tag">About The Platform</div>
+    <h2 class="section-heading">Built for Graphic Era Students</h2>
+    <p class="section-desc">
+      Graphic Era University enforces a strict 75.00% attendance criterion for examination eligibility. gueattend was engineered to ensure no student is caught off guard.
+    </p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div class="feature-box">
+        <h4 style="color: var(--primary); font-size: 17px; margin-bottom: 10px;">🛡️ Debarment Edge-Case Protection</h4>
+        <p style="font-size: 13.5px; line-height: 1.6; color: var(--text);">
+          Standard portal roundings often mislead students when attendance sits at 74.8%. gueattend applies exact mathematical floor and ceiling calculations to ensure you are never debarred by a fraction of a percent.
+        </p>
+      </div>
+
+      <div class="feature-box">
+        <h4 style="color: var(--primary); font-size: 17px; margin-bottom: 10px;">🔐 Complete Multi-Tenant Privacy</h4>
+        <p style="font-size: 13.5px; line-height: 1.6; color: var(--text);">
+          Your portal password is encrypted with military-grade AES-256-GCM. Session cookies are kept in POSIX 0600 locked containers. Your attendance and chats are 100% private and isolated to you.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. FAQ Section (#faq) -->
+  <section class="landing-section" id="faq">
+    <div class="section-tag">Frequently Asked Questions</div>
+    <h2 class="section-heading">Got Questions? We Have Answers.</h2>
+    <p class="section-desc">
+      Everything you need to know about how gueattend handles your college login, attendance calculations, and Telegram alerts.
+    </p>
+
+    <div class="faq-grid">
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Why is there no CAPTCHA on regular platform login?</span>
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          gueattend uses Google Firebase Authentication for your platform account, which uses signed cryptographic tokens. You only solve a CAPTCHA when connecting to the college portal (<a href="https://student.geu.ac.in/N0j5Ha0" target="_blank" style="color: var(--primary);">student.geu.ac.in</a>) so our headless relay can extract your attendance securely!
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>How does the 1-Click Reconnect work when ERP sessions expire?</span>
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          When the college portal logs you out after a day or two, our background worker detects it. Because your password is saved encrypted in your AES-256 vault, you do not need to retype your password. You just enter one fresh CAPTCHA code and you are reconnected instantly!
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>How are the 75% attendance formulas calculated?</span>
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          For attendance &ge; 75%, safe skips are calculated as: <code>floor((4A - 3T) / 3)</code>. For attendance &lt; 75%, required catch-up classes are calculated as: <code>max(1, ceil(3T - 4A))</code>. View our interactive <a href="/attendance-calculator-guide" style="color: var(--primary); font-weight: 700;">Calculator Guide</a> for live proofs and interactive sliders.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Why do I need to verify my email address?</span>
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Email verification ensures that only the genuine owner of the university email address can access the attendance dashboard, preventing spam accounts and safeguarding student privacy.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">
+          <span>Is gueattend free to use for Graphic Era students?</span>
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Yes! gueattend is 100% free for all students of Graphic Era University (GEU) and Graphic Era Hill University (GEHU).
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Contact Section (#contact) -->
+  <section class="landing-section" id="contact">
+    <div class="section-tag">Get in Touch</div>
+    <h2 class="section-heading">Contact & Support</h2>
+    <p class="section-desc">
+      Have a suggestion, found a bug, or need help linking your student account? We're here to help.
+    </p>
+
+    <div class="contact-container">
+      <div class="contact-card">
+        <div class="contact-item">
+          <div class="contact-item-icon">📍</div>
+          <div class="contact-item-content">
+            <h5>Campus Location</h5>
+            <p>Graphic Era University, 566/6, Bell Road, Clement Town, Dehradun, Uttarakhand 248002</p>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-item-icon">📧</div>
+          <div class="contact-item-content">
+            <h5>Student Support Email</h5>
+            <p><a href="mailto:support@gueattend.geu.ac.in" style="color: var(--primary); text-decoration: none;">support@gueattend.geu.ac.in</a></p>
+          </div>
+        </div>
+
+        <div class="contact-item">
+          <div class="contact-item-icon">✈️</div>
+          <div class="contact-item-content">
+            <h5>Official Telegram Bot</h5>
+            <p><a href="https://t.me/gue_attendance_bot" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700;">@gue_attendance_bot</a></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-card">
+        <h4 style="margin-bottom: 14px; font-size: 16px;">Quick Question?</h4>
+        <form onsubmit="event.preventDefault(); alert('Thank you for reaching out! A student support representative will review your query.'); this.reset();">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Your Name</label>
+            <input type="text" class="form-input" placeholder="e.g. Karan Kumar" required>
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Your University Email</label>
+            <input type="email" class="form-input" placeholder="e.g. student@geu.ac.in" required>
+          </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label">Message</label>
+            <textarea class="form-input" rows="3" placeholder="How can we help you?" required></textarea>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%;">Send Message</button>
+        </form>
       </div>
     </div>
   </section>
 
   <!-- Footer -->
-  <footer style="text-align: center; padding: 40px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted);">
-    © 2026 gueattend • Smart University Attendance Portal • Built for Graphic Era University students.
+  <footer style="text-align: center; padding: 40px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); background: #ffffff;">
+    <div style="font-weight: 700; color: var(--text); margin-bottom: 6px;">gueattend — Track. Alert. Stay Updated.</div>
+    <div>© 2026 gueattend • Smart University Attendance Portal • Graphic Era University</div>
   </footer>
 
   <script>
-    // Theme toggle
-    const themes = ['emerald', 'indigo', 'cyan'];
-    let currentThemeIdx = 0;
-    const btn = document.getElementById('themeToggleBtn');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-        document.documentElement.setAttribute('data-theme', themes[currentThemeIdx]);
-        btn.textContent = `🎨 ${themes[currentThemeIdx].toUpperCase()}`;
+    // Simple FAQ Accordion Toggle
+    document.querySelectorAll('.faq-question').forEach((item) => {
+      item.addEventListener('click', () => {
+        const answer = item.nextElementSibling;
+        const arrow = item.querySelector('span:last-child');
+        if (answer.style.display === 'none') {
+          answer.style.display = 'block';
+          arrow.textContent = '▲';
+        } else {
+          answer.style.display = 'none';
+          arrow.textContent = '▼';
+        }
       });
-    }
+    });
   </script>
 </body>
 </html>
-

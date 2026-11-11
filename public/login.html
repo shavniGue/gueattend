@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>gueattend | Smart Attendance Login</title>
+  <title>Login | gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
 </head>
@@ -21,11 +21,22 @@
     <!-- Alert Box -->
     <div id="loginAlert" class="alert-box alert-danger"></div>
 
+    <!-- Verification Needed Notice Box -->
+    <div id="verificationNoticeBox" style="display: none; background: var(--warning-bg); border: 1px solid #fde68a; border-radius: var(--radius); padding: 14px; margin-bottom: 18px; font-size: 13px; color: var(--warning-text);">
+      <div style="font-weight: 800; margin-bottom: 4px;">⚠️ Email Verification Required</div>
+      <p style="margin-bottom: 10px; line-height: 1.4;">
+        A verification link was sent to your email. Please click the link in your inbox to activate your account before logging in.
+      </p>
+      <button id="resendEmailBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px; width: 100%;">
+        Resend Verification Email
+      </button>
+    </div>
+
     <form id="loginForm" autocomplete="on">
       <div class="form-group">
-        <label class="form-label" for="identifier">User ID / Email / Enrollment No</label>
+        <label class="form-label" for="identifier">University Email / Student ID</label>
         <div class="input-with-icon">
-          <input type="text" id="identifier" placeholder="e.g. 24030110 or student@geu.ac.in" required autofocus>
+          <input type="text" id="identifier" placeholder="e.g. student@geu.ac.in or 24030110" required autofocus>
           <span class="input-icon-btn">👤</span>
         </div>
       </div>
@@ -38,25 +49,19 @@
         </div>
       </div>
 
-      <!-- CAPTCHA -->
-      <div class="form-group">
-        <label class="form-label">Security Verification (CAPTCHA)</label>
-        <div class="captcha-box">
-          <div id="captchaDisplay" class="captchaDisplay captcha-display">----</div>
-          <button type="button" id="refreshCaptchaBtn" class="btn btn-secondary" title="Refresh CAPTCHA">🔄</button>
-        </div>
-        <input type="text" id="captchaAnswer" class="form-input" style="width: 100%;" placeholder="Enter characters shown above" required autocomplete="off">
-        <input type="hidden" id="captchaId">
-      </div>
-
+      <!-- Notice: NO CAPTCHA on Platform Login! -->
       <button type="submit" id="submitBtn" class="login-btn">
         <span id="btnText">Sign In to gueattend</span>
         <span id="btnSpinner" style="display: none;">⏳ Authenticating...</span>
       </button>
 
-      <div class="login-footer-links">
+      <div class="login-footer-links" style="margin-top: 18px;">
         <a href="/forgot">Forgot Password?</a>
-        <a href="https://t.me/gue_attendance_bot" target="_blank" rel="noopener">Telegram Bot</a>
+        <a href="/register" style="font-weight: 700;">Create Account</a>
+      </div>
+
+      <div style="text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted);">
+        Need help? Message our bot on <a href="https://t.me/gue_attendance_bot" target="_blank" style="color: var(--primary);">Telegram (@gue_attendance_bot)</a>
       </div>
     </form>
   </div>
@@ -69,6 +74,7 @@
       app: null,
       auth: null,
       signInWithEmailAndPassword: null,
+      sendEmailVerification: null,
       isReady: false,
     };
 
@@ -79,7 +85,7 @@
       if (firebaseState.isReady) return firebaseState;
       try {
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-        const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+        const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
         
         const res = await fetch('/api/auth/firebase-config');
         if (res.ok) {
@@ -87,16 +93,16 @@
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
           firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
+          firebaseState.sendEmailVerification = sendEmailVerification;
           firebaseState.isReady = true;
           console.log('[Tier 1] Firebase Web SDK pre-warmed & ready.');
         }
       } catch (err) {
-        console.warn('[Tier 1] Firebase client pre-warming note (falling back to direct auth):', err.message);
+        console.warn('[Tier 1] Firebase client pre-warming note:', err.message);
       }
       return firebaseState;
     }
 
-    // Trigger pre-warming immediately
     loadFirebase();
 
     // UI elements
@@ -104,43 +110,26 @@
     const identifierInput = document.getElementById('identifier');
     const passwordInput = document.getElementById('password');
     const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-    const captchaDisplay = document.getElementById('captchaDisplay');
-    const captchaIdInput = document.getElementById('captchaId');
-    const captchaAnswerInput = document.getElementById('captchaAnswer');
     const alertBox = document.getElementById('loginAlert');
+    const verificationBox = document.getElementById('verificationNoticeBox');
+    const resendBtn = document.getElementById('resendEmailBtn');
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const btnSpinner = document.getElementById('btnSpinner');
 
-    // Toggle Password Visibility
+    let unverifiedUser = null;
+
     togglePasswordBtn.addEventListener('click', () => {
       const isPass = passwordInput.type === 'password';
       passwordInput.type = isPass ? 'text' : 'password';
       togglePasswordBtn.textContent = isPass ? '🙈' : '👁️';
     });
 
-    // Fetch CAPTCHA
-    async function loadCaptcha() {
-      try {
-        const resp = await fetch('/api/auth/captcha');
-        const data = await resp.json();
-        if (data.success) {
-          captchaDisplay.textContent = data.captchaText;
-          captchaIdInput.value = data.captchaId;
-          captchaAnswerInput.value = '';
-        }
-      } catch (err) {
-        captchaDisplay.textContent = 'ERROR';
-      }
-    }
-
-    document.getElementById('refreshCaptchaBtn').addEventListener('click', loadCaptcha);
-    loadCaptcha();
-
-    // Form Submission (Tier 1 Login)
+    // Form Submission (NO CAPTCHA!)
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       alertBox.style.display = 'none';
+      verificationBox.style.display = 'none';
       btnText.style.display = 'none';
       btnSpinner.style.display = 'inline';
       submitBtn.disabled = true;
@@ -156,12 +145,25 @@
           const fb = await loadFirebase();
           if (fb && fb.auth && fb.signInWithEmailAndPassword) {
             const credential = await fb.signInWithEmailAndPassword(fb.auth, rawId, rawPassword);
-            idToken = await credential.user.getIdToken();
-            console.log('[Tier 1] Firebase ID Token acquired securely.');
+            unverifiedUser = credential.user;
+
+            // MANDATORY CHECK: User must be email verified!
+            if (!credential.user.emailVerified) {
+              verificationBox.style.display = 'block';
+              alertBox.textContent = 'Please verify your email before logging in. Check your inbox for the link.';
+              alertBox.style.display = 'block';
+              btnText.style.display = 'inline';
+              btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+              return;
+            }
+
+            idToken = await credential.user.getIdToken(true);
+            console.log('[Tier 1] Verified Firebase ID Token acquired.');
           }
         } catch (fbErr) {
           console.warn('[Tier 1] Firebase client-side sign-in warning:', fbErr.message);
-          // Don't halt: fallback will send credentials for server-side verification
+          // If user not found in firebase or wrong password, let backend handle fallback or report
         }
       }
 
@@ -175,8 +177,6 @@
             email: isEmail ? rawId : undefined,
             password: rawPassword,
             idToken: idToken || undefined,
-            captchaId: captchaIdInput.value,
-            captchaAnswer: captchaAnswerInput.value.trim(),
           }),
         });
 
@@ -186,9 +186,11 @@
           const target = data.redirect || data.redirectUrl || '/dashboard';
           window.location.href = target;
         } else {
+          if (data.emailNotVerified) {
+            verificationBox.style.display = 'block';
+          }
           alertBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
           alertBox.style.display = 'block';
-          loadCaptcha();
         }
       } catch (err) {
         alertBox.textContent = 'Unable to connect to gueattend server. Please check your network.';
@@ -199,7 +201,30 @@
         submitBtn.disabled = false;
       }
     });
+
+    // Resend verification link
+    resendBtn.addEventListener('click', async () => {
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Sending email...';
+      try {
+        if (unverifiedUser && firebaseState.sendEmailVerification) {
+          await firebaseState.sendEmailVerification(unverifiedUser);
+          alert('Verification email re-sent! Please check your inbox.');
+        } else {
+          await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: identifierInput.value.trim().toLowerCase() }),
+          });
+          alert('Verification email re-sent! Please check your inbox.');
+        }
+      } catch (err) {
+        alert('Could not resend email. Please try again in a few moments.');
+      } finally {
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Resend Verification Email';
+      }
+    });
   </script>
 </body>
 </html>
-

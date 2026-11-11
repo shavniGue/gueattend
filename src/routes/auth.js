@@ -45,10 +45,91 @@ router.get('/firebase-config', (req, res) => {
 });
 
 /**
- * Core Login Handler (Supports Tier 1 Firebase idToken and Legacy Bcrypt Fallback)
+ * POST /api/auth/register
+ * Platform Registration: Email + Password (NO CAPTCHA) with Email Verification
+ */
+router.post('/register', async (req, res) => {
+  const { fullName, email, password, firebaseUid } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ success: false, ok: false, error: 'Email and password are required.' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    const existing = await db.getUserByEmail(cleanEmail);
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        error: 'An account with this email already exists. Please sign in.',
+      });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const name = (fullName || cleanEmail.split('@')[0]).trim();
+    const newUserId = `usr_${crypto.randomUUID()}`;
+
+    // Insert user into Supabase with email_verified = false
+    const newUserRes = await db.query(
+      `INSERT INTO users (id, email, full_name, password_hash, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'student', FALSE, TRUE, FALSE, 'disconnected', NOW(), NOW())
+       RETURNING *`,
+      [newUserId, cleanEmail, name, hash, firebaseUid || null]
+    );
+    const user = newUserRes.rows[0];
+
+    // Seed student profile
+    const studentQid = cleanEmail.split('@')[0].replace(/[^0-9]/g, '') || `2403${Math.floor(1000 + Math.random() * 9000)}`;
+    await db.query(
+      `INSERT INTO students (user_id, student_id, enrollment_number, program, current_semester, academic_year)
+       VALUES ($1, $2, $2, 'B.Tech Computer Science & Engineering', 5, '2025-2026')
+       ON CONFLICT DO NOTHING`,
+      [user.id, studentQid]
+    ).catch(() => {});
+
+    await db.recordAuditLog({
+      userId: user.id,
+      action: 'USER_REGISTERED',
+      resource: 'auth:register',
+      details: { email: cleanEmail, studentQid },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      ok: true,
+      message: 'Account created successfully. A verification email has been sent.',
+      email: cleanEmail,
+    });
+  } catch (err) {
+    console.error('[auth/register] Error:', err.message);
+    res.status(500).json({ success: false, ok: false, error: 'Failed to create student account.' });
+  }
+});
+
+/**
+ * POST /api/auth/resend-verification
+ */
+router.post('/resend-verification', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required.' });
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  const user = await db.getUserByEmail(cleanEmail);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User account not found.' });
+  }
+  res.json({ success: true, message: 'Verification email resent successfully.' });
+});
+
+/**
+ * Core Login Handler (NO CAPTCHA on Platform Login!)
  */
 async function handleUserLogin(req, res) {
-  const { identifier, email, password, idToken, captchaId, captchaAnswer } = req.body;
+  const { identifier, email, password, idToken } = req.body;
   const targetEmailOrId = email || identifier;
 
   // 1. Tier 1: Firebase ID Token authentication (Google Firebase signed JWT)
@@ -81,31 +162,22 @@ async function handleUserLogin(req, res) {
     } catch (fbErr) {
       console.warn('[auth/login] Firebase ID Token rejected:', fbErr.message);
       if (fbErr.statusCode === 403) {
-        return res.status(403).json({ success: false, ok: false, error: fbErr.message });
+        return res.status(403).json({
+          success: false,
+          ok: false,
+          emailNotVerified: Boolean(fbErr.emailNotVerified),
+          error: fbErr.message,
+        });
       }
-      // If no password provided, return error immediately
       if (!password) {
         return res.status(401).json({ success: false, ok: false, error: fbErr.message });
       }
-      // Otherwise fallback to local password verification below
     }
   }
 
-  // 2. Legacy / Bcrypt Fallback
+  // 2. Legacy / Bcrypt Fallback (NO CAPTCHA!)
   if (!targetEmailOrId || !password) {
     return res.status(400).json({ success: false, ok: false, error: 'User ID / Email and password are required.' });
-  }
-
-  // Verify CAPTCHA if provided
-  if (captchaId) {
-    const record = captchaStore.get(captchaId);
-    if (!record || Date.now() > record.expiresAt) {
-      return res.status(400).json({ success: false, ok: false, error: 'CAPTCHA expired. Please reload the CAPTCHA.' });
-    }
-    if (String(captchaAnswer || '').trim().toUpperCase() !== record.text) {
-      return res.status(400).json({ success: false, ok: false, error: 'Incorrect CAPTCHA answer. Please try again.' });
-    }
-    captchaStore.delete(captchaId);
   }
 
   try {
@@ -162,6 +234,16 @@ async function handleUserLogin(req, res) {
         userAgent: req.headers['user-agent'],
       });
       return res.status(401).json({ success: false, ok: false, error: 'Invalid university credentials.' });
+    }
+
+    // Check email verification for student
+    if (user.role === 'student' && user.email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        ok: false,
+        emailNotVerified: true,
+        error: 'Please verify your email before logging in. Check your inbox for the verification link.',
+      });
     }
 
     // Set Session
