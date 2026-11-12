@@ -18,16 +18,30 @@ const db = require('./database/db');
 // ====================================================================
 // CONFIGURABLE COLLEGE SELECTORS & TARGET SETTINGS
 // ====================================================================
+const ALLOW_PORTAL_SIMULATION = String(process.env.ALLOW_PORTAL_SIMULATION || '').toLowerCase() === 'true';
+
 const COLLEGE_CONFIG = {
   loginUrl: process.env.COLLEGE_LOGIN_URL || 'https://student.geu.ac.in/N0j5Ha0',
   dashboardUrlMatch: process.env.COLLEGE_DASHBOARD_MATCH || '/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6',
   selectors: {
-    username: process.env.COLLEGE_SEL_USER || '#txtUserName, input[name="txtUserName"], #txtEmail, #username, input[name="username"]',
-    password: process.env.COLLEGE_SEL_PASS || '#txtPassword, input[name="txtPassword"], #password, input[name="password"]',
-    captchaImg: process.env.COLLEGE_SEL_CAPTCHA_IMG || '#imgCaptcha, #img_captcha, img[src*="captcha"], img.captcha',
-    captchaInput: process.env.COLLEGE_SEL_CAPTCHA_INPUT || '#txtCaptcha, input[name="txtCaptcha"], #captcha, input[name="captcha"]',
-    submitBtn: process.env.COLLEGE_SEL_SUBMIT || '#btnSubmit, #btnLogin, input[type="submit"], button[type="submit"]',
-    errorMessage: process.env.COLLEGE_SEL_ERROR || '#lblMessage, .alert-danger, .error-message',
+    username:
+      process.env.COLLEGE_SEL_USER ||
+      'input[placeholder*="User ID"], #mat-input-0, #txtUserName, input[name="txtUserName"], #txtEmail, #username, input[name="username"]',
+    password:
+      process.env.COLLEGE_SEL_PASS ||
+      'input[placeholder*="Password"], #mat-input-1, #txtPassword, input[name="txtPassword"], #password, input[name="password"]',
+    captchaImg:
+      process.env.COLLEGE_SEL_CAPTCHA_IMG ||
+      'img[alt*="CAPTCHA"], img[alt*="captcha"], #imgCaptcha, #img_captcha, img[src*="captcha"], img.captcha',
+    captchaInput:
+      process.env.COLLEGE_SEL_CAPTCHA_INPUT ||
+      'input[placeholder*="text shown above"], #mat-input-2, #txtCaptcha, input[name="txtCaptcha"], #captcha, input[name="captcha"]',
+    submitBtn:
+      process.env.COLLEGE_SEL_SUBMIT ||
+      'button[type="submit"], #btnSubmit, #btnLogin, input[type="submit"]',
+    errorMessage:
+      process.env.COLLEGE_SEL_ERROR ||
+      '#lblMessage, .mat-mdc-snack-bar-label, .alert-danger, .error-message, [role="alert"]',
   },
   cookieNames: ['ASP.NET_SessionId', 'PHPSESSID', 'JSESSIONID', 'QUMS_AUTH_TOKEN'],
   timeoutMs: Number(process.env.COLLEGE_BROWSER_TIMEOUT_MS) || 15000,
@@ -151,11 +165,18 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
 
     const page = await context.newPage();
 
-    // Navigate to college login URL
+    // Navigate to college login URL and wait for Angular/DOM CAPTCHA rendering
     await page.goto(COLLEGE_CONFIG.loginUrl, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
       timeout: COLLEGE_CONFIG.timeoutMs,
-    });
+    }).catch(() =>
+      page.goto(COLLEGE_CONFIG.loginUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: COLLEGE_CONFIG.timeoutMs,
+      })
+    );
+
+    await page.waitForSelector(COLLEGE_CONFIG.selectors.captchaImg, { timeout: 8000 }).catch(() => {});
 
     // Fill username and password into portal form fields if provided
     const userLoc = page.locator(COLLEGE_CONFIG.selectors.username).first();
@@ -164,7 +185,7 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
     if (effectiveQid && effectivePassword && await userLoc.count() > 0 && await passLoc.count() > 0) {
       await userLoc.fill(effectiveQid);
       await passLoc.fill(effectivePassword);
-      console.log(`[qums-relay] Form fields pre-filled for student QID: ${effectiveQid}`);
+      console.log(`[qums-relay] Form fields pre-filled for student GUeID: ${effectiveQid}`);
     }
 
     // Capture screenshot of live visual CAPTCHA element
@@ -175,10 +196,12 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
       const buffer = await captchaLoc.screenshot();
       captchaBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
       console.log(`[qums-relay] Captured live visual CAPTCHA screenshot (${buffer.length} bytes).`);
-    } else {
-      // If portal captcha selector not found, capture page area or fallback
+    } else if (ALLOW_PORTAL_SIMULATION) {
       const fallback = generateFallbackCaptcha(userId, effectiveQid);
       captchaBase64 = fallback.captchaImage;
+    } else {
+      await browser.close().catch(() => {});
+      throw new Error('Could not find live CAPTCHA image on student.geu.ac.in. Please try again.');
     }
 
     // Set 3-minute auto-termination timer
@@ -209,8 +232,16 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
       expiresInSeconds: 180,
     };
   } catch (err) {
-    console.warn(`[qums-relay] Direct portal connection warning (${err.message}). Using resilient visual stream.`);
-    // Fallback: If external portal is unreachable / offline, provide high-fidelity SVG stream
+    if (!ALLOW_PORTAL_SIMULATION) {
+      console.warn(`[qums-relay] Live portal CAPTCHA unavailable (${err.message}).`);
+      return {
+        ok: false,
+        success: false,
+        error: 'Unable to load live CAPTCHA from student.geu.ac.in right now. Please try again.',
+      };
+    }
+
+    console.warn(`[qums-relay] Simulation mode fallback enabled (${err.message}).`);
     const fallback = generateFallbackCaptcha(userId, effectiveQid);
 
     // Store credentials in fallback pending
@@ -289,9 +320,17 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
 
       const isStillOnLogin = currentUrl.includes('N0j5Ha0') || currentUrl.includes('login') || currentUrl.includes('Login');
 
-      if (isStillOnLogin && hasErrorText && hasErrorText.trim()) {
-        console.warn(`[qums-relay] Login rejected: ${hasErrorText.trim()}`);
-        // Capture refreshed CAPTCHA screenshot so student can re-attempt immediately
+      if (isStillOnLogin) {
+        const turnstileVal = await session.page
+          .locator('input[name="cf-turnstile-response"]')
+          .first()
+          .inputValue()
+          .catch(() => null);
+        const turnstileMsg = turnstileVal === ''
+          ? 'College portal anti-bot verification (Cloudflare Turnstile) is active on student.geu.ac.in; automated login cannot proceed.'
+          : '';
+        console.warn(`[qums-relay] Login did not advance past login URL: ${(hasErrorText || turnstileMsg || 'invalid credentials or CAPTCHA').trim()}`);
+
         const captchaLoc = session.page.locator(COLLEGE_CONFIG.selectors.captchaImg).first();
         let newCaptchaBase64 = null;
         if ((await captchaLoc.count()) > 0) {
@@ -302,7 +341,7 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
         return {
           ok: false,
           success: false,
-          error: hasErrorText.trim() || 'Invalid CAPTCHA or credentials.',
+          error: (hasErrorText && hasErrorText.trim()) || turnstileMsg || 'Invalid GUeID, password, or CAPTCHA code.',
           refreshCaptcha: true,
           captcha: newCaptchaBase64,
           captchaImage: newCaptchaBase64,
@@ -358,7 +397,11 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
     }
   }
 
-  // --- PATH B: Fallback / Simulation Path ---
+  // --- PATH B: Explicit Test Simulation Only ---
+  if (!ALLOW_PORTAL_SIMULATION) {
+    await cleanupPending(userId);
+    throw new Error('Live GEU portal browser session is required. Reload CAPTCHA and try again.');
+  }
   const challenge = fallbackChallenges.get(userId);
   if (challenge) {
     if (Date.now() > challenge.expiresAt) {

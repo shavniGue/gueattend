@@ -29,18 +29,18 @@
     </nav>
 
     <div class="nav-right">
-      <span class="user-tag" id="navUserNameDisplay">SHAVNI</span>
+      <span class="user-tag" id="navUserNameDisplay">STUDENT</span>
       <button id="logoutBtn" class="btn-nav-logout" title="Sign out">Logout</button>
     </div>
   </header>
 
-  <!-- Main Centered Container (Matches Image 1) -->
+  <!-- Main Centered Container -->
   <main class="dashboard-container">
     <!-- Header Row: Greeting + Refresh Button -->
     <div class="dash-header-row">
       <div>
-        <h1 class="greeting-title" id="greetingUser">Hello, SHAVNI 👋</h1>
-        <p class="greeting-subtitle">Your attendance and connection status — data comes live from GEU Student Portal.</p>
+        <h1 class="greeting-title" id="greetingUser">Hello, Student 👋</h1>
+        <p class="greeting-subtitle">Your attendance and connection status — data loads from your own GUeID account.</p>
       </div>
       <div>
         <button id="refreshAttendanceBtn" class="btn-refresh">
@@ -60,12 +60,12 @@
         <div>
           <div class="mini-card-label">GEU ID CONNECTION</div>
           <div class="mini-card-value" id="qumsStatusDisplay">
-            <span>Connected ✅</span>
+            <span>Checking...</span>
           </div>
         </div>
         <div class="mini-card-links">
           <a href="/geu-setup" id="openQumsLink">Open GEU ID Setup</a>
-          <button id="disconnectQumsBtn">Logout</button>
+          <button id="disconnectQumsBtn" style="display: none;">Logout</button>
         </div>
       </div>
 
@@ -74,12 +74,12 @@
         <div>
           <div class="mini-card-label">TELEGRAM CONNECTION</div>
           <div class="mini-card-value" id="telegramStatusDisplay">
-            <span>Connected ✅</span>
+            <span>Checking...</span>
           </div>
         </div>
         <div class="mini-card-links">
           <a href="/telegram-setup" id="openTgLink">Open Telegram settings</a>
-          <button id="disconnectTgBtn">Disconnect</button>
+          <button id="disconnectTgBtn" style="display: none;">Disconnect</button>
         </div>
       </div>
 
@@ -87,7 +87,7 @@
       <div class="status-mini-card">
         <div>
           <div class="mini-card-label">OVERALL ATTENDANCE</div>
-          <div class="mini-card-value big-number" id="overallPctDisplay">93.1%</div>
+          <div class="mini-card-value big-number" id="overallPctDisplay">--%</div>
         </div>
         <div class="mini-card-subtext" id="below75Subtext">0 subject(s) below 75%</div>
       </div>
@@ -96,7 +96,7 @@
       <div class="status-mini-card">
         <div>
           <div class="mini-card-label">TODAY'S CLASSES</div>
-          <div class="mini-card-value big-number" id="classesTodayCountDisplay">6</div>
+          <div class="mini-card-value big-number" id="classesTodayCountDisplay">0</div>
         </div>
         <div class="mini-card-links">
           <button id="toggleTodayClassesBtn">Load today's classes</button>
@@ -112,11 +112,11 @@
       </div>
     </div>
 
-    <!-- 5 Quick Metrics Bar (Matches Image 1) -->
+    <!-- 5 Quick Metrics Bar -->
     <div class="quick-metrics-bar">
       <div class="quick-metric-item">
         <div class="qm-label">Subjects</div>
-        <div class="qm-val" id="qmSubjects">10</div>
+        <div class="qm-val" id="qmSubjects">0</div>
       </div>
       <div class="quick-metric-item">
         <div class="qm-label">Below 75%</div>
@@ -124,15 +124,15 @@
       </div>
       <div class="quick-metric-item">
         <div class="qm-label">OK (&gt;=75%)</div>
-        <div class="qm-val" id="qmOk">10</div>
+        <div class="qm-val" id="qmOk">0</div>
       </div>
       <div class="quick-metric-item">
         <div class="qm-label">Overall</div>
-        <div class="qm-val highlight" id="qmOverall">93.1%</div>
+        <div class="qm-val highlight" id="qmOverall">--%</div>
       </div>
       <div class="quick-metric-item">
         <div class="qm-label">Period</div>
-        <div class="qm-val" style="font-size: 13px; font-weight: 700;" id="qmPeriod">26/07/2026 - 09/11/2026</div>
+        <div class="qm-val" style="font-size: 13px; font-weight: 700;" id="qmPeriod">-</div>
       </div>
     </div>
 

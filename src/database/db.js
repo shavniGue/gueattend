@@ -36,8 +36,17 @@ async function checkDatabaseHealth() {
     connected: false,
     tablesExist: false,
     missingTables: [],
+    projectMismatch: false,
     details: '',
   };
+
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseRef = supabaseUrl.match(/https?:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1] || '';
+  const dbRef = DATABASE_URL.match(/postgres\.([a-z0-9-]+):/i)?.[1] || DATABASE_URL.match(/@db\.([a-z0-9-]+)\.supabase\.co/i)?.[1] || '';
+  if (supabaseRef && dbRef && supabaseRef !== dbRef) {
+    result.projectMismatch = true;
+    console.warn(`[db] WARNING: DATABASE_URL points to Supabase project "${dbRef}", while SUPABASE_URL is "${supabaseRef}". Update DATABASE_URL so GUeAttend does not read another project's database.`);
+  }
 
   if (!DATABASE_URL) {
     result.details = 'DATABASE_URL environment variable is missing.';
@@ -71,9 +80,11 @@ async function checkDatabaseHealth() {
 
       result.missingTables = required.filter((t) => !existing.has(t));
       result.tablesExist = result.missingTables.length === 0;
-      result.details = result.tablesExist
-        ? 'All required university ERP tables are present.'
-        : `Connected, but missing tables: ${result.missingTables.join(', ')}`;
+      result.details = result.projectMismatch
+        ? `WARNING: DATABASE_URL (${dbRef}) does not match SUPABASE_URL (${supabaseRef}).`
+        : result.tablesExist
+          ? 'All required university ERP tables are present.'
+          : `Connected, but missing tables: ${result.missingTables.join(', ')}`;
     } finally {
       client.release();
     }

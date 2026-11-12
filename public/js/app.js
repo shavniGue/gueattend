@@ -65,10 +65,22 @@ async function loadDashboardData() {
     const qidEl = document.getElementById('modalStudentQid');
     if (qidEl) qidEl.textContent = currentStudent.studentId || '';
 
-    // 2. QUMS Connection Card
+    // 2. GEU ID Connection Card (reflects real session status, never hardcoded)
     const qumsEl = document.getElementById('qumsStatusDisplay');
+    const disconnectQumsBtn = document.getElementById('disconnectQumsBtn');
+    const portalConnected = Boolean(data.qumsStatus && data.qumsStatus.connected);
+    const portalState = String(data.qumsStatus?.status || (portalConnected ? 'connected' : 'disconnected')).toLowerCase();
     if (qumsEl) {
-      qumsEl.innerHTML = `<span>Connected ✅</span>`;
+      if (portalConnected) {
+        qumsEl.innerHTML = `<span style="color: #16a34a;">Connected ✅</span>`;
+      } else if (portalState === 'expired') {
+        qumsEl.innerHTML = `<span style="color: #d97706;">Expired ⚠️</span>`;
+      } else {
+        qumsEl.innerHTML = `<span style="color: #6b7280;">Not Connected</span>`;
+      }
+    }
+    if (disconnectQumsBtn) {
+      disconnectQumsBtn.style.display = portalConnected ? 'inline' : 'none';
     }
 
     // 3. Telegram Connection Card
@@ -84,11 +96,13 @@ async function loadDashboardData() {
       }
     }
 
-    // 4. Overall Attendance Card
-    const overallPct = (summary.overallPercentage != null) ? Number(summary.overallPercentage).toFixed(1) : '93.1';
+    // 4. Overall Attendance Card (only show real percentage when portal connected & records exist)
+    const totalMarked = subjects.reduce((acc, s) => acc + Number(s.marked_classes || 0), 0);
+    const hasAttendanceData = portalConnected && subjects.length > 0 && totalMarked > 0 && summary.overallPercentage != null;
+    const overallPctText = hasAttendanceData ? `${Number(summary.overallPercentage).toFixed(1)}%` : '--%';
     const overallEl = document.getElementById('overallPctDisplay');
     if (overallEl) {
-      overallEl.textContent = `${overallPct}%`;
+      overallEl.textContent = overallPctText;
       overallEl.style.color = '#111827';
     }
 
@@ -96,37 +110,37 @@ async function loadDashboardData() {
     const below75Subtext = document.getElementById('below75Subtext');
     if (below75Subtext) {
       below75Subtext.textContent = `${below75} subject(s) below 75%`;
-      if (below75 > 0) below75Subtext.style.color = 'var(--danger)';
+      below75Subtext.style.color = below75 > 0 ? 'var(--danger)' : '';
     }
 
-    // 5. Today's Classes Count
+    // 5. Today's Classes Count (never hardcode 6)
     const todayClasses = data.widgets?.todayTimetable || [];
     const countDisplay = document.getElementById('classesTodayCountDisplay');
-    if (countDisplay) countDisplay.textContent = todayClasses.length || 6;
+    if (countDisplay) countDisplay.textContent = String(todayClasses.length);
 
     // Render Today's Classes list
     renderTodayClasses(todayClasses);
 
-    // 6. 5 Quick Metrics Bar (Exact Image 1)
+    // 6. 5 Quick Metrics Bar
     const qmSubjects = document.getElementById('qmSubjects');
-    if (qmSubjects) qmSubjects.textContent = summary.totalSubjects || subjects.length;
+    if (qmSubjects) qmSubjects.textContent = summary.totalSubjects ?? subjects.length;
 
     const qmBelow75 = document.getElementById('qmBelow75');
     if (qmBelow75) qmBelow75.textContent = below75;
 
     const qmOk = document.getElementById('qmOk');
-    if (qmOk) qmOk.textContent = summary.okCount || (subjects.length - below75);
+    if (qmOk) qmOk.textContent = summary.okCount ?? Math.max(0, subjects.length - below75);
 
     const qmOverall = document.getElementById('qmOverall');
     if (qmOverall) {
-      qmOverall.textContent = `${overallPct}%`;
+      qmOverall.textContent = overallPctText;
     }
 
     const qmPeriod = document.getElementById('qmPeriod');
-    if (qmPeriod) qmPeriod.textContent = data.periodDisplay || '26/07/2026 - 09/11/2026';
+    if (qmPeriod) qmPeriod.textContent = data.periodDisplay || '-';
 
-    // 7. Main Subject Attendance Table (Exact Image 1)
-    renderSubjectsTable(subjects);
+    // 7. Main Subject Attendance Table
+    renderSubjectsTable(subjects, portalConnected);
   } catch (err) {
     console.error('[dashboard] Render error:', err);
   }
@@ -156,12 +170,15 @@ function renderTodayClasses(classes) {
   container.innerHTML = html;
 }
 
-function renderSubjectsTable(subjects) {
+function renderSubjectsTable(subjects, portalConnected = false) {
   const tbody = document.getElementById('subjectsAttendanceTbody');
   if (!tbody) return;
 
   if (!subjects || subjects.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">No subject attendance records found.</td></tr>`;
+    const emptyMsg = portalConnected
+      ? 'No subject attendance records synced for your account yet.'
+      : 'Connect your GUeID on <a href="/geu-setup" style="color: var(--primary); font-weight: 700;">GEU ID Setup</a> to load your own portal attendance.';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">${emptyMsg}</td></tr>`;
     return;
   }
 

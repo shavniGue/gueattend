@@ -22,17 +22,74 @@ const { requireAuth } = require('../middleware/auth');
 
 router.get('/student', requireAuth, async (req, res) => {
   try {
-    const student = await db.getStudentByUserId(req.session.userId);
+    const userRow = await db.getUserById(req.session.userId);
+    let student = await db.getStudentByUserId(req.session.userId);
+    if (!student && userRow) {
+      await db.ensureStudentProfile(userRow.id, userRow.email).catch(() => null);
+      student = await db.getStudentByUserId(req.session.userId);
+    }
+
+    const rawPortalState = String(
+      userRow?.qums_session_status || userRow?.new_erp_session_status || 'disconnected'
+    ).toLowerCase();
+    const isPortalConnected = rawPortalState === 'active' || rawPortalState === 'connected';
+    const isPortalExpired = rawPortalState === 'expired';
+    const portalLabel = isPortalConnected
+      ? 'Connected ✅'
+      : isPortalExpired
+        ? 'Expired ⚠️'
+        : 'Not Connected';
+
     if (!student) {
-      return res.status(404).json({ success: false, error: 'Student profile not found.' });
+      const tgRes = await db.query(
+        'SELECT telegram_chat_id AS chat_id, telegram_username AS username FROM telegram_accounts WHERE user_id = $1',
+        [req.session.userId]
+      );
+      const isTgConnected = Boolean(tgRes.rows.length > 0 && tgRes.rows[0].chat_id);
+      return res.json({
+        success: true,
+        currentDate: req.query.date || new Date().toISOString().split('T')[0],
+        periodDisplay: '-',
+        academicSession: '-',
+        qumsStatus: {
+          connected: isPortalConnected,
+          status: rawPortalState,
+          label: portalLabel,
+          lastSynced: userRow?.last_attendance_sync_at || null,
+        },
+        telegramStatus: {
+          connected: isTgConnected,
+          username: tgRes.rows[0]?.username || null,
+          chatId: tgRes.rows[0]?.chat_id || null,
+        },
+        student: {
+          userId: req.session.userId,
+          name: userRow?.full_name || userRow?.student_name || 'Student',
+          email: userRow?.email || '',
+          studentId: userRow?.qums_qid || '',
+        },
+        widgets: {
+          classesTodayCount: 0,
+          rightNow: null,
+          upNext: null,
+          todayTimetable: [],
+          classSubstitutions: [],
+          todayAttendance: [],
+          attendanceSummary: { overallPercentage: null, below75Count: 0, totalSubjects: 0, okCount: 0, subjects: [] },
+          monthRegister: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), totalMarkedInMonth: 0, records: [] },
+        },
+        feed: { notifications: [] },
+      });
     }
 
     const todayStr = req.query.date || new Date().toISOString().split('T')[0];
     const now = new Date();
-    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
 
-    // 1. Weekly schedule and Today's Timetable
-    const weeklySchedule = await db.getStudentWeeklyTimetable(student.id);
+    // Only expose attendance & timetable once this user has connected their own GUeID portal session
+    const weeklySchedule = isPortalConnected ? await db.getStudentWeeklyTimetable(student.id) : [];
+    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
     let todayClasses = weeklySchedule.filter((r) => r.day_of_week === dayOfWeek);
     if (todayClasses.length === 0 && weeklySchedule.length > 0) {
       todayClasses = weeklySchedule.filter((r) => r.day_of_week === 1);
@@ -66,16 +123,14 @@ router.get('/student', requireAuth, async (req, res) => {
     // 3. Class Substitutions
     const substitutions = todayClasses.filter((c) => Boolean(c.substitution_id));
 
-    // 4. Today's Attendance
-    const todayAttendance = await db.getTodayAttendance(student.id, todayStr);
-
-    // 5. Overall and Subject-wise Attendance Summary (includes 75% Bunk Margins)
-    const attendanceSummary = await db.getAttendanceSummary(student.id);
-
-    // 6. Month Register (current month)
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const monthlyAttendance = await db.getMonthlyAttendance(student.id, currentMonth, currentYear);
+    // 4. Today's Attendance & 5. Summary & 6. Month Register
+    const todayAttendance = isPortalConnected ? await db.getTodayAttendance(student.id, todayStr) : [];
+    const attendanceSummary = isPortalConnected
+      ? await db.getAttendanceSummary(student.id)
+      : { overallPercentage: null, below75Count: 0, totalSubjects: 0, okCount: 0, subjects: [] };
+    const monthlyAttendance = isPortalConnected
+      ? await db.getMonthlyAttendance(student.id, currentMonth, currentYear)
+      : [];
 
     // 7. Telegram Status
     const tgRes = await db.query(
@@ -90,12 +145,13 @@ router.get('/student', requireAuth, async (req, res) => {
     res.json({
       success: true,
       currentDate: todayStr,
-      periodDisplay: '26/07/2026 - 09/11/2026',
-      academicSession: student.session_name,
+      periodDisplay: student.session_name || '-',
+      academicSession: student.session_name || '-',
       qumsStatus: {
-        connected: true,
-        label: 'Connected ✔',
-        lastSynced: student.updated_at || new Date().toISOString(),
+        connected: isPortalConnected,
+        status: rawPortalState,
+        label: portalLabel,
+        lastSynced: userRow?.last_attendance_sync_at || student.updated_at || null,
       },
       telegramStatus: {
         connected: isTgConnected,
