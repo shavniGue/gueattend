@@ -323,7 +323,23 @@ function setupEventListeners() {
     });
   }
 
-  // GEU Password update form
+  // GEU Password modal view toggle + update form
+  const toggleModalPwBtn = document.getElementById('toggleModalPasswordBtn');
+  if (toggleModalPwBtn) {
+    toggleModalPwBtn.addEventListener('click', () => {
+      const input = document.getElementById('qumsPasswordInput');
+      const offIcon = document.getElementById('modalEyeOffIcon');
+      const onIcon = document.getElementById('modalEyeOnIcon');
+      if (!input) return;
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      if (offIcon) offIcon.style.display = reveal ? 'none' : 'block';
+      if (onIcon) onIcon.style.display = reveal ? 'block' : 'none';
+      toggleModalPwBtn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      toggleModalPwBtn.setAttribute('title', reveal ? 'Hide password' : 'Show password');
+    });
+  }
+
   const qumsForm = document.getElementById('qumsSyncForm');
   if (qumsForm) {
     qumsForm.addEventListener('submit', (e) => {

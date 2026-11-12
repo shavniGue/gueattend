@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telegram Setup & Alerts — gueattend</title>
+  <title>Telegram Alerts — gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -33,172 +33,85 @@
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="dashboard-container" style="max-width: 900px;">
-    <div class="dash-header-row" style="margin-bottom: 24px;">
+  <!-- Main Centered Clean Container -->
+  <main class="dashboard-container" style="max-width: 640px;">
+    <div class="dash-header-row" style="margin-bottom: 20px;">
       <div>
-        <h1 class="greeting-title">✈️ Telegram Bot Alerts & Setup</h1>
-        <p class="greeting-subtitle">Receive instant period attendance alerts, daily morning timetables, and bunk margin calculations directly on Telegram.</p>
+        <h1 class="greeting-title" style="font-size: 21px;">Telegram Bot Alerts</h1>
+        <p class="greeting-subtitle">Link your Telegram account for attendance and timetable updates.</p>
       </div>
       <div>
-        <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Back to Dashboard</a>
+        <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Dashboard</a>
       </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px;">
-      
-      <!-- Left Column: Connection Status & 1-Click Deep Link -->
-      <div>
-        <!-- Card 1: Connection Box -->
-        <div class="dash-table-card" style="margin-bottom: 24px;">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <h2 style="font-size: 16px; font-weight: 700;">Connection Status</h2>
-              <span id="tgStatusBadge" class="status-tag attention">Checking...</span>
-            </div>
-          </div>
-
-          <div style="padding: 20px;">
-            <div id="linkedInfoBox" style="display: none; padding: 14px; background: var(--success-bg); border-radius: var(--radius-sm); margin-bottom: 16px;">
-              <div style="font-weight: 700; color: var(--success-text); font-size: 14px;">🟢 Linked to Telegram</div>
-              <div id="linkedDetails" style="font-size: 13px; color: var(--text); margin-top: 4px;">Chat ID: -</div>
-              <div style="margin-top: 10px;">
-                <button id="unlinkBtn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px; color: var(--danger);">Disconnect Telegram</button>
-              </div>
-            </div>
-
-            <div id="unlinkedActionBox">
-              <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">
-                Connect your account in seconds using our official bot <strong style="color: var(--primary);">@gue_attendance_bot</strong>.
-              </p>
-
-              <button id="genTokenBtn" class="btn-primary" style="padding: 11px 22px; font-size: 14px;">
-                🔗 Generate 1-Click Link Button
-              </button>
-
-              <div id="tokenResultBox" style="display: none; margin-top: 18px; padding: 16px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius);">
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-muted);">STEP 1: CLICK TO LAUNCH BOT DIRECTLY</div>
-                <div style="margin: 10px 0;">
-                  <a id="deepLinkBtn" href="#" target="_blank" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 10px 22px; font-weight: 700;">
-                    🚀 Open @gue_attendance_bot in Telegram
-                  </a>
-                </div>
-
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-top: 16px;">OR STEP 2: SEND MANUAL COMMAND</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Open Telegram and message our bot:</div>
-                <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
-                  <code id="manualCommandCode" style="background: #ffffff; border: 1px solid var(--border); padding: 8px 14px; border-radius: 4px; font-size: 15px; font-weight: 800; color: var(--primary);">/login ......</code>
-                  <button id="copyCodeBtn" class="btn-secondary" style="padding: 7px 12px; font-size: 12px;">📋 Copy</button>
-                </div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">This linking code expires in 15 minutes.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 2: Telegram Bot Commands -->
-        <div class="dash-table-card">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <h2 style="font-size: 16px; font-weight: 700;">Supported Telegram Commands</h2>
-          </div>
-          <div style="padding: 16px 20px;">
-            <div style="display: grid; gap: 14px;">
-              <div style="padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <code style="font-weight: 800; color: var(--primary); font-size: 14px;">/status</code>
-                  <span class="status-tag ok" style="font-size: 10px;">Auto-Pruned (2 min)</span>
-                </div>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
-                  Returns your overall attendance %, total subjects, and subjects below 75%. Automatically deletes itself after 2 minutes to keep your chat clean.
-                </p>
-              </div>
-
-              <div style="padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm);">
-                <code style="font-weight: 800; color: var(--primary); font-size: 14px;">/today</code>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
-                  Shows today's live lecture timetable with lecture periods, room numbers, faculty names, and current attendance status.
-                </p>
-              </div>
-
-              <div style="padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm);">
-                <code style="font-weight: 800; color: var(--primary); font-size: 14px;">/timetable</code>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
-                  Retrieves your full Monday through Saturday weekly classroom schedule.
-                </p>
-              </div>
-
-              <div style="padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <code style="font-weight: 800; color: var(--primary); font-size: 14px;">DD/MM/YYYY</code>
-                  <span class="status-tag ok" style="font-size: 10px;">Auto-Pruned (60s)</span>
-                </div>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">
-                  Send any date (e.g. <code>15/10/2026</code>) to inspect past attendance marked on that specific day. Auto-cleans after 60 seconds.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- Card 1: Connection Status -->
+    <div class="dash-table-card" style="margin-bottom: 20px;">
+      <div style="padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+        <h2 style="font-size: 15px; font-weight: 700;">Connection Status</h2>
+        <span id="tgStatusBadge" class="status-tag attention">Checking...</span>
       </div>
 
-      <!-- Right Column: Auto-Prune & Clean Inbox Guarantee -->
-      <div>
-        <div class="dash-table-card" style="margin-bottom: 20px;">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <h3 style="font-size: 14px; font-weight: 700;">🧹 Clean Inbox Guarantee</h3>
-          </div>
-          <div style="padding: 16px 20px; font-size: 12.5px; line-height: 1.6; color: var(--text);">
-            <p style="color: var(--text-muted); margin-bottom: 12px;">
-              Most college bots flood your chat with hundreds of permanent messages that you have to delete manually.
-            </p>
-            <div style="margin-bottom: 12px;">
-              <strong style="color: var(--primary);">⏱️ Ephemeral Queries:</strong>
-              <div style="color: var(--text-muted);">Status checks & date queries auto-delete after you view them.</div>
-            </div>
-            <div style="margin-bottom: 12px;">
-              <strong style="color: var(--primary);">🔔 Important Alerts Persist:</strong>
-              <div style="color: var(--text-muted);">Attendance mark alerts, morning schedules, and low attendance warnings stay safe in your chat.</div>
-            </div>
-            <div>
-              <strong style="color: var(--primary);">⚡ 1-Click Reconnect:</strong>
-              <div style="color: var(--text-muted);">If your portal session expires, Telegram sends you a direct button to refresh with 1 click.</div>
-            </div>
+      <div style="padding: 20px;">
+        <div id="linkedInfoBox" style="display: none; padding: 14px; background: var(--success-bg); border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; color: var(--success-text); font-size: 13.5px;">Connected to Telegram</div>
+          <div id="linkedDetails" style="font-size: 13px; color: var(--text); margin-top: 4px;">Chat ID: -</div>
+          <div style="margin-top: 12px;">
+            <button id="unlinkBtn" class="btn-secondary" style="color: var(--danger);">Disconnect</button>
           </div>
         </div>
 
-        <div class="notif-explainer-card">
-          <div class="notif-explainer-header">
-            <span>🛡️</span>
-            <span>Privacy Isolation</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 4px;">
-            One Telegram chat is strictly bound to one student account. Your attendance, marks, and notifications are 100% private to you.
+        <div id="unlinkedActionBox">
+          <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 14px;">
+            Bot: <strong style="color: var(--primary);">@gue_attendance_bot</strong>
           </p>
+
+          <button id="genTokenBtn" class="btn-primary">Link Telegram</button>
+
+          <div id="tokenResultBox" style="display: none; margin-top: 16px; padding: 14px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius);">
+            <div style="margin-bottom: 12px;">
+              <a id="deepLinkBtn" href="#" target="_blank" class="btn-primary" style="display: inline-block; text-decoration: none;">
+                Open @gue_attendance_bot
+              </a>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Or send this command to the bot:</div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <code id="manualCommandCode" style="background: #ffffff; border: 1px solid var(--border); padding: 7px 12px; border-radius: 5px; font-size: 14px; font-weight: 700; color: var(--primary);">/login ......</code>
+              <button type="button" id="copyCodeBtn" class="btn-secondary">Copy</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Expires in 15 minutes.</div>
+          </div>
         </div>
       </div>
+    </div>
 
+    <!-- Card 2: Compact Bot Commands -->
+    <div class="dash-table-card">
+      <div style="padding: 15px 20px; border-bottom: 1px solid var(--border);">
+        <h2 style="font-size: 15px; font-weight: 700;">Bot Commands</h2>
+      </div>
+      <div style="padding: 14px 20px; display: grid; gap: 10px; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-alt); border-radius: 6px;">
+          <code style="font-weight: 700; color: var(--primary);">/status</code>
+          <span style="color: var(--text-muted);">Overall attendance summary</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-alt); border-radius: 6px;">
+          <code style="font-weight: 700; color: var(--primary);">/today</code>
+          <span style="color: var(--text-muted);">Today's classes &amp; status</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-alt); border-radius: 6px;">
+          <code style="font-weight: 700; color: var(--primary);">/timetable</code>
+          <span style="color: var(--text-muted);">Weekly class schedule</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-alt); border-radius: 6px;">
+          <code style="font-weight: 700; color: var(--primary);">DD/MM/YYYY</code>
+          <span style="color: var(--text-muted);">Attendance for a specific date</span>
+        </div>
+      </div>
     </div>
   </main>
 
   <script>
-    // Theme Switcher Logic
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const themes = ['emerald', 'indigo', 'cyan'];
-    let currentThemeIdx = 0;
-    const savedTheme = localStorage.getItem('gueattend_theme') || 'emerald';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    currentThemeIdx = themes.indexOf(savedTheme) >= 0 ? themes.indexOf(savedTheme) : 0;
-
-    if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', () => {
-        currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-        const nextTheme = themes[currentThemeIdx];
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('gueattend_theme', nextTheme);
-      });
-    }
-
-    // Load Telegram Status
     async function checkTelegramStatus() {
       try {
         const res = await fetch('/api/telegram/status');
@@ -213,7 +126,7 @@
           badge.textContent = 'Connected ✔';
           linkedBox.style.display = 'block';
           unlinkedBox.style.display = 'none';
-          details.innerHTML = `Connected as <strong>${data.account.username ? '@' + data.account.username : data.account.firstName || 'User'}</strong> (Chat ID: <code>${data.account.chatId}</code>)<br><small style="color: var(--text-muted);">Linked on ${new Date(data.account.linkedAt).toLocaleDateString()}</small>`;
+          details.innerHTML = `Connected as <strong>${data.account.username ? '@' + data.account.username : data.account.firstName || 'User'}</strong> (Chat ID: <code>${data.account.chatId}</code>)`;
         } else {
           badge.className = 'status-tag attention';
           badge.textContent = 'Not Connected';
@@ -223,7 +136,6 @@
       } catch (err) {}
     }
 
-    // Generate Linking Token
     document.getElementById('genTokenBtn')?.addEventListener('click', async () => {
       const btn = document.getElementById('genTokenBtn');
       btn.disabled = true;
@@ -237,32 +149,33 @@
           document.getElementById('deepLinkBtn').href = data.deepLink;
           document.getElementById('manualCommandCode').textContent = `/login ${data.token}`;
         } else {
-          alert('Failed to generate token.');
+          alert(data.error || 'Failed to generate link.');
         }
       } catch (err) {
         alert('Network error while generating link.');
       } finally {
         btn.disabled = false;
-        btn.textContent = '🔗 Generate 1-Click Link Button';
+        btn.textContent = 'Link Telegram';
       }
     });
 
-    // Copy command
     document.getElementById('copyCodeBtn')?.addEventListener('click', () => {
       const text = document.getElementById('manualCommandCode').textContent;
       navigator.clipboard.writeText(text).then(() => {
-        alert('Copied command to clipboard!');
+        const copyBtn = document.getElementById('copyCodeBtn');
+        if (copyBtn) {
+          copyBtn.textContent = 'Copied';
+          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        }
       });
     });
 
-    // Disconnect
     document.getElementById('unlinkBtn')?.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to disconnect Telegram notifications?')) return;
+      if (!confirm('Disconnect Telegram notifications?')) return;
       try {
-        const res = await fetch('/api/telegram/disconnect', { method: 'POST' });
+        const res = await fetch('/api/telegram/unlink', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-          alert('Disconnected from Telegram.');
           checkTelegramStatus();
         }
       } catch (err) {
@@ -270,7 +183,6 @@
       }
     });
 
-    // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login';
@@ -280,4 +192,3 @@
   </script>
 </body>
 </html>
-

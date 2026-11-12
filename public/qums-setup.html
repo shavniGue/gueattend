@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GEU ID Setup &amp; Reconnect — gueattend</title>
+  <title>GEU ID Login — gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -33,164 +33,141 @@
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="dashboard-container" style="max-width: 900px;">
-    <div class="dash-header-row" style="margin-bottom: 24px;">
+  <!-- Centered Clean GEU ID Login Container -->
+  <main class="dashboard-container" style="max-width: 520px;">
+    <div class="dash-header-row" style="margin-bottom: 18px;">
       <div>
-        <h1 class="greeting-title">🔐 GEU ID Account Connection</h1>
-        <p class="greeting-subtitle">Connect your Graphic Era Student Portal (student.geu.ac.in) credentials to enable live attendance tracking &amp; automated Telegram alerts.</p>
+        <h1 class="greeting-title" style="font-size: 21px;">GEU ID Portal Login</h1>
+        <p class="greeting-subtitle">Connect using your GUeID, password, and live CAPTCHA from student.geu.ac.in</p>
       </div>
       <div>
-        <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Back to Dashboard</a>
+        <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Dashboard</a>
       </div>
     </div>
 
     <!-- Alert / Status Banner -->
-    <div id="statusBanner" style="display: none; padding: 14px 18px; border-radius: var(--radius); margin-bottom: 20px; font-weight: 600;"></div>
+    <div id="statusBanner" style="display: none; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px; font-weight: 600;"></div>
+    <div id="setupAlertBox" style="display: none; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px;"></div>
 
-    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px;">
-      
-      <!-- Left Column: Form & CAPTCHA -->
-      <div>
-        <!-- Card 1: 1-Click Reconnect (if expired) -->
-        <div id="reconnectCard" class="dash-table-card" style="display: none; margin-bottom: 20px; border-left: 4px solid var(--warning);">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <h2 style="font-size: 16px; font-weight: 700; color: var(--warning-text);">⚡ 1-Click Session Reconnect</h2>
-              <span class="status-tag attention">Session Expired</span>
-            </div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-              Your ERP password is saved securely in your AES-256 vault. Just enter the fresh visual CAPTCHA below to reconnect instantly without typing your password!
-            </p>
+    <!-- Card 1: 1-Click Reconnect (only shown when session expired) -->
+    <div id="reconnectCard" class="dash-table-card" style="display: none; margin-bottom: 18px; border-left: 4px solid var(--warning);">
+      <div style="padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+        <h2 style="font-size: 15px; font-weight: 700; color: var(--warning-text);">Reconnect GEU Session</h2>
+        <span class="status-tag attention">Session Expired</span>
+      </div>
+
+      <div style="padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+          <div id="reconnectCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; display: inline-flex; align-items: center; min-width: 160px; min-height: 52px; justify-content: center;">
+            <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
+          </div>
+          <button type="button" id="refreshReconnectCaptchaBtn" class="btn-secondary">Refresh</button>
+        </div>
+
+        <form id="reconnectForm">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label class="form-label" for="reconnectCaptchaInput">CAPTCHA</label>
+            <input type="text" id="reconnectCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 15px;">
+          </div>
+          <button type="submit" id="reconnectSubmitBtn" class="btn-primary" style="width: 100%;">Reconnect</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Card 2: GEU ID Login Form (GUeID + Password + Live CAPTCHA only) -->
+    <div class="dash-table-card">
+      <div style="padding: 22px;">
+        <form id="qumsSetupForm">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="setupQidInput">GUeID</label>
+            <input type="text" id="setupQidInput" class="form-input" placeholder="Enter your GUeID" required autocomplete="username">
           </div>
 
-          <div style="padding: 20px;">
-            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
-              <div id="reconnectCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px; display: inline-flex; align-items: center; min-width: 140px; min-height: 50px; justify-content: center;">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="setupPasswordInput">Password</label>
+            <div class="input-with-icon">
+              <input type="password" id="setupPasswordInput" class="has-toggle" placeholder="Enter your portal password" required autocomplete="current-password">
+              <button type="button" id="toggleSetupPasswordBtn" class="input-icon-btn" aria-label="Show password" title="Show password">
+                <svg id="setupEyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                <svg id="setupEyeOnIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label class="form-label" for="setupCaptchaInput">CAPTCHA</label>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+              <div id="setupCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; display: inline-flex; align-items: center; min-width: 170px; min-height: 52px; justify-content: center;">
                 <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
               </div>
-              <button type="button" id="refreshReconnectCaptchaBtn" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">🔄 Refresh</button>
+              <button type="button" id="refreshSetupCaptchaBtn" class="btn-secondary">Refresh CAPTCHA</button>
             </div>
-
-            <form id="reconnectForm">
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label">Enter CAPTCHA Code</label>
-                <input type="text" id="reconnectCaptchaInput" class="form-input" placeholder="e.g. 74X9B" required autocomplete="off" style="text-transform: uppercase; font-family: monospace; letter-spacing: 2px; font-size: 16px; max-width: 200px;">
-              </div>
-              <button type="submit" id="reconnectSubmitBtn" class="btn-primary" style="padding: 10px 20px;">⚡ 1-Click Reconnect</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Card 2: Full Setup / Update Credentials -->
-        <div class="dash-table-card">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <h2 style="font-size: 16px; font-weight: 700;">University Portal Credentials</h2>
-            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-              Used strictly by the headless browser relay to extract your attendance and timetable.
-            </p>
+            <input type="text" id="setupCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 15px;">
           </div>
 
-          <div style="padding: 20px;">
-            <form id="qumsSetupForm">
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label">Student GUeID / University ID</label>
-                <input type="text" id="setupQidInput" class="form-input" placeholder="Enter your GUeID" required>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Your official Graphic Era student portal login ID (GUeID).</div>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label">University ERP Password</label>
-                <input type="password" id="setupPasswordInput" class="form-input" placeholder="Enter your portal password" required>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Stored in an AES-256-GCM encrypted vault. Never shared.</div>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 18px;">
-                <label class="form-label">Visual Security CAPTCHA</label>
-                <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 8px;">
-                  <div id="setupCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px; display: inline-flex; align-items: center; min-width: 140px; min-height: 50px; justify-content: center;">
-                    <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
-                  </div>
-                  <button type="button" id="refreshSetupCaptchaBtn" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">🔄 New Code</button>
-                </div>
-                <input type="text" id="setupCaptchaInput" class="form-input" placeholder="Enter code shown above" required autocomplete="off" style="text-transform: uppercase; font-family: monospace; letter-spacing: 2px; font-size: 16px; max-width: 200px;">
-              </div>
-
-              <div style="display: flex; gap: 12px; align-items: center;">
-                <button type="submit" id="setupSubmitBtn" class="btn-primary" style="padding: 10px 24px;">Connect & Sync Attendance</button>
-                <span id="setupSpinner" style="display: none; font-size: 13px; color: var(--text-muted);">Connecting to ERP portal...</span>
-              </div>
-            </form>
-          </div>
-        </div>
+          <button type="submit" id="setupSubmitBtn" class="btn-primary" style="width: 100%; padding: 11px;">
+            <span id="setupBtnLabel">Connect GEU ID</span>
+          </button>
+          <div id="setupSpinner" style="display: none; font-size: 12.5px; color: var(--text-muted); text-align: center; margin-top: 8px;">Connecting to student.geu.ac.in...</div>
+        </form>
       </div>
-
-      <!-- Right Column: Architecture & Security Badges -->
-      <div>
-        <div class="dash-table-card" style="margin-bottom: 20px;">
-          <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
-            <h3 style="font-size: 14px; font-weight: 700;">🛡️ Security Architecture</h3>
-          </div>
-          <div style="padding: 16px 20px; font-size: 12.5px; line-height: 1.6; color: var(--text);">
-            <div style="margin-bottom: 14px;">
-              <strong style="color: var(--primary);">🔐 AES-256-GCM Vault:</strong>
-              <div style="color: var(--text-muted);">Credentials are encrypted at rest with industry-standard authenticated cryptography.</div>
-            </div>
-            <div style="margin-bottom: 14px;">
-              <strong style="color: var(--primary);">🧩 Human-in-the-Loop CAPTCHA:</strong>
-              <div style="color: var(--text-muted);">No fragile OCR or third-party bypass. Live CAPTCHAs are streamed for you to verify safely.</div>
-            </div>
-            <div style="margin-bottom: 14px;">
-              <strong style="color: var(--primary);">📁 POSIX 0600 Session Isolation:</strong>
-              <div style="color: var(--text-muted);">Cookie jars are locked down with owner-only access. Multi-tenant privacy guaranteed.</div>
-            </div>
-            <div>
-              <strong style="color: var(--primary);">⚡ Autonomous Sync:</strong>
-              <div style="color: var(--text-muted);">Background schedulers fetch your marks, timetable, and attendance automatically.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="notif-explainer-card">
-          <div class="notif-explainer-header">
-            <span>ℹ️</span>
-            <span>Why connect your GEU ID?</span>
-          </div>
-          <ul class="notif-list" style="font-size: 12px;">
-            <li>Morning 8:30 AM timetable alert before 9:00 AM lectures.</li>
-            <li>Instant Telegram notification when attendance is marked.</li>
-            <li>Real-time 75% bunk margin formula calculations.</li>
-            <li>Backdated change alerts if a teacher marks past dates.</li>
-          </ul>
-        </div>
-      </div>
-
     </div>
   </main>
 
   <script>
-    // Load Captcha helper
+    function showSetupMessage(text, isError = true) {
+      const box = document.getElementById('setupAlertBox');
+      if (!box) return;
+      box.textContent = text;
+      box.style.display = 'block';
+      box.style.background = isError ? '#fef2f2' : '#dcfce7';
+      box.style.border = isError ? '1px solid #fecaca' : '1px solid #bbf7d0';
+      box.style.color = isError ? '#b91c1c' : '#15803d';
+    }
+
+    // Password eye toggle
+    document.getElementById('toggleSetupPasswordBtn')?.addEventListener('click', () => {
+      const input = document.getElementById('setupPasswordInput');
+      const offIcon = document.getElementById('setupEyeOffIcon');
+      const onIcon = document.getElementById('setupEyeOnIcon');
+      const btn = document.getElementById('toggleSetupPasswordBtn');
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      if (offIcon) offIcon.style.display = reveal ? 'none' : 'block';
+      if (onIcon) onIcon.style.display = reveal ? 'block' : 'none';
+      btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      btn.setAttribute('title', reveal ? 'Hide password' : 'Show password');
+    });
+
+    // Load live CAPTCHA from student.geu.ac.in
     async function loadCaptcha(targetContainerId) {
       const container = document.getElementById(targetContainerId);
       if (!container) return;
-      container.innerHTML = `<span style="font-size: 12px; color: var(--text-muted);">Loading...</span>`;
+      container.innerHTML = `<span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>`;
       try {
-        const res = await fetch('/api/qums/captcha');
+        const res = await fetch('/api/geu/captcha');
         const data = await res.json();
-        if (data.success && data.captcha) {
-          container.innerHTML = `<img src="${data.captcha}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+        if (data.success && (data.captcha || data.captchaImage)) {
+          container.innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
         } else {
-          container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">Failed to load</span>`;
+          container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">${data.error || 'Could not load CAPTCHA'}</span>`;
         }
       } catch (err) {
-        container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">Error fetching</span>`;
+        container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">Error loading CAPTCHA</span>`;
       }
     }
 
     // Check Status on Load
     async function checkStatus() {
       try {
-        const res = await fetch('/api/qums/status');
+        const res = await fetch('/api/geu/status');
         const data = await res.json();
         const banner = document.getElementById('statusBanner');
         const reconnectCard = document.getElementById('reconnectCard');
@@ -199,14 +176,14 @@
           banner.style.display = 'block';
           banner.style.background = 'var(--warning-bg)';
           banner.style.color = 'var(--warning-text)';
-          banner.innerHTML = `⚠️ <strong>Session Expired:</strong> Your GEU portal connection needs a 1-click CAPTCHA refresh to keep notifications active.`;
+          banner.textContent = 'Session expired. Enter the CAPTCHA below to reconnect.';
           reconnectCard.style.display = 'block';
           loadCaptcha('reconnectCaptchaContainer');
-        } else if (data.sessionState === 'connected') {
+        } else if (data.sessionState === 'connected' || data.sessionState === 'active') {
           banner.style.display = 'block';
           banner.style.background = 'var(--success-bg)';
           banner.style.color = 'var(--success-text)';
-          banner.innerHTML = `🟢 <strong>Connected:</strong> GEU ID account is active and live-syncing attendance for GUeID <strong>${data.studentQid || ''}</strong>.`;
+          banner.innerHTML = `Connected for GUeID: <strong>${data.studentQid || ''}</strong>`;
         }
 
         if (data.studentQid) {
@@ -219,9 +196,10 @@
     document.getElementById('refreshSetupCaptchaBtn')?.addEventListener('click', () => loadCaptcha('setupCaptchaContainer'));
     document.getElementById('refreshReconnectCaptchaBtn')?.addEventListener('click', () => loadCaptcha('reconnectCaptchaContainer'));
 
-    // Handle Full Setup Form Submit
+    // Handle GEU ID Login Submit
     document.getElementById('qumsSetupForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      document.getElementById('setupAlertBox').style.display = 'none';
       const qid = document.getElementById('setupQidInput').value.trim();
       const password = document.getElementById('setupPasswordInput').value;
       const captcha = document.getElementById('setupCaptchaInput').value.trim();
@@ -229,20 +207,20 @@
       const spinner = document.getElementById('setupSpinner');
 
       btn.disabled = true;
-      spinner.style.display = 'inline';
+      spinner.style.display = 'block';
 
       try {
-        const res = await fetch('/api/qums/login', {
+        const res = await fetch('/api/geu/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ qid, password, captcha }),
         });
         const data = await res.json();
         if (data.success || data.ok) {
-          alert('✅ Connected successfully! Your live attendance has been synchronized.');
+          showSetupMessage('Connected! Redirecting to dashboard...', false);
           window.location.href = data.redirect || '/dashboard';
         } else {
-          alert(`❌ Connection failed: ${data.error || 'Invalid credentials or CAPTCHA'}`);
+          showSetupMessage(data.error || 'Invalid GUeID, password, or CAPTCHA.');
           if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
             document.getElementById('setupCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
           } else {
@@ -251,34 +229,34 @@
           document.getElementById('setupCaptchaInput').value = '';
         }
       } catch (err) {
-        alert('Network error while connecting to GEU Student Portal.');
+        showSetupMessage('Network error while connecting to student.geu.ac.in.');
       } finally {
         btn.disabled = false;
         spinner.style.display = 'none';
       }
     });
 
-    // Handle 1-Click Reconnect Submit
+    // Handle Reconnect Submit
     document.getElementById('reconnectForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      document.getElementById('setupAlertBox').style.display = 'none';
       const captcha = document.getElementById('reconnectCaptchaInput').value.trim();
       const btn = document.getElementById('reconnectSubmitBtn');
 
       btn.disabled = true;
-      btn.textContent = '⚡ Reconnecting...';
+      btn.textContent = 'Reconnecting...';
 
       try {
-        const res = await fetch('/api/qums/reconnect', {
+        const res = await fetch('/api/geu/reconnect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ captcha }),
         });
         const data = await res.json();
         if (data.success || data.ok) {
-          alert('✅ Session restored successfully!');
           window.location.href = data.redirect || '/dashboard';
         } else {
-          alert(`❌ Reconnect failed: ${data.error || 'Invalid CAPTCHA code'}`);
+          showSetupMessage(data.error || 'Invalid CAPTCHA code.');
           if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
             document.getElementById('reconnectCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
           } else {
@@ -287,10 +265,10 @@
           document.getElementById('reconnectCaptchaInput').value = '';
         }
       } catch (err) {
-        alert('Network error while reconnecting.');
+        showSetupMessage('Network error while reconnecting.');
       } finally {
         btn.disabled = false;
-        btn.textContent = '⚡ 1-Click Reconnect';
+        btn.textContent = 'Reconnect';
       }
     });
 
@@ -300,10 +278,8 @@
       window.location.href = '/login';
     });
 
-    // Initial Execution
     loadCaptcha('setupCaptchaContainer');
     checkStatus();
   </script>
 </body>
 </html>
-
