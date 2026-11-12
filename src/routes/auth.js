@@ -44,79 +44,399 @@ router.get('/firebase-config', (req, res) => {
   res.json(getFirebaseWebConfig());
 });
 
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 25,
+  message: 'Too many registration attempts. Please try again shortly.',
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 20,
+  message: 'Too many verification requests. Please wait a few minutes.',
+});
+
 /**
- * POST /api/auth/register
- * Platform Registration: Email + Password (NO CAPTCHA) with Email Verification
+ * Cryptographically verifies a Firebase ID token and ensures it belongs to the expected email/UID.
  */
-router.post('/register', async (req, res) => {
-  const { fullName, email, password, firebaseUid } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ success: false, ok: false, error: 'Email and password are required.' });
+async function verifyRegistrationIdToken(idToken, expectedEmail, expectedUid) {
+  if (!idToken) return null;
+
+  const { getAuth } = require('firebase-admin/auth');
+  const { getFirebaseApp } = require('../config/firebase');
+  const app = getFirebaseApp();
+  if (!app) {
+    const err = new Error('Firebase authentication service is unavailable.');
+    err.statusCode = 503;
+    throw err;
   }
 
-  const cleanEmail = email.trim().toLowerCase();
-
+  let decoded;
   try {
-    const existing = await db.getUserByEmail(cleanEmail);
-    if (existing) {
-      return res.status(400).json({
+    decoded = await getAuth(app).verifyIdToken(idToken);
+  } catch (verifyErr) {
+    const err = new Error('Invalid or expired authentication token.');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const tokenEmail = (decoded.email || '').trim().toLowerCase();
+  if (!tokenEmail || tokenEmail !== expectedEmail) {
+    const err = new Error('Authentication token email does not match registration email.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (expectedUid && decoded.uid !== expectedUid) {
+    const err = new Error('Authentication token identity mismatch.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  return decoded;
+}
+
+/**
+ * Creates a student profile only when the user has student role and no profile exists yet.
+ * Never overwrites an existing student's GUeID/student_id.
+ */
+async function ensureSafeStudentRecord(user, cleanEmail) {
+  if (!user || user.role !== 'student') return null;
+  const existingStudent = await db.getStudentByUserId(user.id);
+  if (existingStudent) return existingStudent;
+  return db.ensureStudentProfile(user.id, cleanEmail).catch(() => null);
+}
+
+/**
+ * Case A (No account exists) or Case D3 (Firebase account exists without DB record).
+ */
+async function handleNewUserRegistration({ req, res, cleanEmail, fullName, password, decodedToken }) {
+  const { isAdminEmail } = require('../config/firebase');
+  const role = isAdminEmail(cleanEmail) ? 'admin' : 'student';
+  const hash = await bcrypt.hash(password, 10);
+  const name = (fullName || cleanEmail.split('@')[0]).trim();
+  const newUserId = `usr_${crypto.randomUUID()}`;
+  const emailVerified = Boolean(decodedToken?.email_verified);
+  // Only persist firebase_uid after server-side Firebase ID token verification.
+  const verifiedFirebaseUid = decodedToken ? decodedToken.uid : null;
+
+  const newUserRes = await db.query(
+    `INSERT INTO users (id, email, full_name, password_hash, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, FALSE, 'disconnected', NOW(), NOW())
+     RETURNING *`,
+    [newUserId, cleanEmail, name, hash, verifiedFirebaseUid, role, emailVerified]
+  );
+  const user = newUserRes.rows[0];
+
+  const studentProfile = await ensureSafeStudentRecord(user, cleanEmail);
+
+  await db.recordAuditLog({
+    userId: user.id,
+    action: 'USER_REGISTERED',
+    resource: 'auth:register',
+    details: {
+      email: cleanEmail,
+      firebaseUidLinked: Boolean(verifiedFirebaseUid),
+      resumedFromFirebase: Boolean(decodedToken),
+      emailVerified,
+      studentQid: studentProfile?.student_id || null,
+    },
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  return res.json({
+    success: true,
+    ok: true,
+    status: emailVerified ? 'ALREADY_VERIFIED' : 'VERIFICATION_REQUIRED',
+    resumed: false,
+    emailVerified,
+    message: emailVerified
+      ? 'Your account is already verified and ready. Please sign in.'
+      : 'Account created successfully. A verification email has been sent.',
+    email: cleanEmail,
+  });
+}
+
+/**
+ * Handles Cases B, C, D, and E when a record already exists in public.users.
+ */
+async function handleExistingUserRegistration({ req, res, existing, cleanEmail, password, decodedToken }) {
+  // Without a verified Firebase ID token, require password ownership before disclosing verification state.
+  if (!decodedToken) {
+    const passwordMatches = existing.password_hash
+      ? await bcrypt.compare(password, existing.password_hash)
+      : false;
+
+    if (!passwordMatches) {
+      await db.recordAuditLog({
+        userId: existing.id,
+        action: 'REGISTRATION_UNAUTHENTICATED_RETRY',
+        resource: 'auth:register',
+        details: { email: cleanEmail },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      return res.status(409).json({
         success: false,
         ok: false,
-        error: 'An account with this email already exists. Please sign in.',
+        status: 'ACCOUNT_EXISTS_UNAUTHENTICATED',
+        error: 'Unable to complete registration for this email directly. If you already have an account or pending verification, please sign in or reset your password.',
       });
     }
 
-    const hash = await bcrypt.hash(password, 10);
-    const name = (fullName || cleanEmail.split('@')[0]).trim();
-    const newUserId = `usr_${crypto.randomUUID()}`;
+    const ensuredStudent = await ensureSafeStudentRecord(existing, cleanEmail);
 
-    // Insert user into Supabase with email_verified = false
-    const newUserRes = await db.query(
-      `INSERT INTO users (id, email, full_name, password_hash, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'student', FALSE, TRUE, FALSE, 'disconnected', NOW(), NOW())
-       RETURNING *`,
-      [newUserId, cleanEmail, name, hash, firebaseUid || null]
-    );
-    const user = newUserRes.rows[0];
+    if (existing.email_verified) {
+      await db.recordAuditLog({
+        userId: existing.id,
+        action: 'REGISTRATION_ALREADY_VERIFIED',
+        resource: 'auth:register',
+        details: { email: cleanEmail, studentProfileEnsured: Boolean(ensuredStudent) },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
-    // Seed valid student profile row in Supabase
-    const studentProfile = await db.ensureStudentProfile(user.id, cleanEmail).catch(() => null);
+      return res.status(409).json({
+        success: false,
+        ok: false,
+        status: 'ALREADY_VERIFIED',
+        emailVerified: true,
+        email: cleanEmail,
+        message: 'An account with this email already exists and is verified. Please sign in.',
+      });
+    }
 
     await db.recordAuditLog({
-      userId: user.id,
-      action: 'USER_REGISTERED',
+      userId: existing.id,
+      action: 'REGISTRATION_RESUMED',
       resource: 'auth:register',
-      details: { email: cleanEmail, studentQid: studentProfile?.student_id || null },
+      details: { email: cleanEmail, method: 'password_match', studentProfileEnsured: Boolean(ensuredStudent) },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
 
-    res.json({
+    return res.json({
       success: true,
       ok: true,
-      message: 'Account created successfully. A verification email has been sent.',
+      status: 'VERIFICATION_REQUIRED',
+      resumed: true,
+      emailVerified: false,
       email: cleanEmail,
+      message: 'Your registration is incomplete and awaiting email verification. Please verify your email or use Resend Link.',
     });
+  }
+
+  // Case E: Firebase UID mismatch or unverified Firebase token against an already-verified DB row without UID.
+  const hasUidMismatch = Boolean(existing.firebase_uid && existing.firebase_uid !== decodedToken.uid);
+  const hasVerifiedStateConflict = Boolean(
+    existing.email_verified && !existing.firebase_uid && !decodedToken.email_verified
+  );
+
+  if (hasUidMismatch || hasVerifiedStateConflict) {
+    await db.recordAuditLog({
+      userId: existing.id,
+      action: 'REGISTRATION_IDENTITY_CONFLICT',
+      resource: 'auth:register',
+      details: {
+        email: cleanEmail,
+        supabaseFirebaseUid: existing.firebase_uid || null,
+        incomingFirebaseUid: decodedToken.uid,
+        existingEmailVerified: Boolean(existing.email_verified),
+        incomingEmailVerified: Boolean(decodedToken.email_verified),
+        role: existing.role,
+        hasExistingStudentId: Boolean(existing.qums_qid),
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return res.status(409).json({
+      success: false,
+      ok: false,
+      status: 'IDENTITY_CONFLICT',
+      code: 'IDENTITY_CONFLICT',
+      emailVerified: Boolean(decodedToken.email_verified),
+      error: 'An earlier profile record exists for this email under a different sign-in state. Your existing university data was preserved safely.',
+      message: 'Please verify the email link we sent and sign in on the Login page (or reset your password) to safely recover your account.',
+    });
+  }
+
+  // Cases B, C, and D (no identity conflict): safely resume incomplete state and preserve roles & GUeID.
+  const mergedVerified = Boolean(existing.email_verified || decodedToken.email_verified);
+  const needsUidLink = !existing.firebase_uid;
+  const needsVerifiedSync = mergedVerified && !existing.email_verified;
+  const canUpdatePasswordHash = !existing.email_verified && !existing.qums_qid && existing.role !== 'admin';
+
+  if (needsUidLink || needsVerifiedSync || canUpdatePasswordHash) {
+    const nextPasswordHash = canUpdatePasswordHash
+      ? await bcrypt.hash(password, 10)
+      : existing.password_hash;
+
+    await db.query(
+      `UPDATE users
+       SET firebase_uid = COALESCE(firebase_uid, $1),
+           email_verified = $2,
+           password_hash = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [decodedToken.uid, mergedVerified, nextPasswordHash, existing.id]
+    );
+  }
+
+  const studentExistedBefore = existing.role === 'student' ? Boolean(await db.getStudentByUserId(existing.id)) : true;
+  await ensureSafeStudentRecord(existing, cleanEmail);
+
+  const repairedIncompleteState = needsUidLink || needsVerifiedSync || !studentExistedBefore;
+
+  if (mergedVerified) {
+    await db.recordAuditLog({
+      userId: existing.id,
+      action: repairedIncompleteState ? 'REGISTRATION_RESUMED' : 'REGISTRATION_ALREADY_VERIFIED',
+      resource: 'auth:register',
+      details: {
+        email: cleanEmail,
+        firebaseUidLinked: needsUidLink,
+        emailVerified: true,
+        studentProfileRepaired: !studentExistedBefore,
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return res.status(409).json({
+      success: false,
+      ok: false,
+      status: 'ALREADY_VERIFIED',
+      resumed: repairedIncompleteState,
+      emailVerified: true,
+      email: cleanEmail,
+      message: 'An account with this email already exists and is verified. Please sign in.',
+    });
+  }
+
+  await db.recordAuditLog({
+    userId: existing.id,
+    action: 'REGISTRATION_RESUMED',
+    resource: 'auth:register',
+    details: {
+      email: cleanEmail,
+      firebaseUidLinked: needsUidLink,
+      emailVerified: false,
+      studentProfileRepaired: !studentExistedBefore,
+    },
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  return res.json({
+    success: true,
+    ok: true,
+    status: 'VERIFICATION_REQUIRED',
+    resumed: true,
+    emailVerified: false,
+    email: cleanEmail,
+    message: 'Your registration is pending email verification. Please verify your email or use Resend Link.',
+  });
+}
+
+/**
+ * POST /api/auth/register
+ * Platform Registration: Email + Password (NO CAPTCHA) with Email Verification & Safe Recovery
+ */
+router.post('/register', registerLimiter, async (req, res) => {
+  const { fullName, email, password, firebaseUid, idToken } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ success: false, ok: false, error: 'Email and password are required.' });
+  }
+
+  const cleanEmail = String(email).trim().toLowerCase();
+  if (!cleanEmail.includes('@')) {
+    return res.status(400).json({ success: false, ok: false, error: 'Please enter a valid email address.' });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ success: false, ok: false, error: 'Password must be at least 6 characters long.' });
+  }
+
+  let decodedToken = null;
+  if (idToken) {
+    try {
+      decodedToken = await verifyRegistrationIdToken(idToken, cleanEmail, firebaseUid || null);
+    } catch (tokenErr) {
+      await db.recordAuditLog({
+        userId: null,
+        action: 'REGISTRATION_TOKEN_INVALID',
+        resource: 'auth:register',
+        details: { email: cleanEmail, reason: tokenErr.message },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch(() => {});
+
+      return res.status(tokenErr.statusCode || 401).json({
+        success: false,
+        ok: false,
+        error: tokenErr.message || 'Invalid authentication token.',
+      });
+    }
+  }
+
+  try {
+    const existing = await db.getUserByEmail(cleanEmail);
+    if (!existing) {
+      return await handleNewUserRegistration({ req, res, cleanEmail, fullName, password, decodedToken });
+    }
+    return await handleExistingUserRegistration({ req, res, existing, cleanEmail, password, decodedToken });
   } catch (err) {
     console.error('[auth/register] Error:', err.message);
-    res.status(500).json({ success: false, ok: false, error: 'Failed to create student account.' });
+    return res.status(500).json({ success: false, ok: false, error: 'Failed to process registration.' });
   }
 });
 
 /**
  * POST /api/auth/resend-verification
+ * Rate-limited and privacy-safe verification resend audit endpoint
  */
-router.post('/resend-verification', async (req, res) => {
-  const { email } = req.body;
+router.post('/resend-verification', resendVerificationLimiter, async (req, res) => {
+  const { email, idToken } = req.body || {};
   if (!email) {
     return res.status(400).json({ success: false, error: 'Email is required.' });
   }
-  const cleanEmail = email.trim().toLowerCase();
-  const user = await db.getUserByEmail(cleanEmail);
-  if (!user) {
-    return res.status(404).json({ success: false, error: 'User account not found.' });
+
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  try {
+    let decodedToken = null;
+    if (idToken) {
+      decodedToken = await verifyRegistrationIdToken(idToken, cleanEmail, null);
+    }
+
+    const user = await db.getUserByEmail(cleanEmail);
+    if (user) {
+      await db.recordAuditLog({
+        userId: user.id,
+        action: 'VERIFICATION_RESEND_REQUESTED',
+        resource: 'auth:resend-verification',
+        details: {
+          email: cleanEmail,
+          authenticatedViaFirebase: Boolean(decodedToken),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'If this account is awaiting verification, use the verification email sent to your inbox or sign in on the Login page to request another link.',
+    });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, error: err.message });
+    }
+    console.error('[auth/resend-verification] Error:', err.message);
+    return res.status(500).json({ success: false, error: 'Could not process verification resend request.' });
   }
-  res.json({ success: true, message: 'Verification email resent successfully.' });
 });
 
 /**

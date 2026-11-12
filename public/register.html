@@ -86,32 +86,126 @@
       </div>
     </form>
 
-    <!-- State 2: Verification Email Sent Card -->
+    <!-- State 2: Verification Email Sent / Resumed Verification Card (Cases A, C, D) -->
     <div id="verificationSentCard" style="display: none; text-align: center; padding: 10px 0;">
-      <div style="width: 64px; height: 64px; background: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
-        ✉️
+      <div style="width: 64px; height: 64px; background: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--primary);">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+        </svg>
       </div>
-      <h2 style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Verify Your Email</h2>
+      <h2 id="verificationHeading" style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Verify Your Email</h2>
       <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px;">
-        We have sent a verification email to:
+        <span id="verificationSubtext">We have sent a verification email to:</span>
         <br><strong id="sentEmailDisplay" style="color: var(--primary); font-size: 15px;">student@geu.ac.in</strong>
       </p>
 
-      <div style="background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-size: 13px; color: var(--text); text-align: left; margin-bottom: 22px;">
+      <div style="background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; font-size: 13px; color: var(--text); text-align: left; margin-bottom: 18px;">
         <div style="font-weight: 700; margin-bottom: 4px; color: var(--primary);">Next Steps:</div>
         <ol style="margin-left: 18px; line-height: 1.5; color: var(--text-muted);">
           <li>Open your inbox and look for the verification email from Firebase / gueattend.</li>
           <li>Click the verification link to confirm your account.</li>
-          <li>Come back and log in with your verified credentials!</li>
+          <li>Come back and log in with your verified credentials.</li>
         </ol>
       </div>
 
+      <div id="resendStatusMsg" style="display: none; font-size: 12.5px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);"></div>
+
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <a href="/login" class="btn-primary" style="display: block; text-decoration: none; padding: 11px; font-size: 14px; font-weight: 700;">
-          Go to Login Screen 🚀
+          Go to Login Screen
         </a>
-        <button id="resendVerificationBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+        <button type="button" id="resendVerificationBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
           Didn't get the email? Resend Link
+        </button>
+        <button type="button" id="verificationBackBtn" class="btn-secondary" style="padding: 8px; font-size: 12.5px;">
+          Use a different email
+        </button>
+      </div>
+    </div>
+
+    <!-- State 3: Account Already Verified Card (Case B) -->
+    <div id="alreadyVerifiedCard" style="display: none; text-align: center; padding: 10px 0;">
+      <div style="width: 64px; height: 64px; background: var(--success-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #16a34a;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <h2 style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Account Already Verified</h2>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">
+        Your account <strong id="verifiedEmailDisplay" style="color: var(--primary);">student@geu.ac.in</strong> is already verified and ready to use.
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="/login" class="btn-primary" style="display: block; text-decoration: none; padding: 11px; font-size: 14px; font-weight: 700;">
+          Sign In to GUeAttend
+        </a>
+        <button type="button" id="alreadyVerifiedBackBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+          Register a Different Email
+        </button>
+      </div>
+    </div>
+
+    <!-- State 4: Identity Conflict Recovery Card (Case E) -->
+    <div id="conflictRecoveryCard" style="display: none; text-align: center; padding: 10px 0;">
+      <div style="width: 64px; height: 64px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #d97706;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <path d="M12 9v4"/>
+          <path d="M12 17h.01"/>
+        </svg>
+      </div>
+      <h2 style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Recovery Needed for Existing Record</h2>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+        An earlier record already exists for <strong id="conflictEmailDisplay" style="color: var(--primary);">student@geu.ac.in</strong> under a different sign-in state. No existing student data was modified.
+      </p>
+      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 14px; font-size: 13px; color: var(--text); text-align: left; margin-bottom: 16px;">
+        <div style="font-weight: 700; margin-bottom: 4px; color: #b45309;">Safe Recovery Steps:</div>
+        <ol style="margin-left: 18px; line-height: 1.5; color: var(--text-muted);">
+          <li>Check your inbox and click the verification link we just sent.</li>
+          <li>Then click <strong>Sign In to Recover Account</strong> using this email and password.</li>
+          <li>If you remember using an older password before, use <strong>Send Password Reset Email</strong> below.</li>
+        </ol>
+      </div>
+      <div id="conflictStatusMsg" style="display: none; font-size: 12.5px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);"></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="/login" class="btn-primary" style="display: block; text-decoration: none; padding: 11px; font-size: 14px; font-weight: 700;">
+          Sign In to Recover Account
+        </a>
+        <button type="button" id="conflictResendBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+          Resend Verification Email
+        </button>
+        <button type="button" id="conflictResetBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+          Send Password Reset Email
+        </button>
+        <button type="button" id="conflictBackBtn" class="btn-secondary" style="padding: 8px; font-size: 12.5px;">
+          Use a different email
+        </button>
+      </div>
+    </div>
+
+    <!-- State 5: Existing Auth Account Recovery Card (when existing Firebase password differs) -->
+    <div id="existingAuthCard" style="display: none; text-align: center; padding: 10px 0;">
+      <div style="width: 64px; height: 64px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--primary);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h2 style="font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px;">Email Already Registered</h2>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+        An authentication account already exists for <strong id="existingEmailDisplay" style="color: var(--primary);">student@geu.ac.in</strong>. Sign in with your existing password, or send a password reset link. (If your email is unverified, signing in on Login lets you resend verification.)
+      </p>
+      <div id="existingStatusMsg" style="display: none; font-size: 12.5px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);"></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="/login" class="btn-primary" style="display: block; text-decoration: none; padding: 11px; font-size: 14px; font-weight: 700;">
+          Sign In on Login Page
+        </a>
+        <button type="button" id="existingResetBtn" class="btn-secondary" style="padding: 10px; font-size: 13px;">
+          Send Password Reset Email
+        </button>
+        <button type="button" id="existingBackBtn" class="btn-secondary" style="padding: 8px; font-size: 12.5px;">
+          Use a different email
         </button>
       </div>
     </div>
@@ -133,7 +227,9 @@
       auth: null,
       configured: false,
       createUserWithEmailAndPassword: null,
+      signInWithEmailAndPassword: null,
       sendEmailVerification: null,
+      sendPasswordResetEmail: null,
       currentUser: null,
       isReady: false,
     };
@@ -150,11 +246,19 @@
             return firebaseState;
           }
           const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-          const { getAuth, createUserWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+          const {
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            sendEmailVerification,
+            sendPasswordResetEmail,
+          } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
           firebaseState.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+          firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
           firebaseState.sendEmailVerification = sendEmailVerification;
+          firebaseState.sendPasswordResetEmail = sendPasswordResetEmail;
           firebaseState.isReady = true;
           console.log('[Register] Firebase Web SDK initialized.');
         }
@@ -171,14 +275,82 @@
     const emailInput = document.getElementById('regEmail');
     const passwordInput = document.getElementById('regPassword');
     const confirmPasswordInput = document.getElementById('regConfirmPassword');
-    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
     const alertBox = document.getElementById('registerAlert');
     const submitBtn = document.getElementById('submitBtn');
     const btnText = document.getElementById('btnText');
     const btnSpinner = document.getElementById('btnSpinner');
+
     const verificationCard = document.getElementById('verificationSentCard');
+    const verificationHeading = document.getElementById('verificationHeading');
+    const verificationSubtext = document.getElementById('verificationSubtext');
     const sentEmailDisplay = document.getElementById('sentEmailDisplay');
     const resendBtn = document.getElementById('resendVerificationBtn');
+    const resendStatusMsg = document.getElementById('resendStatusMsg');
+
+    const alreadyVerifiedCard = document.getElementById('alreadyVerifiedCard');
+    const verifiedEmailDisplay = document.getElementById('verifiedEmailDisplay');
+
+    const conflictRecoveryCard = document.getElementById('conflictRecoveryCard');
+    const conflictEmailDisplay = document.getElementById('conflictEmailDisplay');
+    const conflictResendBtn = document.getElementById('conflictResendBtn');
+    const conflictResetBtn = document.getElementById('conflictResetBtn');
+    const conflictStatusMsg = document.getElementById('conflictStatusMsg');
+
+    const existingAuthCard = document.getElementById('existingAuthCard');
+    const existingEmailDisplay = document.getElementById('existingEmailDisplay');
+    const existingResetBtn = document.getElementById('existingResetBtn');
+    const existingStatusMsg = document.getElementById('existingStatusMsg');
+
+    let activeEmail = '';
+
+    function showOnlyCard(cardEl) {
+      [form, verificationCard, alreadyVerifiedCard, conflictRecoveryCard, existingAuthCard].forEach((el) => {
+        if (el) el.style.display = el === cardEl ? 'block' : 'none';
+      });
+      if (cardEl === form) {
+        alertBox.style.display = 'none';
+      }
+    }
+
+    function showStatusMessage(statusEl, text, isError = false) {
+      if (!statusEl) return;
+      statusEl.textContent = text;
+      statusEl.style.display = 'block';
+      statusEl.style.color = isError ? '#b91c1c' : 'var(--text)';
+      statusEl.style.borderColor = isError ? '#fecaca' : 'var(--border)';
+      statusEl.style.background = isError ? '#fef2f2' : 'var(--surface-alt)';
+    }
+
+    function showVerificationCard(email, resumed = false) {
+      activeEmail = email;
+      sentEmailDisplay.textContent = email;
+      verificationHeading.textContent = resumed ? 'Verify Your Email to Continue' : 'Verify Your Email';
+      verificationSubtext.textContent = resumed
+        ? 'Your registration is saved, and email verification is still pending for:'
+        : 'We have sent a verification email to:';
+      resendStatusMsg.style.display = 'none';
+      showOnlyCard(verificationCard);
+    }
+
+    function showAlreadyVerifiedCard(email) {
+      activeEmail = email;
+      verifiedEmailDisplay.textContent = email;
+      showOnlyCard(alreadyVerifiedCard);
+    }
+
+    function showConflictRecoveryCard(email) {
+      activeEmail = email;
+      conflictEmailDisplay.textContent = email;
+      conflictStatusMsg.style.display = 'none';
+      showOnlyCard(conflictRecoveryCard);
+    }
+
+    function showExistingAuthCard(email) {
+      activeEmail = email;
+      existingEmailDisplay.textContent = email;
+      existingStatusMsg.style.display = 'none';
+      showOnlyCard(existingAuthCard);
+    }
 
     function bindEyeToggle(btnId, inputEl, offId, onId) {
       const btn = document.getElementById(btnId);
@@ -197,6 +369,77 @@
 
     bindEyeToggle('togglePasswordBtn', passwordInput, 'regEyeOffIcon', 'regEyeOnIcon');
     bindEyeToggle('toggleConfirmBtn', confirmPasswordInput, 'confirmEyeOffIcon', 'confirmEyeOnIcon');
+
+    ['verificationBackBtn', 'alreadyVerifiedBackBtn', 'conflictBackBtn', 'existingBackBtn'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener('click', () => showOnlyCard(form));
+    });
+
+    async function handleResendClick(btnEl, statusEl, defaultLabel) {
+      const email = activeEmail || emailInput.value.trim().toLowerCase();
+      btnEl.disabled = true;
+      btnEl.textContent = 'Sending...';
+      try {
+        let idToken = null;
+        if (firebaseState.currentUser && firebaseState.sendEmailVerification) {
+          await firebaseState.sendEmailVerification(firebaseState.currentUser);
+          idToken = await firebaseState.currentUser.getIdToken();
+        }
+        await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, idToken }),
+        });
+        showStatusMessage(
+          statusEl,
+          firebaseState.currentUser
+            ? 'Verification email re-sent! Please check your inbox and Spam/Junk folder.'
+            : 'Please sign in on the Login page with your password to trigger a fresh verification email link.'
+        );
+      } catch (err) {
+        const msg = err?.code === 'auth/too-many-requests'
+          ? 'A verification email was already sent recently. Please check Spam/Junk or wait a minute before trying again.'
+          : 'Could not resend right now. Please check your inbox or sign in on the Login page.';
+        showStatusMessage(statusEl, msg, true);
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = defaultLabel;
+      }
+    }
+
+    async function handleResetPasswordClick(btnEl, statusEl) {
+      const email = activeEmail || emailInput.value.trim().toLowerCase();
+      btnEl.disabled = true;
+      const prevText = btnEl.textContent;
+      btnEl.textContent = 'Sending Reset Link...';
+      try {
+        const fb = await initFirebase();
+        if (!fb.configured || !fb.auth || !fb.sendPasswordResetEmail) {
+          showStatusMessage(statusEl, 'Password reset is unavailable right now. Please use Forgot Password on Login.', true);
+          return;
+        }
+        await fb.sendPasswordResetEmail(fb.auth, email);
+        showStatusMessage(statusEl, `Password reset email sent to ${email}. Check your inbox and Spam/Junk folder.`);
+      } catch (err) {
+        showStatusMessage(statusEl, err?.message || 'Could not send password reset email right now.', true);
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = prevText;
+      }
+    }
+
+    resendBtn.addEventListener('click', () =>
+      handleResendClick(resendBtn, resendStatusMsg, "Didn't get the email? Resend Link")
+    );
+    conflictResendBtn.addEventListener('click', () =>
+      handleResendClick(conflictResendBtn, conflictStatusMsg, 'Resend Verification Email')
+    );
+    conflictResetBtn.addEventListener('click', () =>
+      handleResetPasswordClick(conflictResetBtn, conflictStatusMsg)
+    );
+    existingResetBtn.addEventListener('click', () =>
+      handleResetPasswordClick(existingResetBtn, existingStatusMsg)
+    );
 
     // Form submit
     form.addEventListener('submit', async (e) => {
@@ -223,10 +466,8 @@
       btnSpinner.style.display = 'inline';
       submitBtn.disabled = true;
 
-      let firebaseUid = null;
-
       try {
-        // 1. Create account in Firebase and send real verification email
+        // 1. Authenticate / create account in Firebase Auth
         const fb = await initFirebase();
         if (!fb.configured || !fb.auth || !fb.createUserWithEmailAndPassword) {
           alertBox.textContent = 'Firebase Email Verification is not configured yet (FIREBASE_API_KEY missing on server). Add FIREBASE_API_KEY in .env / Render Environment Variables.';
@@ -234,50 +475,86 @@
           return;
         }
 
+        let cred = null;
         try {
-          const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, password);
+          cred = await fb.createUserWithEmailAndPassword(fb.auth, email, password);
           firebaseState.currentUser = cred.user;
-          firebaseUid = cred.user.uid;
-
           if (fb.sendEmailVerification) {
-            await fb.sendEmailVerification(cred.user);
-            console.log('[Register] Verification email dispatched successfully.');
+            try {
+              await fb.sendEmailVerification(cred.user);
+            } catch (verifyErr) {
+              console.warn('[Register] Verification dispatch note:', verifyErr.code || verifyErr.message);
+            }
           }
         } catch (fbErr) {
           const code = fbErr.code || '';
           if (code === 'auth/email-already-in-use') {
-            alertBox.textContent = 'This email is already registered. Please sign in or reset your password on the Login page.';
+            // Check whether user owns this unverified/verified account so partial or unverified signup can resume safely
+            try {
+              cred = await fb.signInWithEmailAndPassword(fb.auth, email, password);
+              firebaseState.currentUser = cred.user;
+              if (!cred.user.emailVerified && fb.sendEmailVerification) {
+                try {
+                  await fb.sendEmailVerification(cred.user);
+                } catch (resendErr) {
+                  console.warn('[Register] Existing unverified resend note:', resendErr.code || resendErr.message);
+                }
+              }
+            } catch (signInErr) {
+              const signInCode = signInErr.code || '';
+              if (
+                signInCode === 'auth/wrong-password' ||
+                signInCode === 'auth/invalid-credential' ||
+                signInCode === 'auth/user-mismatch' ||
+                signInCode === 'auth/too-many-requests'
+              ) {
+                showExistingAuthCard(email);
+                return;
+              }
+              alertBox.textContent = signInErr.message || 'Could not sign in with existing authentication credentials.';
+              alertBox.style.display = 'block';
+              return;
+            }
           } else if (code === 'auth/weak-password') {
             alertBox.textContent = 'Password is too weak. Use at least 6 characters.';
+            alertBox.style.display = 'block';
+            return;
           } else if (code === 'auth/invalid-email') {
             alertBox.textContent = 'Please enter a valid university email address.';
+            alertBox.style.display = 'block';
+            return;
           } else if (code === 'auth/unauthorized-domain') {
             alertBox.textContent = 'This domain is not authorized in Firebase Console (Authentication → Settings → Authorized domains).';
+            alertBox.style.display = 'block';
+            return;
           } else {
             alertBox.textContent = fbErr.message || 'Firebase signup failed. Please check your configuration.';
+            alertBox.style.display = 'block';
+            return;
           }
-          alertBox.style.display = 'block';
-          return;
         }
 
-        // 2. Register student in backend Supabase database
+        // 2. Complete or resume registration in Supabase using verified Firebase ID Token
+        const idToken = await cred.user.getIdToken(true);
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email,
             password,
-            firebaseUid,
+            firebaseUid: cred.user.uid,
+            idToken,
           }),
         });
 
         const data = await res.json();
 
-        if (data.success || data.ok) {
-          // Switch to verification pending state
-          form.style.display = 'none';
-          sentEmailDisplay.textContent = email;
-          verificationCard.style.display = 'block';
+        if (data.status === 'IDENTITY_CONFLICT') {
+          showConflictRecoveryCard(email);
+        } else if (data.status === 'ALREADY_VERIFIED') {
+          showAlreadyVerifiedCard(email);
+        } else if (data.success || data.ok || data.status === 'VERIFICATION_REQUIRED') {
+          showVerificationCard(email, Boolean(data.resumed));
         } else {
           alertBox.textContent = data.error || 'Failed to create account. Please try again.';
           alertBox.style.display = 'block';
@@ -289,30 +566,6 @@
         btnText.style.display = 'inline';
         btnSpinner.style.display = 'none';
         submitBtn.disabled = false;
-      }
-    });
-
-    // Resend verification email
-    resendBtn.addEventListener('click', async () => {
-      resendBtn.disabled = true;
-      resendBtn.textContent = 'Sending...';
-      try {
-        if (firebaseState.currentUser && firebaseState.sendEmailVerification) {
-          await firebaseState.sendEmailVerification(firebaseState.currentUser);
-          alert('Verification email re-sent! Please check your inbox.');
-        } else {
-          await fetch('/api/auth/resend-verification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: emailInput.value.trim().toLowerCase() }),
-          });
-          alert('Verification email re-sent! Please check your inbox.');
-        }
-      } catch (err) {
-        alert('Could not resend email right now. Please check your inbox or try logging in.');
-      } finally {
-        resendBtn.disabled = false;
-        resendBtn.textContent = "Didn't get the email? Resend Link";
       }
     });
   </script>
