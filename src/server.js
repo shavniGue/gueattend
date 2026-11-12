@@ -62,6 +62,11 @@ app.use(
   })
 );
 
+// Protect authenticated HTML pages from direct unauthenticated static access
+app.use(['/index.html', '/qums-setup.html', '/telegram-setup.html'], requireAuth);
+app.use('/faculty.html', requireFaculty);
+app.use('/admin.html', requireAdmin);
+
 // Serve Static Frontend Assets (disable automatic index.html on root so landing page can be served)
 app.use(express.static(PUBLIC_DIR, { index: false }));
 
@@ -85,7 +90,7 @@ app.get('/health', async (req, res) => {
     supabase: supabaseHealth,
     firebase: firebaseHealth,
     telegram: {
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'gue_attendance_bot',
+      configured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
       polling: String(process.env.TELEGRAM_POLLING || '').toLowerCase() === 'on',
     },
   });

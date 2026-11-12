@@ -1,35 +1,9 @@
 /**
- * gueattend - Modular Google AdSense & Sponsored Banner Loader
+ * gueattend - Google AdSense & Advertisement Container Loader
  * Reads runtime config from /api/ads/config so Render environment variables
  * control live AdSense units without editing HTML templates.
  */
 (function () {
-  function renderPlaceholder(container, placement) {
-    const isCompact = placement === 'auth';
-    const title = isCompact
-      ? 'Sponsored Banner Slot (Responsive)'
-      : 'Advertisement Space • Google AdSense Ready';
-    const subtitle = isCompact
-      ? 'Set ADSENSE_CLIENT_ID in Render Environment Variables to serve live ads'
-      : 'Supports responsive AdSense display units (728×90 / Auto) via ADSENSE_CLIENT_ID & placement slot IDs';
-
-    container.innerHTML = '';
-    const box = document.createElement('div');
-    box.className = 'ads-placeholder';
-
-    const titleEl = document.createElement('div');
-    titleEl.className = 'ads-placeholder-title';
-    titleEl.textContent = title;
-
-    const subEl = document.createElement('div');
-    subEl.className = 'ads-placeholder-sub';
-    subEl.textContent = subtitle;
-
-    box.appendChild(titleEl);
-    box.appendChild(subEl);
-    container.appendChild(box);
-  }
-
   function loadAdSenseScript(clientId) {
     if (document.querySelector('script[data-gueattend-adsense="true"]')) return;
     const script = document.createElement('script');
@@ -68,12 +42,17 @@
 
     containers.forEach((wrapper) => {
       const placement = wrapper.getAttribute('data-ad-placement') || 'landing';
+      const labelEl = wrapper.querySelector('.ads-label');
+      if (labelEl) {
+        labelEl.textContent = 'Advertisement';
+      }
+
       const body = wrapper.querySelector('.ads-slot-body') || wrapper;
       const rawSlot = (config.slots && config.slots[placement]) || '';
       const slotId = /^\d+$/.test(rawSlot) ? rawSlot : '';
 
+      body.innerHTML = '';
       if (clientId && slotId) {
-        body.innerHTML = '';
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
         ins.style.display = 'block';
@@ -87,8 +66,6 @@
         } catch (err) {
           console.warn('[ads] AdSense push note:', err.message);
         }
-      } else {
-        renderPlaceholder(body, placement);
       }
     });
   }

@@ -54,11 +54,14 @@ router.post('/start-login', requireAuth, async (req, res) => {
  * Submits human-solved CAPTCHA to active browser session
  */
 router.post('/submit-captcha', requireAuth, async (req, res) => {
+  const { qid, password } = req.body;
   const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
   try {
     const result = await qumsWeb.submitQumsCaptcha({
       userId: req.session.userId,
       captchaAnswer,
+      qid,
+      password,
     });
     res.json(result);
   } catch (err) {
@@ -82,6 +85,8 @@ router.post('/login', requireAuth, async (req, res) => {
     const result = await qumsWeb.submitQumsCaptcha({
       userId: req.session.userId,
       captchaAnswer,
+      qid,
+      password,
     });
     res.json(result);
   } catch (err) {
@@ -170,7 +175,7 @@ router.get('/status', requireAuth, async (req, res) => {
       ok: true,
       success: true,
       sessionState,
-      studentQid: student?.student_id || user?.qums_qid || '24030110',
+      studentQid: user?.qums_qid || '',
       status: sessionState === 'connected' ? 'active' : sessionState,
       hasVaultedPassword: Boolean(user && user.qums_password_encrypted),
       lastSynced: user?.updated_at || new Date().toISOString(),

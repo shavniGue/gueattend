@@ -63,7 +63,7 @@ async function loadDashboardData() {
     if (greeting) greeting.textContent = `Hello, ${fullNameUpper} 👋`;
 
     const qidEl = document.getElementById('modalStudentQid');
-    if (qidEl) qidEl.textContent = currentStudent.studentId || '24030110';
+    if (qidEl) qidEl.textContent = currentStudent.studentId || '';
 
     // 2. QUMS Connection Card
     const qumsEl = document.getElementById('qumsStatusDisplay');

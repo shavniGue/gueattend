@@ -94,7 +94,7 @@
             <form id="qumsSetupForm">
               <div class="form-group" style="margin-bottom: 14px;">
                 <label class="form-label">Student University ID / QID</label>
-                <input type="text" id="setupQidInput" class="form-input" placeholder="e.g. 24030110" required>
+                <input type="text" id="setupQidInput" class="form-input" placeholder="" required>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Your official Graphic Era student registration number.</div>
               </div>
 
@@ -168,23 +168,6 @@
   </main>
 
   <script>
-    // Theme Switcher Logic
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const themes = ['emerald', 'indigo', 'cyan'];
-    let currentThemeIdx = 0;
-    const savedTheme = localStorage.getItem('gueattend_theme') || 'emerald';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    currentThemeIdx = themes.indexOf(savedTheme) >= 0 ? themes.indexOf(savedTheme) : 0;
-
-    if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', () => {
-        currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-        const nextTheme = themes[currentThemeIdx];
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('gueattend_theme', nextTheme);
-      });
-    }
-
     // Load Captcha helper
     async function loadCaptcha(targetContainerId) {
       const container = document.getElementById(targetContainerId);

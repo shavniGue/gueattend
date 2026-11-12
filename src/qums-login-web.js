@@ -100,20 +100,26 @@ function generateFallbackCaptcha(userId, qid) {
  * Launches Headless Chromium with Playwright, navigates to college portal, fills credentials,
  * takes screenshot of visual CAPTCHA, and streams it to the user.
  */
-async function startQumsLogin({ userId, qid, password, isReconnect = false }) {
+async function startQumsLogin({ userId, qid = '', password = '', isReconnect = false, previewOnly = false }) {
   // If reconnecting, retrieve and decrypt password from AES-256-GCM vault
   let effectiveQid = qid;
   let effectivePassword = password;
 
-  if (isReconnect || !password) {
+  if (isReconnect) {
     const user = await db.getUserById(userId);
     if (!user || !user.qums_password_encrypted) {
       throw new Error('No vaulted ERP credentials found. Please perform initial setup first.');
     }
     effectivePassword = cryptoVault.decrypt(user.qums_password_encrypted);
-    effectiveQid = effectiveQid || user.qums_qid || '24030110';
+    effectiveQid = effectiveQid || user.qums_qid || '';
     if (!effectivePassword) {
       throw new Error('Failed to decrypt vaulted ERP password. Key mismatch.');
+    }
+  } else if (!previewOnly && !password) {
+    const user = await db.getUserById(userId);
+    if (user && user.qums_password_encrypted) {
+      effectivePassword = cryptoVault.decrypt(user.qums_password_encrypted) || '';
+      effectiveQid = effectiveQid || user.qums_qid || '';
     }
   }
 
@@ -151,11 +157,11 @@ async function startQumsLogin({ userId, qid, password, isReconnect = false }) {
       timeout: COLLEGE_CONFIG.timeoutMs,
     });
 
-    // Fill username and password into portal form fields
+    // Fill username and password into portal form fields if provided
     const userLoc = page.locator(COLLEGE_CONFIG.selectors.username).first();
     const passLoc = page.locator(COLLEGE_CONFIG.selectors.password).first();
 
-    if (await userLoc.count() > 0 && await passLoc.count() > 0) {
+    if (effectiveQid && effectivePassword && await userLoc.count() > 0 && await passLoc.count() > 0) {
       await userLoc.fill(effectiveQid);
       await passLoc.fill(effectivePassword);
       console.log(`[qums-relay] Form fields pre-filled for student QID: ${effectiveQid}`);
@@ -237,7 +243,7 @@ async function startQumsLogin({ userId, qid, password, isReconnect = false }) {
  * Submits student's solved CAPTCHA to the active Playwright session, checks login outcome,
  * extracts session cookies, encrypts password in PostgreSQL, and closes the browser.
  */
-async function submitQumsCaptcha({ userId, captchaAnswer, captchaText }) {
+async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, password }) {
   const answer = String(captchaAnswer || captchaText || '').trim();
   if (!answer) {
     throw new Error('Please enter the CAPTCHA answer.');
@@ -248,10 +254,22 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText }) {
     throw new Error('Login session timed out or not started. Please reload the CAPTCHA.');
   }
 
+  if (qid) session.qid = String(qid).trim();
+  if (password) session.password = password;
+
   // --- PATH A: Real Headless Browser Active ---
   if (session.page && !session.page.isClosed()) {
     try {
       console.log(`[qums-relay] Submitting CAPTCHA "${answer}" into active portal page for ${userId}...`);
+
+      if (session.qid && session.password) {
+        const userLoc = session.page.locator(COLLEGE_CONFIG.selectors.username).first();
+        const passLoc = session.page.locator(COLLEGE_CONFIG.selectors.password).first();
+        if (await userLoc.count() > 0 && await passLoc.count() > 0) {
+          await userLoc.fill(session.qid);
+          await passLoc.fill(session.password);
+        }
+      }
 
       const captchaInputLoc = session.page.locator(COLLEGE_CONFIG.selectors.captchaInput).first();
       const submitBtnLoc = session.page.locator(COLLEGE_CONFIG.selectors.submitBtn).first();
@@ -445,8 +463,9 @@ async function getVisualCaptcha(userId) {
   const isReconnect = Boolean(user && user.qums_password_encrypted);
   return startQumsLogin({
     userId,
-    qid: user?.qums_qid || '24030110',
+    qid: user?.qums_qid || '',
     isReconnect,
+    previewOnly: !isReconnect,
   });
 }
 
