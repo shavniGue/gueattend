@@ -550,6 +550,11 @@
 
         const data = await res.json();
 
+        // Force-refresh Firebase ID token if custom claim `role=authenticated` was just assigned
+        if (data.tokenRefreshRequired && cred?.user) {
+          await cred.user.getIdToken(true).catch(() => {});
+        }
+
         if (data.status === 'IDENTITY_CONFLICT') {
           showConflictRecoveryCard(email);
         } else if (data.status === 'ALREADY_VERIFIED') {

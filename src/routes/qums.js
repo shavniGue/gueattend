@@ -16,11 +16,19 @@ const db = require('../database/db');
 router.get('/captcha', requireAuth, async (req, res) => {
   try {
     const challenge = await qumsWeb.getVisualCaptcha(req.session.userId);
+    const captchaImg = challenge?.captchaImage || challenge?.captcha || null;
+    if (!challenge || !challenge.success || !captchaImg) {
+      return res.status(502).json({
+        ok: false,
+        success: false,
+        error: challenge?.error || 'Could not load live CAPTCHA from student.geu.ac.in. Please retry.',
+      });
+    }
     res.json({
       ok: true,
       success: true,
-      captcha: challenge.captchaImage || challenge.captcha,
-      captchaImage: challenge.captchaImage || challenge.captcha,
+      captcha: captchaImg,
+      captchaImage: captchaImg,
       challengeId: challenge.challengeId,
       expiresInSeconds: challenge.expiresInSeconds || 180,
     });

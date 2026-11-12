@@ -6,8 +6,52 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirebaseApp, isAdminEmail } = require('./config/firebase');
+const {
+  getFirebaseApp,
+  hasServiceAccountCredential,
+  isAdminEmail,
+  setAuthenticatedUserClaim,
+} = require('./config/firebase');
 const db = require('./database/db');
+
+/**
+ * Ensures the Firebase user has custom claim `role = "authenticated"` for Supabase Third-Party Auth,
+ * while keeping application roles (`student`, `faculty`, `admin`) separate in `app_role` and `public.users.role`.
+ */
+async function ensureFirebaseAuthenticatedClaim(decodedOrUid, appRole = 'student') {
+  const uid = typeof decodedOrUid === 'string' ? decodedOrUid : decodedOrUid?.uid;
+  if (!uid) {
+    return { claimAssigned: false, tokenRefreshRequired: false };
+  }
+
+  if (
+    typeof decodedOrUid === 'object' &&
+    decodedOrUid.role === 'authenticated' &&
+    (!appRole || decodedOrUid.app_role === appRole)
+  ) {
+    return { claimAssigned: false, tokenRefreshRequired: false, claims: decodedOrUid };
+  }
+
+  if (!hasServiceAccountCredential()) {
+    return {
+      claimAssigned: false,
+      tokenRefreshRequired: false,
+      requiresServiceAccount: true,
+    };
+  }
+
+  try {
+    const res = await setAuthenticatedUserClaim(uid, appRole);
+    return {
+      claimAssigned: Boolean(res.updated || res.claims?.role === 'authenticated'),
+      tokenRefreshRequired: Boolean(res.updated),
+      claims: res.claims,
+    };
+  } catch (err) {
+    console.warn(`[firebaseAuth] Could not assign role=authenticated claim for ${uid}:`, err.message);
+    return { claimAssigned: false, tokenRefreshRequired: false, error: err.message };
+  }
+}
 
 function hasValidFirebaseApiKey() {
   const key = (process.env.FIREBASE_API_KEY || '').trim();
@@ -119,6 +163,9 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
     throw err;
   }
 
+  // Ensure Firebase custom claim `role=authenticated` is assigned for Supabase RLS
+  const claimResult = await ensureFirebaseAuthenticatedClaim(decodedToken, user.role || 'student');
+
   // Create Express session
   req.session.userId = user.id;
   req.session.role = user.role || 'student';
@@ -134,13 +181,14 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
     const creds = require('./credentials');
     const hasCookies = creds.loadSessionCookies(user.id);
     const isConnected = user.qums_session_status === 'connected' || Boolean(hasCookies);
-    redirect = isConnected ? '/dashboard' : '/qums-setup';
+    redirect = isConnected ? '/dashboard' : '/geu-setup';
   }
 
   return {
     ok: true,
     user,
     redirect,
+    tokenRefreshRequired: Boolean(claimResult.tokenRefreshRequired),
   };
 }
 
@@ -159,12 +207,21 @@ async function verifyFirebaseTokenMiddleware(req, res, next) {
 
       const decodedToken = await getAuth(app).verifyIdToken(idToken);
       req.firebaseUser = decodedToken;
+      req.firebaseClaims = {
+        role: decodedToken.role || null,
+        appRole: decodedToken.app_role || null,
+      };
 
       const user = await db.getUserByEmail(decodedToken.email);
       if (user) {
+        if (user.is_active === false || user.is_suspended) {
+          return res.status(403).json({ success: false, error: 'Account is inactive or suspended.' });
+        }
         req.session.userId = user.id;
         req.session.role = (user.role === 'admin' || user.is_admin === true) ? 'admin' : user.role;
+        req.session.firebaseUid = decodedToken.uid;
         req.currentUser = user;
+        req.firebaseClaims.appRole = req.session.role;
       }
       return next();
     } catch (err) {
@@ -183,6 +240,7 @@ async function verifyFirebaseTokenMiddleware(req, res, next) {
 module.exports = {
   hasValidFirebaseApiKey,
   getFirebaseWebConfig,
+  ensureFirebaseAuthenticatedClaim,
   establishSessionFromIdToken,
   verifyFirebaseTokenMiddleware,
 };

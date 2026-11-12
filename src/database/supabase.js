@@ -121,6 +121,47 @@ async function checkSupabaseHealth() {
   return result;
 }
 
+/**
+ * Returns ONLY public Supabase configuration safe to expose to browsers.
+ * Never includes SUPABASE_SECRET_KEY.
+ */
+function getSupabasePublicConfig() {
+  const validAnon = Boolean(
+    SUPABASE_PUBLISHABLE_KEY && !SUPABASE_PUBLISHABLE_KEY.includes('your_')
+  );
+  return {
+    configured: Boolean(SUPABASE_URL && validAnon),
+    url: SUPABASE_URL,
+    anonKey: validAnon ? SUPABASE_PUBLISHABLE_KEY : '',
+  };
+}
+
+/**
+ * Creates a Firebase-scoped Supabase JS client using the official third-party auth
+ * `accessToken` callback so PostgREST runs queries under the PostgreSQL `authenticated` role
+ * enforced by Supabase RLS policies.
+ */
+function createFirebaseScopedSupabaseClient(accessTokenOrCallback) {
+  const pubCfg = getSupabasePublicConfig();
+  if (!pubCfg.configured) {
+    return null;
+  }
+
+  const accessTokenFn =
+    typeof accessTokenOrCallback === 'function'
+      ? accessTokenOrCallback
+      : async () => accessTokenOrCallback || null;
+
+  return createClient(pubCfg.url, pubCfg.anonKey, {
+    accessToken: accessTokenFn,
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 module.exports = {
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
@@ -129,4 +170,6 @@ module.exports = {
   supabaseClient,
   supabaseAdmin,
   checkSupabaseHealth,
+  getSupabasePublicConfig,
+  createFirebaseScopedSupabaseClient,
 };

@@ -44,6 +44,83 @@ router.get('/firebase-config', (req, res) => {
   res.json(getFirebaseWebConfig());
 });
 
+/**
+ * GET /api/auth/supabase-config
+ * Public Supabase project URL + Publishable (anon) key ONLY.
+ * Never exposes SUPABASE_SECRET_KEY or DATABASE_URL.
+ */
+router.get('/supabase-config', (req, res) => {
+  const { getSupabasePublicConfig } = require('../database/supabase');
+  res.json(getSupabasePublicConfig());
+});
+
+/**
+ * POST /api/auth/sync-claims
+ * Verifies a Firebase ID Token and ensures custom claim `role=authenticated` is assigned
+ * for Supabase Third-Party Auth (while keeping application roles separate).
+ */
+router.post('/sync-claims', async (req, res) => {
+  const authHeader = req.headers.authorization || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const idToken = bearerToken || req.body?.idToken || '';
+
+  if (!idToken) {
+    return res.status(401).json({ success: false, error: 'Firebase ID token is required.' });
+  }
+
+  try {
+    const { verifyFirebaseToken, isAdminEmail } = require('../config/firebase');
+    const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
+
+    const decoded = await verifyFirebaseToken(idToken);
+    const cleanEmail = (decoded.email || '').trim().toLowerCase();
+    const existingUser = cleanEmail ? await db.getUserByEmail(cleanEmail) : null;
+
+    const appRole = existingUser
+      ? (existingUser.role === 'admin' || existingUser.is_admin === true ? 'admin' : existingUser.role || 'student')
+      : (isAdminEmail(cleanEmail) ? 'admin' : 'student');
+
+    const claimOutcome = await ensureFirebaseAuthenticatedClaim(decoded, appRole);
+
+    return res.json({
+      success: true,
+      uid: decoded.uid,
+      roleClaim: 'authenticated',
+      appRole,
+      claimAssigned: Boolean(claimOutcome.claimAssigned || decoded.role === 'authenticated'),
+      tokenRefreshRequired: Boolean(claimOutcome.tokenRefreshRequired),
+      requiresServiceAccount: Boolean(claimOutcome.requiresServiceAccount),
+    });
+  } catch (err) {
+    return res.status(401).json({ success: false, error: 'Invalid or expired Firebase ID token.' });
+  }
+});
+
+/**
+ * GET /api/auth/firebase-session
+ * Verifies Firebase JWT via verifyFirebaseTokenMiddleware without touching Express cookie sessions.
+ */
+router.get('/firebase-session', (req, res, next) => {
+  const { verifyFirebaseTokenMiddleware } = require('../firebaseAuth');
+  return verifyFirebaseTokenMiddleware(req, res, next);
+}, (req, res) => {
+  res.json({
+    success: true,
+    firebaseUid: req.firebaseUser?.uid || req.session?.firebaseUid || null,
+    email: req.firebaseUser?.email || req.currentUser?.email || null,
+    roleClaim: req.firebaseClaims?.role || null,
+    appRole: req.firebaseClaims?.appRole || req.session?.role || null,
+    user: req.currentUser
+      ? {
+          id: req.currentUser.id,
+          email: req.currentUser.email,
+          fullName: req.currentUser.full_name,
+          role: req.firebaseClaims?.appRole || req.currentUser.role,
+        }
+      : null,
+  });
+});
+
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   maxRequests: 25,
@@ -130,6 +207,12 @@ async function handleNewUserRegistration({ req, res, cleanEmail, fullName, passw
 
   const studentProfile = await ensureSafeStudentRecord(user, cleanEmail);
 
+  let claimOutcome = { claimAssigned: false, tokenRefreshRequired: false };
+  if (decodedToken) {
+    const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
+    claimOutcome = await ensureFirebaseAuthenticatedClaim(decodedToken, role);
+  }
+
   await db.recordAuditLog({
     userId: user.id,
     action: 'USER_REGISTERED',
@@ -140,6 +223,7 @@ async function handleNewUserRegistration({ req, res, cleanEmail, fullName, passw
       resumedFromFirebase: Boolean(decodedToken),
       emailVerified,
       studentQid: studentProfile?.student_id || null,
+      claimAssigned: Boolean(claimOutcome.claimAssigned),
     },
     ip: req.ip,
     userAgent: req.headers['user-agent'],
@@ -151,6 +235,8 @@ async function handleNewUserRegistration({ req, res, cleanEmail, fullName, passw
     status: emailVerified ? 'ALREADY_VERIFIED' : 'VERIFICATION_REQUIRED',
     resumed: false,
     emailVerified,
+    claimAssigned: Boolean(claimOutcome.claimAssigned),
+    tokenRefreshRequired: Boolean(claimOutcome.tokenRefreshRequired),
     message: emailVerified
       ? 'Your account is already verified and ready. Please sign in.'
       : 'Account created successfully. A verification email has been sent.',
@@ -288,6 +374,10 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
   const studentExistedBefore = existing.role === 'student' ? Boolean(await db.getStudentByUserId(existing.id)) : true;
   await ensureSafeStudentRecord(existing, cleanEmail);
 
+  const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
+  const existingAppRole = (existing.role === 'admin' || existing.is_admin === true) ? 'admin' : (existing.role || 'student');
+  const claimOutcome = await ensureFirebaseAuthenticatedClaim(decodedToken, existingAppRole);
+
   const repairedIncompleteState = needsUidLink || needsVerifiedSync || !studentExistedBefore;
 
   if (mergedVerified) {
@@ -300,6 +390,7 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
         firebaseUidLinked: needsUidLink,
         emailVerified: true,
         studentProfileRepaired: !studentExistedBefore,
+        claimAssigned: Boolean(claimOutcome.claimAssigned),
       },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
@@ -311,6 +402,8 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
       status: 'ALREADY_VERIFIED',
       resumed: repairedIncompleteState,
       emailVerified: true,
+      claimAssigned: Boolean(claimOutcome.claimAssigned),
+      tokenRefreshRequired: Boolean(claimOutcome.tokenRefreshRequired),
       email: cleanEmail,
       message: 'An account with this email already exists and is verified. Please sign in.',
     });
@@ -325,6 +418,7 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
       firebaseUidLinked: needsUidLink,
       emailVerified: false,
       studentProfileRepaired: !studentExistedBefore,
+      claimAssigned: Boolean(claimOutcome.claimAssigned),
     },
     ip: req.ip,
     userAgent: req.headers['user-agent'],
@@ -336,6 +430,8 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
     status: 'VERIFICATION_REQUIRED',
     resumed: true,
     emailVerified: false,
+    claimAssigned: Boolean(claimOutcome.claimAssigned),
+    tokenRefreshRequired: Boolean(claimOutcome.tokenRefreshRequired),
     email: cleanEmail,
     message: 'Your registration is pending email verification. Please verify your email or use Resend Link.',
   });
@@ -466,6 +562,7 @@ async function handleUserLogin(req, res) {
         success: true,
         redirect: outcome.redirect,
         redirectUrl: outcome.redirect,
+        tokenRefreshRequired: Boolean(outcome.tokenRefreshRequired),
         user: {
           id: outcome.user.id,
           email: outcome.user.email,

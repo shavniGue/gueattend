@@ -80,6 +80,8 @@
   </div>
 
   <script type="module">
+    import { refreshFirebaseTokenWithClaims } from '/js/supabase-firebase.js';
+
     // ====================================================================
     // TIER 1: CLIENT-SIDE PRE-WARMING & FIREBASE WEB SDK v10
     // ====================================================================
@@ -170,8 +172,8 @@
           if (fb && fb.configured && fb.auth && fb.signInWithEmailAndPassword) {
             const credential = await fb.signInWithEmailAndPassword(fb.auth, rawId, rawPassword);
             unverifiedUser = credential.user;
-            idToken = await credential.user.getIdToken(true);
-            console.log('[Tier 1] Firebase ID Token acquired.');
+            idToken = await refreshFirebaseTokenWithClaims(credential.user);
+            console.log('[Tier 1] Firebase ID Token acquired (claims synced).');
           }
         } catch (fbErr) {
           console.warn('[Tier 1] Firebase client-side sign-in warning:', fbErr.code || fbErr.message);
@@ -197,6 +199,9 @@
         const data = await resp.json();
 
         if (data.ok || data.success) {
+          if (data.tokenRefreshRequired && unverifiedUser) {
+            await unverifiedUser.getIdToken(true).catch(() => {});
+          }
           const target = data.redirect || data.redirectUrl || '/dashboard';
           window.location.href = target;
         } else {

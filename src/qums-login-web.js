@@ -10,10 +10,48 @@
  *   5. POSIX 0600 session cookie vault
  */
 
+const fs = require('fs');
+const path = require('path');
+
+// Use bundled node_modules browsers when present (persists across Render build -> runtime)
+const localBrowsersDir = path.join(__dirname, '..', 'node_modules', 'playwright-core', '.local-browsers');
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH && fs.existsSync(localBrowsersDir)) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
+}
+
 const { chromium } = require('playwright');
 const cryptoVault = require('./crypto');
 const credentials = require('./credentials');
 const db = require('./database/db');
+
+function resolveChromiumLaunchOptions() {
+  const options = {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+    ],
+  };
+
+  try {
+    const defaultPath = chromium.executablePath();
+    if (!defaultPath || !fs.existsSync(defaultPath)) {
+      const systemCandidates = [
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+      ].filter(Boolean);
+      const found = systemCandidates.find((p) => fs.existsSync(p));
+      if (found) options.executablePath = found;
+    }
+  } catch (err) {}
+
+  return options;
+}
 
 // ====================================================================
 // CONFIGURABLE COLLEGE SELECTORS & TARGET SETTINGS
@@ -44,7 +82,7 @@ const COLLEGE_CONFIG = {
       '#lblMessage, .mat-mdc-snack-bar-label, .alert-danger, .error-message, [role="alert"]',
   },
   cookieNames: ['ASP.NET_SessionId', 'PHPSESSID', 'JSESSIONID', 'QUMS_AUTH_TOKEN'],
-  timeoutMs: Number(process.env.COLLEGE_BROWSER_TIMEOUT_MS) || 15000,
+  timeoutMs: Number(process.env.COLLEGE_BROWSER_TIMEOUT_MS) || 30000,
 };
 
 // In-Memory Active Relay Browsers (userId -> session object)
@@ -143,19 +181,7 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
   try {
     console.log(`[qums-relay] Launching Playwright Chromium for user ${userId} (reconnect: ${isReconnect})...`);
 
-    const browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-      ],
-    });
+    const browser = await chromium.launch(resolveChromiumLaunchOptions());
 
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -165,18 +191,16 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
 
     const page = await context.newPage();
 
-    // Navigate to college login URL and wait for Angular/DOM CAPTCHA rendering
+    // Navigate to college login URL and wait for Angular CAPTCHA image element
     await page.goto(COLLEGE_CONFIG.loginUrl, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: COLLEGE_CONFIG.timeoutMs,
-    }).catch(() =>
-      page.goto(COLLEGE_CONFIG.loginUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: COLLEGE_CONFIG.timeoutMs,
-      })
-    );
+    });
 
-    await page.waitForSelector(COLLEGE_CONFIG.selectors.captchaImg, { timeout: 8000 }).catch(() => {});
+    await page.waitForSelector(COLLEGE_CONFIG.selectors.captchaImg, {
+      state: 'visible',
+      timeout: Math.min(COLLEGE_CONFIG.timeoutMs, 22000),
+    });
 
     // Fill username and password into portal form fields if provided
     const userLoc = page.locator(COLLEGE_CONFIG.selectors.username).first();
