@@ -270,23 +270,30 @@ app.use('/api/admin', adminRoutes);
 // CENTRALIZED ERROR HANDLING & 404
 // ====================================================================
 app.use((req, res) => {
+  if (res.headersSent) return;
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ success: false, error: 'API route not found.' });
   }
-  res.status(404).redirect('/login');
+  return res.status(404).redirect('/login');
 });
 
 app.use((err, req, res, next) => {
   console.error('[server] Uncaught exception:', err);
-  res.status(500).json({
+  if (res.headersSent) {
+    return next(err);
+  }
+  return res.status(500).json({
     success: false,
     error: 'Internal server error.',
     message: process.env.NODE_ENV !== 'production' ? err.message : undefined,
   });
 });
 
-// Initialize Telegram Bot & Autonomous Schedulers
+// Initialize Session Table, Telegram Bot & Autonomous Schedulers
 if (process.env.NODE_ENV !== 'test') {
+  sessionStore.ensureTable().catch((err) => {
+    console.error('[server] Startup session-store initialization failed:', err.code || err.message);
+  });
   initTelegram();
   initAutonomousSchedulers(sendTelegramAlert);
 }

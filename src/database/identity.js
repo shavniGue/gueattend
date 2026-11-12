@@ -7,7 +7,10 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const { URL } = require('url');
+
+const BUNDLED_SUPABASE_CA_PATH = path.join(__dirname, '..', '..', 'config', 'supabase-prod-ca-2021.crt');
 
 const EXPECTED_SUPABASE_PROJECT_REF = (
   process.env.GUEATTEND_SUPABASE_PROJECT_REF || 'cnpullmxupyqdndxzbih'
@@ -185,7 +188,8 @@ function assertDatabaseIsolation(options = {}) {
 }
 
 /**
- * Resolves PostgreSQL TLS options cleanly without unconditionally disabling certificate validation.
+ * Resolves PostgreSQL TLS options with strict certificate verification (`rejectUnauthorized: true`).
+ * Uses operator-supplied CA or the bundled Supabase Root 2021 CA for Supabase pooler/direct hosts.
  */
 function resolvePgSslConfig(connectionString = '') {
   const conn = parseConnectionStringIdentity(connectionString);
@@ -195,21 +199,19 @@ function resolvePgSslConfig(connectionString = '') {
 
   const caPath = process.env.DATABASE_CA_CERT_PATH || process.env.PGSSLROOTCERT || '';
   const inlineCa = process.env.DATABASE_CA_CERT || '';
+  const isSupabaseHost = conn.hostname.endsWith('.supabase.com') || conn.hostname.endsWith('.supabase.co');
   let ca = undefined;
 
   if (inlineCa) {
     ca = inlineCa.replace(/\\n/g, '\n');
   } else if (caPath && fs.existsSync(caPath)) {
     ca = fs.readFileSync(caPath, 'utf8');
+  } else if (isSupabaseHost && fs.existsSync(BUNDLED_SUPABASE_CA_PATH)) {
+    ca = fs.readFileSync(BUNDLED_SUPABASE_CA_PATH, 'utf8');
   }
 
-  // Enforce certificate verification by default; only allow override if operator sets explicit env flag for Supabase pooler CA environments.
-  const allowInsecure =
-    String(process.env.DATABASE_SSL_ALLOW_INSECURE || '').toLowerCase() === 'true' ||
-    String(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED || '').toLowerCase() === 'false';
-
   return {
-    rejectUnauthorized: !allowInsecure,
+    rejectUnauthorized: true,
     ...(ca ? { ca } : {}),
   };
 }
@@ -224,3 +226,4 @@ module.exports = {
   assertDatabaseIsolation,
   resolvePgSslConfig,
 };
+
