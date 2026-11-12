@@ -4,13 +4,18 @@
  */
 
 const db = require('../database/db');
+const { isAdminEmail } = require('../config/firebase');
+
+function isApiRequest(req) {
+  return req.xhr || req.headers.accept?.includes('json') || req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
+}
 
 /**
  * Ensures user is authenticated via session
  */
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.userId) {
-    if (req.xhr || req.headers.accept?.includes('json') || req.path.startsWith('/api/')) {
+    if (isApiRequest(req)) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required. Please log in to gueattend.',
@@ -28,32 +33,45 @@ function requireAuth(req, res, next) {
 function requireRole(...allowedRoles) {
   return async (req, res, next) => {
     if (!req.session || !req.session.userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required.',
-        code: 'UNAUTHORIZED',
-      });
+      if (isApiRequest(req)) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required.',
+          code: 'UNAUTHORIZED',
+        });
+      }
+      return res.redirect('/login');
     }
 
     try {
       const user = await db.getUserById(req.session.userId);
       if (!user || !user.is_active || user.is_suspended) {
         req.session.destroy(() => {});
-        return res.status(403).json({
-          success: false,
-          error: 'Your account is inactive or suspended. Contact university administrator.',
-          code: 'ACCOUNT_SUSPENDED',
-        });
+        if (isApiRequest(req)) {
+          return res.status(403).json({
+            success: false,
+            error: 'Your account is inactive or suspended. Contact university administrator.',
+            code: 'ACCOUNT_SUSPENDED',
+          });
+        }
+        return res.redirect('/login');
       }
 
+      const effectiveRole = (user.role === 'admin' || user.is_admin === true || isAdminEmail(user.email))
+        ? 'admin'
+        : user.role;
+      user.role = effectiveRole;
       req.user = user;
 
-      if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          error: `Access denied. Requires one of roles: ${allowedRoles.join(', ')}.`,
-          code: 'FORBIDDEN',
-        });
+      if (!allowedRoles.includes(effectiveRole)) {
+        if (isApiRequest(req)) {
+          return res.status(403).json({
+            success: false,
+            error: `Access denied. Requires one of roles: ${allowedRoles.join(', ')}.`,
+            code: 'FORBIDDEN',
+          });
+        }
+        return res.redirect('/dashboard');
       }
 
       next();

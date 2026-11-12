@@ -105,6 +105,7 @@
     let firebaseState = {
       app: null,
       auth: null,
+      configured: false,
       createUserWithEmailAndPassword: null,
       sendEmailVerification: null,
       currentUser: null,
@@ -115,12 +116,15 @@
     async function initFirebase() {
       if (firebaseState.isReady) return firebaseState;
       try {
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-        const { getAuth, createUserWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
-        
         const res = await fetch('/api/auth/firebase-config');
         if (res.ok) {
           const config = await res.json();
+          firebaseState.configured = Boolean(config.configured && config.apiKey);
+          if (!firebaseState.configured) {
+            return firebaseState;
+          }
+          const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+          const { getAuth, createUserWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
           firebaseState.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
@@ -186,20 +190,36 @@
       try {
         // 1. Create account in Firebase and send real verification email
         const fb = await initFirebase();
-        if (fb && fb.auth && fb.createUserWithEmailAndPassword) {
-          try {
-            const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, password);
-            firebaseState.currentUser = cred.user;
-            firebaseUid = cred.user.uid;
+        if (!fb.configured || !fb.auth || !fb.createUserWithEmailAndPassword) {
+          alertBox.textContent = 'Firebase Email Verification is not configured yet (FIREBASE_API_KEY missing on server). Add FIREBASE_API_KEY in .env / Render Environment Variables.';
+          alertBox.style.display = 'block';
+          return;
+        }
 
-            if (fb.sendEmailVerification) {
-              await fb.sendEmailVerification(cred.user);
-              console.log('[Register] Verification email dispatched successfully.');
-            }
-          } catch (fbErr) {
-            console.warn('[Register] Firebase createUser note:', fbErr.message);
-            // If already in firebase, continue to check backend
+        try {
+          const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, password);
+          firebaseState.currentUser = cred.user;
+          firebaseUid = cred.user.uid;
+
+          if (fb.sendEmailVerification) {
+            await fb.sendEmailVerification(cred.user);
+            console.log('[Register] Verification email dispatched successfully.');
           }
+        } catch (fbErr) {
+          const code = fbErr.code || '';
+          if (code === 'auth/email-already-in-use') {
+            alertBox.textContent = 'This email is already registered. Please sign in or reset your password on the Login page.';
+          } else if (code === 'auth/weak-password') {
+            alertBox.textContent = 'Password is too weak. Use at least 6 characters.';
+          } else if (code === 'auth/invalid-email') {
+            alertBox.textContent = 'Please enter a valid university email address.';
+          } else if (code === 'auth/unauthorized-domain') {
+            alertBox.textContent = 'This domain is not authorized in Firebase Console (Authentication → Settings → Authorized domains).';
+          } else {
+            alertBox.textContent = fbErr.message || 'Firebase signup failed. Please check your configuration.';
+          }
+          alertBox.style.display = 'block';
+          return;
         }
 
         // 2. Register student in backend Supabase database

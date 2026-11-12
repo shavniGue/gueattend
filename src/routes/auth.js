@@ -79,20 +79,14 @@ router.post('/register', async (req, res) => {
     );
     const user = newUserRes.rows[0];
 
-    // Seed student profile
-    const studentQid = cleanEmail.split('@')[0].replace(/[^0-9]/g, '') || `2403${Math.floor(1000 + Math.random() * 9000)}`;
-    await db.query(
-      `INSERT INTO students (user_id, student_id, enrollment_number, program, current_semester, academic_year)
-       VALUES ($1, $2, $2, 'B.Tech Computer Science & Engineering', 5, '2025-2026')
-       ON CONFLICT DO NOTHING`,
-      [user.id, studentQid]
-    ).catch(() => {});
+    // Seed valid student profile row in Supabase
+    const studentProfile = await db.ensureStudentProfile(user.id, cleanEmail).catch(() => null);
 
     await db.recordAuditLog({
       userId: user.id,
       action: 'USER_REGISTERED',
       resource: 'auth:register',
-      details: { email: cleanEmail, studentQid },
+      details: { email: cleanEmail, studentQid: studentProfile?.student_id || null },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
@@ -223,7 +217,10 @@ async function handleUserLogin(req, res) {
     }
 
     // Verify Password
-    const match = await bcrypt.compare(password, user.password_hash);
+    const { hasValidFirebaseApiKey } = require('../firebaseAuth');
+    const { isAdminEmail } = require('../config/firebase');
+    const match = user.password_hash ? await bcrypt.compare(password, user.password_hash).catch(() => false) : false;
+
     if (!match) {
       await db.recordAuditLog({
         userId: user.id,
@@ -233,11 +230,20 @@ async function handleUserLogin(req, res) {
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      return res.status(401).json({ success: false, ok: false, error: 'Invalid university credentials.' });
+
+      const needsFirebaseKey = !hasValidFirebaseApiKey() && (Boolean(user.firebase_uid) || isAdminEmail(user.email));
+      const errMsg = needsFirebaseKey
+        ? 'Invalid credentials. (Note: Firebase Auth requires FIREBASE_API_KEY in .env / Render Environment Variables to verify Firebase passwords.)'
+        : 'Invalid university credentials.';
+      return res.status(401).json({ success: false, ok: false, error: errMsg });
     }
 
+    const effectiveRole = (user.role === 'admin' || user.is_admin === true || isAdminEmail(user.email))
+      ? 'admin'
+      : (user.role || 'student');
+
     // Check email verification for student
-    if (user.role === 'student' && user.email_verified === false) {
+    if (effectiveRole === 'student' && user.email_verified === false) {
       return res.status(403).json({
         success: false,
         ok: false,
@@ -248,15 +254,16 @@ async function handleUserLogin(req, res) {
 
     // Set Session
     req.session.userId = user.id;
-    req.session.role = user.role;
+    req.session.role = effectiveRole;
 
     // Determine redirect route based on role & ERP connection status
     let redirectUrl = '/dashboard';
-    if (user.role === 'admin') {
+    if (effectiveRole === 'admin') {
       redirectUrl = '/admin';
-    } else if (user.role === 'faculty') {
+    } else if (effectiveRole === 'faculty') {
       redirectUrl = '/faculty';
     } else {
+      await db.ensureStudentProfile(user.id, user.email).catch(() => {});
       const creds = require('../credentials');
       const hasCookies = creds.loadSessionCookies(user.id);
       const isConnected = user.qums_session_status === 'connected' || Boolean(hasCookies);
@@ -267,7 +274,7 @@ async function handleUserLogin(req, res) {
       userId: user.id,
       action: 'USER_LOGIN',
       resource: 'auth:login',
-      details: { role: user.role, redirectUrl },
+      details: { role: effectiveRole, redirectUrl },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
@@ -282,7 +289,7 @@ async function handleUserLogin(req, res) {
         id: user.id,
         email: user.email,
         fullName: user.full_name,
-        role: user.role,
+        role: effectiveRole,
       },
     });
   } catch (err) {

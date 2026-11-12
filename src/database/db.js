@@ -196,6 +196,67 @@ async function getStudentByUserId(userId) {
   return res.rows[0] || null;
 }
 
+/**
+ * Ensures a newly registered or Firebase-provisioned student has a valid profile row
+ */
+async function ensureStudentProfile(userId, email = '') {
+  const existing = await getStudentByUserId(userId);
+  if (existing) return existing;
+
+  const hierarchyRes = await query(`
+    SELECT
+      sec.id AS section_id,
+      sem.id AS semester_id,
+      c.id AS course_id,
+      d.id AS department_id,
+      sess.id AS academic_session_id
+    FROM sections sec
+    JOIN semesters sem ON sec.semester_id = sem.id
+    JOIN courses c ON sem.course_id = c.id
+    JOIN departments d ON c.department_id = d.id
+    JOIN academic_sessions sess ON sem.academic_session_id = sess.id
+    ORDER BY sess.is_current DESC, sec.id ASC
+    LIMIT 1
+  `);
+
+  if (hierarchyRes.rows.length === 0) {
+    return null;
+  }
+
+  const h = hierarchyRes.rows[0];
+  const digits = String(email || '').split('@')[0].replace(/[^0-9]/g, '');
+  const uniqueSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const baseQid = digits.length >= 4 ? digits.slice(0, 12) : `GEU${uniqueSuffix}`;
+  const studentRowId = `stu_${crypto.randomUUID()}`;
+  const studentIdVal = `${baseQid}_${uniqueSuffix}`.slice(0, 24);
+  const enrollmentNo = `GEU/2026/${uniqueSuffix}`;
+
+  try {
+    await query(
+      `INSERT INTO students (
+         id, user_id, student_id, enrollment_number,
+         department_id, course_id, semester_id, section_id, academic_session_id
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [studentRowId, userId, studentIdVal, enrollmentNo, h.department_id, h.course_id, h.semester_id, h.section_id, h.academic_session_id]
+    );
+  } catch (err) {
+    const fallbackId = `GEU_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    await query(
+      `INSERT INTO students (
+         id, user_id, student_id, enrollment_number,
+         department_id, course_id, semester_id, section_id, academic_session_id
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [studentRowId, userId, fallbackId, `GEU/2026/${fallbackId}`, h.department_id, h.course_id, h.semester_id, h.section_id, h.academic_session_id]
+    );
+  }
+
+  return getStudentByUserId(userId);
+}
+
 async function getStudentById(studentId) {
   const sql = `
     SELECT 
@@ -855,6 +916,7 @@ module.exports = {
   updateUserRole,
   // Profiles
   getStudentByUserId,
+  ensureStudentProfile,
   getStudentById,
   getFacultyByUserId,
   // Attendance

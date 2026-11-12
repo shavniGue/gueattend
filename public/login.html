@@ -73,6 +73,7 @@
     let firebaseState = {
       app: null,
       auth: null,
+      configured: false,
       signInWithEmailAndPassword: null,
       sendEmailVerification: null,
       isReady: false,
@@ -84,12 +85,15 @@
     async function loadFirebase() {
       if (firebaseState.isReady) return firebaseState;
       try {
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-        const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
-        
         const res = await fetch('/api/auth/firebase-config');
         if (res.ok) {
           const config = await res.json();
+          firebaseState.configured = Boolean(config.configured && config.apiKey);
+          if (!firebaseState.configured) {
+            return firebaseState;
+          }
+          const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+          const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
           firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
@@ -138,32 +142,23 @@
       const rawPassword = passwordInput.value;
       const isEmail = rawId.includes('@');
       let idToken = null;
+      let firebaseAuthWarning = null;
 
-      // A. Client-Side Firebase Authentication (if email entered)
+      // A. Client-Side Firebase Authentication (if email entered & Firebase Web Key configured)
       if (isEmail) {
         try {
           const fb = await loadFirebase();
-          if (fb && fb.auth && fb.signInWithEmailAndPassword) {
+          if (fb && fb.configured && fb.auth && fb.signInWithEmailAndPassword) {
             const credential = await fb.signInWithEmailAndPassword(fb.auth, rawId, rawPassword);
             unverifiedUser = credential.user;
-
-            // MANDATORY CHECK: User must be email verified!
-            if (!credential.user.emailVerified) {
-              verificationBox.style.display = 'block';
-              alertBox.textContent = 'Please verify your email before logging in. Check your inbox for the link.';
-              alertBox.style.display = 'block';
-              btnText.style.display = 'inline';
-              btnSpinner.style.display = 'none';
-              submitBtn.disabled = false;
-              return;
-            }
-
             idToken = await credential.user.getIdToken(true);
-            console.log('[Tier 1] Verified Firebase ID Token acquired.');
+            console.log('[Tier 1] Firebase ID Token acquired.');
           }
         } catch (fbErr) {
-          console.warn('[Tier 1] Firebase client-side sign-in warning:', fbErr.message);
-          // If user not found in firebase or wrong password, let backend handle fallback or report
+          console.warn('[Tier 1] Firebase client-side sign-in warning:', fbErr.code || fbErr.message);
+          if (fbErr.code === 'auth/unauthorized-domain' || fbErr.code === 'auth/api-key-not-valid') {
+            firebaseAuthWarning = fbErr.message;
+          }
         }
       }
 
@@ -189,7 +184,9 @@
           if (data.emailNotVerified) {
             verificationBox.style.display = 'block';
           }
-          alertBox.textContent = data.error || 'Authentication failed. Please verify credentials.';
+          alertBox.textContent = firebaseAuthWarning
+            ? `${data.error || 'Authentication failed.'} (${firebaseAuthWarning})`
+            : (data.error || 'Authentication failed. Please verify credentials.');
           alertBox.style.display = 'block';
         }
       } catch (err) {

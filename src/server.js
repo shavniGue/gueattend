@@ -57,7 +57,7 @@ app.use(
       maxAge: 90 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: 'lax',
-      secure: IS_PROD,
+      secure: 'auto',
     },
   })
 );

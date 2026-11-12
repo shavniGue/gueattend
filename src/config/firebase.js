@@ -47,6 +47,25 @@ try {
 }
 
 /**
+ * Returns the initialized Firebase Admin App instance (or null)
+ */
+function getFirebaseApp() {
+  return admin.apps.length > 0 ? admin.app() : null;
+}
+
+/**
+ * Checks if an email is configured as an administrator in ADMIN_EMAILS
+ */
+function isAdminEmail(email) {
+  if (!email) return false;
+  const list = String(process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}
+
+/**
  * Verifies Firebase ID Token if provided by client (e.g. for optional Google Sign-In)
  */
 async function verifyFirebaseToken(idToken) {
@@ -68,6 +87,8 @@ function checkFirebaseHealth() {
 
 module.exports = {
   admin,
+  getFirebaseApp,
+  isAdminEmail,
   verifyFirebaseToken,
   checkFirebaseHealth,
 };
