@@ -244,12 +244,12 @@ function setupEventListeners() {
   const navQums = document.getElementById('navQumsBtn');
   if (navQums) navQums.addEventListener('click', () => openModal('qumsModal'));
 
-  // Disconnect QUMS button (Logout)
+  // Disconnect GEU portal button (Logout)
   const disconnectQumsBtn = document.getElementById('disconnectQumsBtn');
   if (disconnectQumsBtn) {
     disconnectQumsBtn.addEventListener('click', async () => {
-      if (confirm('Disconnect QUMS session?')) {
-        await fetch('/api/qums/disconnect', { method: 'POST' });
+      if (confirm('Disconnect GEU portal session?')) {
+        await fetch('/api/geu/disconnect', { method: 'POST' });
         loadDashboardData();
       }
     });
@@ -306,12 +306,12 @@ function setupEventListeners() {
     });
   }
 
-  // QUMS Password update form
+  // GEU Password update form
   const qumsForm = document.getElementById('qumsSyncForm');
   if (qumsForm) {
     qumsForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('QUMS credentials updated and encrypted successfully.');
+      alert('GEU portal credentials updated and encrypted successfully.');
       closeModal('qumsModal');
     });
   }

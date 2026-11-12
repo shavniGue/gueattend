@@ -23,7 +23,7 @@
 
     <nav class="nav-links">
       <a href="/dashboard" class="nav-link active">Dashboard</a>
-      <a href="/qums-setup" class="nav-link">QUMS Setup</a>
+      <a href="/geu-setup" class="nav-link">GEU ID Setup</a>
       <a href="/telegram-setup" class="nav-link">Telegram</a>
       <a id="navAdminLink" href="/admin" class="nav-link" style="display: none;">Admin</a>
     </nav>
@@ -40,7 +40,7 @@
     <div class="dash-header-row">
       <div>
         <h1 class="greeting-title" id="greetingUser">Hello, SHAVNI 👋</h1>
-        <p class="greeting-subtitle">Your attendance and connection status — data comes live from QUMS.</p>
+        <p class="greeting-subtitle">Your attendance and connection status — data comes live from GEU Student Portal.</p>
       </div>
       <div>
         <button id="refreshAttendanceBtn" class="btn-refresh">
@@ -55,16 +55,16 @@
 
     <!-- 4 Status Mini Cards Grid (Matches Image 1) -->
     <div class="status-cards-grid">
-      <!-- Card 1: QUMS Connection -->
+      <!-- Card 1: GEU ID Connection -->
       <div class="status-mini-card">
         <div>
-          <div class="mini-card-label">QUMS CONNECTION</div>
+          <div class="mini-card-label">GEU ID CONNECTION</div>
           <div class="mini-card-value" id="qumsStatusDisplay">
             <span>Connected ✅</span>
           </div>
         </div>
         <div class="mini-card-links">
-          <a href="/qums-setup" id="openQumsLink">Open QUMS Setup</a>
+          <a href="/geu-setup" id="openQumsLink">Open GEU ID Setup</a>
           <button id="disconnectQumsBtn">Logout</button>
         </div>
       </div>
@@ -150,7 +150,7 @@
           </tr>
         </thead>
         <tbody id="subjectsAttendanceTbody">
-          <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading live QUMS attendance...</td></tr>
+          <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading live GEU portal attendance...</td></tr>
         </tbody>
       </table>
     </div>
@@ -176,29 +176,29 @@
   </main>
 
   <!-- =========================================================
-       MODAL 1: QUMS SETUP / CONNECTION
+       MODAL 1: GEU ID SETUP / CONNECTION
        ========================================================= -->
   <div class="modal-backdrop" id="qumsModal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <div class="modal-title">🔐 QUMS Account Connection</div>
+        <div class="modal-title">🔐 GEU ID Account Connection</div>
         <button class="modal-close-btn" onclick="closeModal('qumsModal')">&times;</button>
       </div>
       <div class="modal-body">
         <div style="background: var(--surface-alt); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 16px;">
-          <div style="font-size: 12px; color: var(--text-muted);">Connected Student QID:</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Connected Student GUeID:</div>
           <div style="font-size: 16px; font-weight: 800; color: var(--primary);" id="modalStudentQid"></div>
           <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Status: <strong style="color: var(--success);">Active & Syncing</strong></div>
         </div>
 
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-          Your QUMS credentials are encrypted with AES-256 and used strictly by the university automated polling worker to synchronize your attendance without manual logins.
+          Your GEU Student Portal credentials are encrypted with AES-256 and used strictly by the automated polling worker to synchronize your attendance without manual logins.
         </p>
 
         <form id="qumsSyncForm">
           <div class="form-group">
-            <label class="form-label">Update University Password</label>
-            <input type="password" id="qumsPasswordInput" class="form-input" placeholder="Enter new QUMS password to refresh credentials">
+            <label class="form-label">Update GEU Portal Password</label>
+            <input type="password" id="qumsPasswordInput" class="form-input" placeholder="Enter new GEU portal password to refresh credentials">
           </div>
           <button type="submit" class="btn-primary" style="width: 100%;">Save & Refresh Connection</button>
         </form>

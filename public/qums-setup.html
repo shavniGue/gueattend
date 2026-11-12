@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QUMS Setup & Reconnect — gueattend</title>
+  <title>GEU ID Setup &amp; Reconnect — gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -23,7 +23,7 @@
 
     <nav class="nav-links">
       <a href="/dashboard" class="nav-link">Dashboard</a>
-      <a href="/qums-setup" class="nav-link active">QUMS Setup</a>
+      <a href="/geu-setup" class="nav-link active">GEU ID Setup</a>
       <a href="/telegram-setup" class="nav-link">Telegram</a>
     </nav>
 
@@ -37,8 +37,8 @@
   <main class="dashboard-container" style="max-width: 900px;">
     <div class="dash-header-row" style="margin-bottom: 24px;">
       <div>
-        <h1 class="greeting-title">🔐 QUMS Account Connection</h1>
-        <p class="greeting-subtitle">Connect your university ERP portal credentials to enable live attendance tracking & automated Telegram alerts.</p>
+        <h1 class="greeting-title">🔐 GEU ID Account Connection</h1>
+        <p class="greeting-subtitle">Connect your Graphic Era Student Portal (student.geu.ac.in) credentials to enable live attendance tracking &amp; automated Telegram alerts.</p>
       </div>
       <div>
         <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Back to Dashboard</a>
@@ -94,9 +94,9 @@
           <div style="padding: 20px;">
             <form id="qumsSetupForm">
               <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label">Student University ID / QID</label>
-                <input type="text" id="setupQidInput" class="form-input" placeholder="" required>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Your official Graphic Era student registration number.</div>
+                <label class="form-label">Student GUeID / University ID</label>
+                <input type="text" id="setupQidInput" class="form-input" placeholder="Enter your GUeID" required>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Your official Graphic Era student portal login ID (GUeID).</div>
               </div>
 
               <div class="form-group" style="margin-bottom: 14px;">
@@ -154,7 +154,7 @@
         <div class="notif-explainer-card">
           <div class="notif-explainer-header">
             <span>ℹ️</span>
-            <span>Why connect your QUMS?</span>
+            <span>Why connect your GEU ID?</span>
           </div>
           <ul class="notif-list" style="font-size: 12px;">
             <li>Morning 8:30 AM timetable alert before 9:00 AM lectures.</li>
@@ -199,14 +199,14 @@
           banner.style.display = 'block';
           banner.style.background = 'var(--warning-bg)';
           banner.style.color = 'var(--warning-text)';
-          banner.innerHTML = `⚠️ <strong>Session Expired:</strong> Your QUMS connection needs a 1-click CAPTCHA refresh to keep notifications active.`;
+          banner.innerHTML = `⚠️ <strong>Session Expired:</strong> Your GEU portal connection needs a 1-click CAPTCHA refresh to keep notifications active.`;
           reconnectCard.style.display = 'block';
           loadCaptcha('reconnectCaptchaContainer');
         } else if (data.sessionState === 'connected') {
           banner.style.display = 'block';
           banner.style.background = 'var(--success-bg)';
           banner.style.color = 'var(--success-text)';
-          banner.innerHTML = `🟢 <strong>Connected:</strong> QUMS account is active and live-syncing attendance for Student <strong>${data.studentQid || ''}</strong>.`;
+          banner.innerHTML = `🟢 <strong>Connected:</strong> GEU ID account is active and live-syncing attendance for GUeID <strong>${data.studentQid || ''}</strong>.`;
         }
 
         if (data.studentQid) {
@@ -251,7 +251,7 @@
           document.getElementById('setupCaptchaInput').value = '';
         }
       } catch (err) {
-        alert('Network error while connecting to QUMS.');
+        alert('Network error while connecting to GEU Student Portal.');
       } finally {
         btn.disabled = false;
         spinner.style.display = 'none';

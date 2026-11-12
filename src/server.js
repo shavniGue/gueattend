@@ -116,7 +116,7 @@ app.get('/login', sendPage('login.html'));
 app.get('/register', sendPage('register.html'));
 app.get('/forgot', sendPage('forgot.html'));
 app.get('/dashboard', requireAuth, sendPage('index.html'));
-app.get('/qums-setup', requireAuth, sendPage('qums-setup.html'));
+app.get(['/qums-setup', '/geu-setup'], requireAuth, sendPage('qums-setup.html'));
 app.get('/telegram-setup', requireAuth, sendPage('telegram-setup.html'));
 app.get('/attendance-calculator-guide', sendPage('attendance-calculator-guide.html'));
 app.get('/faculty', requireFaculty, sendPage('faculty.html'));
@@ -157,7 +157,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/telegram', telegramRoutes);
-app.use('/api/qums', qumsRoutes);
+app.use(['/api/qums', '/api/geu'], qumsRoutes);
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/admin', adminRoutes);
 
