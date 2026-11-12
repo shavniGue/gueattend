@@ -1,27 +1,26 @@
 /**
  * Database Migration Runner for Supabase PostgreSQL
- * Executes SQL migration scripts in order and tracks applied migrations.
+ * Executes forward-only SQL migration scripts in order ONLY after verifying
+ * strict isolation with GUeAttend project reference `cnpullmxupyqdndxzbih`.
  */
 
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-
-const DATABASE_URL = process.env.DATABASE_URL || '';
+const { assertDatabaseIsolation, resolvePgSslConfig } = require('./identity');
 
 async function runMigrations() {
-  console.log('[migrate] Initializing database migrations...');
+  console.log('[migrate] Initializing GUeAttend database isolation check...');
 
-  if (!DATABASE_URL) {
-    console.error('[migrate] ERROR: DATABASE_URL environment variable is not set.');
-    console.error('[migrate] Please configure DATABASE_URL in your .env file or environment.');
-    process.exit(1);
-  }
+  // Abort immediately if DATABASE_URL / SUPABASE_URL do not match GUeAttend (cnpullmxupyqdndxzbih)
+  const report = assertDatabaseIsolation();
+  console.log(`[migrate] Isolation verified for Supabase project: ${report.expectedRef} (host=${report.dbHost})`);
 
+  const DATABASE_URL = process.env.DATABASE_URL || '';
   const pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    ssl: resolvePgSslConfig(DATABASE_URL),
   });
 
   const client = await pool.connect();
@@ -35,7 +34,7 @@ async function runMigrations() {
       );
     `);
 
-    // 2. Read all .sql files in migrations dir
+    // 2. Read all .sql files in migrations dir in lexical order
     const migrationsDir = path.join(__dirname, 'migrations');
     const files = fs
       .readdirSync(migrationsDir)
@@ -79,10 +78,9 @@ async function runMigrations() {
 
 if (require.main === module) {
   runMigrations().catch((err) => {
-    console.error('[migrate] Fatal migration error:', err.message);
+    console.error('[migrate] ABORTED:', err.message);
     process.exit(1);
   });
 }
 
 module.exports = { runMigrations };
-

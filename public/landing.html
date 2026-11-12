@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="gueattend — Graphic Era University student attendance tracker, 75% bunk margin calculator, live timetable, and Telegram notifications.">
+  <meta property="og:title" content="gueattend – Track. Alert. Stay Updated.">
+  <meta property="og:description" content="Monitor Graphic Era University attendance, classes today, and academic alerts seamlessly.">
   <title>gueattend – Track. Alert. Stay Updated.</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -305,20 +308,21 @@
 
       <div class="contact-card">
         <h4 style="margin-bottom: 14px; font-size: 16px;">Quick Question?</h4>
-        <form onsubmit="event.preventDefault(); alert('Thank you for reaching out! A student support representative will review your query.'); this.reset();">
+        <div id="contactFormStatus" style="display: none; font-size: 13px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm);"></div>
+        <form id="landingContactForm">
           <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label">Your Name</label>
-            <input type="text" class="form-input" placeholder="e.g. Shavni" required>
+            <label class="form-label" for="contactNameInput">Your Name</label>
+            <input type="text" id="contactNameInput" class="form-input" placeholder="e.g. Shavni" required>
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label">Your University Email</label>
-            <input type="email" class="form-input" placeholder="e.g. student@geu.ac.in" required>
+            <label class="form-label" for="contactEmailInput">Your University Email</label>
+            <input type="email" id="contactEmailInput" class="form-input" placeholder="e.g. student@geu.ac.in" required>
           </div>
           <div class="form-group" style="margin-bottom: 16px;">
-            <label class="form-label">Message</label>
-            <textarea class="form-input" rows="3" placeholder="How can we help you?" required></textarea>
+            <label class="form-label" for="contactMessageInput">Message</label>
+            <textarea id="contactMessageInput" class="form-input" rows="3" placeholder="How can we help you?" required></textarea>
           </div>
-          <button type="submit" class="btn-primary" style="width: 100%;">Send Message</button>
+          <button type="submit" id="contactSubmitBtn" class="btn-primary" style="width: 100%;">Send Message</button>
         </form>
       </div>
     </div>
@@ -327,11 +331,58 @@
   <!-- Footer -->
   <footer style="text-align: center; padding: 40px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); background: #ffffff;">
     <div style="font-weight: 700; color: var(--text); margin-bottom: 6px;">gueattend — Track. Alert. Stay Updated.</div>
-    <div>© 2026 gueattend • Smart University Attendance Portal • Graphic Era University</div>
+    <div style="margin-bottom: 8px;">© 2026 gueattend • Smart University Attendance Portal • Graphic Era University</div>
+    <div>
+      <a href="/attendance-calculator-guide" style="color: var(--primary); text-decoration: none; margin: 0 8px;">Calculator Guide</a> •
+      <a href="/privacy-policy" style="color: var(--primary); text-decoration: none; margin: 0 8px;">Privacy Policy</a> •
+      <a href="/sitemap.xml" style="color: var(--primary); text-decoration: none; margin: 0 8px;">Sitemap</a>
+    </div>
   </footer>
 
   <script src="/js/ads.js"></script>
   <script>
+    // Real backend submission for landing contact form
+    document.getElementById('landingContactForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('contactFormStatus');
+      const btn = document.getElementById('contactSubmitBtn');
+      const name = document.getElementById('contactNameInput').value.trim();
+      const email = document.getElementById('contactEmailInput').value.trim();
+      const message = document.getElementById('contactMessageInput').value.trim();
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      statusEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/campus/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message }),
+        });
+        const data = await res.json();
+        statusEl.style.display = 'block';
+        if (data.success) {
+          statusEl.style.background = '#ecfdf5';
+          statusEl.style.color = '#065f46';
+          statusEl.textContent = data.message || 'Your message was sent successfully.';
+          e.target.reset();
+        } else {
+          statusEl.style.background = '#fef2f2';
+          statusEl.style.color = '#991b1b';
+          statusEl.textContent = data.error || 'Could not send message.';
+        }
+      } catch (err) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#fef2f2';
+        statusEl.style.color = '#991b1b';
+        statusEl.textContent = 'Network error sending message.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Message';
+      }
+    });
+
     // Simple FAQ Accordion Toggle
     document.querySelectorAll('.faq-question').forEach((item) => {
       item.addEventListener('click', () => {

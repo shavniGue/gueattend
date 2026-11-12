@@ -7,12 +7,18 @@
 require('dotenv').config();
 const assert = require('assert');
 const bcrypt = require('bcryptjs');
+const http = require('http');
 const db = require('../src/database/db');
 const { checkDatabaseHealth } = require('../src/database/db');
+const { verifyDatabaseIsolation, assertDatabaseIsolation, resolvePgSslConfig } = require('../src/database/identity');
 const { checkSupabaseHealth } = require('../src/database/supabase');
 const { checkFirebaseHealth } = require('../src/config/firebase');
 const { validateAttendanceRecord, syncAttendanceBatch } = require('../src/services/external-sync');
-const { initTelegramBot } = require('../src/services/telegram-bot');
+const { defaultErpAdapter } = require('../src/services/erp-adapter');
+const { encrypt, decrypt } = require('../src/crypto');
+const telegramService = require('../src/services/telegram-bot');
+const { initTelegramBot } = telegramService;
+const app = require('../src/server');
 
 let totalChecks = 0;
 let passedChecks = 0;
@@ -54,8 +60,11 @@ async function runTestSuite() {
   // -------------------------------------------------------------
   console.log('--- 1. Database & Supabase PostgreSQL Health ---');
 
-  await checkAsync('Database connection pool is operational and connected', async () => {
+  await checkAsync('Database isolation & connection pool strictly match cnpullmxupyqdndxzbih', async () => {
     const health = await checkDatabaseHealth();
+    assert.strictEqual(health.isolated, true, `Isolation failed: ${health.details}`);
+    assert.strictEqual(health.expectedProjectRef, 'cnpullmxupyqdndxzbih');
+    assert.strictEqual(health.projectMismatch, false);
     assert.strictEqual(health.connected, true, 'Database should connect successfully.');
     assert.strictEqual(health.tablesExist, true, 'All required ERP tables must exist.');
     assert.strictEqual(health.missingTables.length, 0, `Missing tables: ${health.missingTables.join(', ')}`);
@@ -287,6 +296,151 @@ async function runTestSuite() {
     assert.strictEqual(res.success, true);
     assert.strictEqual(res.processed, 1);
     assert.ok(res.syncId);
+  });
+
+  // -------------------------------------------------------------
+  // SECTION 8: ISOLATION GUARDS, SECURITY, CRYPTO & ERP ADAPTER
+  // -------------------------------------------------------------
+  console.log('\n--- 8. Isolation Guards, Security, Crypto & ERP Adapter ---');
+
+  check('Isolation guard rejects QAttend (ifqcykeinpgqyoduwyho) & accepts cnpullmxupyqdndxzbih', () => {
+    const bad = verifyDatabaseIsolation({
+      connectionString: 'postgresql://postgres.ifqcykeinpgqyoduwyho:secret@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+      supabaseUrl: 'https://cnpullmxupyqdndxzbih.supabase.co',
+      jwksUrl: 'https://cnpullmxupyqdndxzbih.supabase.co/auth/v1/.well-known/jwks.json',
+    });
+    assert.strictEqual(bad.ok, false);
+    assert.strictEqual(bad.isForbiddenProject, true);
+    assert.throws(() => assertDatabaseIsolation({
+      connectionString: 'postgresql://postgres.ifqcykeinpgqyoduwyho:secret@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres',
+      supabaseUrl: 'https://cnpullmxupyqdndxzbih.supabase.co',
+    }), /DATABASE_ISOLATION_VIOLATION|Database isolation/);
+
+    const good = verifyDatabaseIsolation({
+      connectionString: 'postgresql://postgres.cnpullmxupyqdndxzbih:secret@aws-0-ap-south-1.pooler.supabase.com:5432/postgres',
+      supabaseUrl: 'https://cnpullmxupyqdndxzbih.supabase.co',
+      jwksUrl: 'https://cnpullmxupyqdndxzbih.supabase.co/auth/v1/.well-known/jwks.json',
+    });
+    assert.strictEqual(good.ok, true);
+    assert.strictEqual(good.dbRef, 'cnpullmxupyqdndxzbih');
+  });
+
+  check('TLS validation defaults to strict certificate verification for remote hosts', () => {
+    const tlsCfg = resolvePgSslConfig('postgresql://postgres.cnpullmxupyqdndxzbih:secret@aws-0-ap-south-1.pooler.supabase.com:5432/postgres');
+    assert.strictEqual(tlsCfg.rejectUnauthorized, true);
+    assert.strictEqual(resolvePgSslConfig('postgresql://postgres:secret@localhost:5432/postgres'), false);
+  });
+
+  check('AES-256-GCM vault round-trip encryption & decryption succeeds', () => {
+    const cipher = encrypt('GEU_Portal_Secret_2026!');
+    assert.ok(cipher.startsWith('v2:'));
+    assert.strictEqual(decrypt(cipher), 'GEU_Portal_Secret_2026!');
+  });
+
+  await checkAsync('Modular GEU ERP adapter documents missing endpoints cleanly without inventing URLs', async () => {
+    const caps = defaultErpAdapter.getCapabilities();
+    assert.strictEqual(caps.loginAndCaptchaRelay.turnstileBypass, false);
+    assert.strictEqual(caps.postLoginLiveEndpoints.status, 'AWAITING_AUTHORIZED_ENDPOINT_EVIDENCE');
+    await assert.rejects(() => defaultErpAdapter.fetchSubjectAttendance(), /NOT_CONFIGURED/);
+  });
+
+  // -------------------------------------------------------------
+  // SECTION 9: SEO, ADSENSE HYGIENE, CSRF & PUBLIC ROUTES
+  // -------------------------------------------------------------
+  console.log('\n--- 9. SEO, AdSense Hygiene, CSRF & Public Routes ---');
+
+  await checkAsync('Public SEO routes (/robots.txt, /sitemap.xml, /privacy-policy, /ads.txt, /api/ads/validate) & CSRF guard pass', async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const [robotsRes, sitemapRes, privacyRes, adsTxtRes, adsValRes, csrfBlockRes] = await Promise.all([
+        fetch(`${baseUrl}/robots.txt`),
+        fetch(`${baseUrl}/sitemap.xml`),
+        fetch(`${baseUrl}/privacy-policy`),
+        fetch(`${baseUrl}/ads.txt`),
+        fetch(`${baseUrl}/api/ads/validate`),
+        fetch(`${baseUrl}/api/campus/grievances`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Origin: 'https://evil-attacker.example' },
+          body: JSON.stringify({ subject: 'x', description: 'y' }),
+        }),
+      ]);
+      assert.strictEqual(robotsRes.status, 200);
+      assert.ok((await robotsRes.text()).includes('Disallow: /admin'));
+      assert.strictEqual(sitemapRes.status, 200);
+      assert.ok((await sitemapRes.text()).includes('/privacy-policy'));
+      assert.strictEqual(privacyRes.status, 200);
+      assert.strictEqual(adsTxtRes.status, 200);
+      const adsValJson = await adsValRes.json();
+      assert.strictEqual(adsValJson.success, true);
+      assert.ok(!adsValJson.publicPlacements.includes('dashboard'));
+      assert.ok(!adsValJson.publicPlacements.includes('auth'));
+      assert.strictEqual(csrfBlockRes.status, 403, 'Cross-origin POST must be blocked by CSRF middleware');
+
+      // Ensure ads are absent on dashboard & auth pages
+      const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+      const loginHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'login.html'), 'utf8');
+      const regHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'register.html'), 'utf8');
+      assert.ok(!indexHtml.includes('ads.js'), 'No ads on private student dashboard');
+      assert.ok(!loginHtml.includes('ads.js'), 'No ads on login page');
+      assert.ok(!regHtml.includes('ads.js'), 'No ads on registration page');
+    } finally {
+      server.close();
+    }
+  });
+
+  // -------------------------------------------------------------
+  // SECTION 10: NON-SCRAPING ERP MODULES & UNIFIED TELEGRAM BOT
+  // -------------------------------------------------------------
+  console.log('\n--- 10. Non-Scraping ERP Modules & Unified Telegram Bot ---');
+
+  await checkAsync('Unified Telegram bot /help command & dispatchers behave correctly', async () => {
+    assert.strictEqual(typeof telegramService.handleBotCommand, 'function');
+    assert.strictEqual(typeof telegramService.handleCallbackQuery, 'function');
+
+    const sentMessages = [];
+    const mockBot = {
+      async sendMessage(chatId, text, opts) {
+        sentMessages.push({ chatId, text, opts });
+        return { message_id: sentMessages.length };
+      },
+      async answerCallbackQuery() {},
+    };
+    await telegramService.handleBotCommand(mockBot, { chat: { id: 12345 }, text: '/help', from: {} });
+    assert.ok(sentMessages.some((m) => m.text.includes('/assignments') && m.text.includes('/reconnect') && m.text.includes('/admin')));
+  });
+
+  await checkAsync('Non-scraping ERP modules (lecture plans, exams, results, fees, circulars) & callback query work on live DB', async () => {
+    const health = await checkDatabaseHealth();
+    assert.strictEqual(health.connected, true, 'Live DB must be connected to verify student ERP module records.');
+    const ackedCallbacks = [];
+    const mockBot = {
+      async sendMessage() { return { message_id: 1 }; },
+      async answerCallbackQuery(id) { ackedCallbacks.push(id); },
+    };
+    await telegramService.handleCallbackQuery(mockBot, { id: 'cb_1', data: 'unknown_action', message: { chat: { id: 12345 } } });
+    assert.strictEqual(ackedCallbacks[0], 'cb_1');
+
+    const studentUser = await db.getUserByEmail('karan.kumar@geu.ac.in');
+    const student = await db.getStudentByUserId(studentUser.id);
+    assert.ok(student, 'Seeded student required for Phase 1 ERP checks.');
+    const [plans, schedules, results, fees, receipts, circulars] = await Promise.all([
+      db.getLecturePlans(student.section_id),
+      db.getExamSchedules(student.semester_id),
+      db.getStudentResults(student.id),
+      db.getStudentFees(student.id),
+      db.getPaymentReceipts(student.id),
+      db.getCirculars('students', 10),
+    ]);
+    assert.ok(plans.length > 0, 'Lecture plans should exist for seeded section');
+    assert.ok(schedules.length > 0, 'Exam schedules should exist for seeded semester');
+    assert.ok(results.length > 0, 'Student results should exist');
+    assert.ok(fees.length > 0, 'Student fees should exist');
+    assert.ok(receipts.length > 0, 'Payment receipts should exist');
+    assert.ok(circulars.length > 0, 'Circulars should exist');
   });
 
   // -------------------------------------------------------------

@@ -8,12 +8,25 @@ const router = express.Router();
 const qumsWeb = require('../qums-login-web');
 const { requireAuth } = require('../middleware/auth');
 const db = require('../database/db');
+const { rateLimit } = require('../middleware/rate-limiter');
+
+const captchaLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 12,
+  message: 'Too many CAPTCHA requests. Please wait a minute before retrying.',
+});
+
+const portalSubmitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 10,
+  message: 'Too many GEU portal authentication attempts. Please wait briefly.',
+});
 
 /**
  * GET /api/qums/captcha
  * Stream live visual CAPTCHA element as base64 to frontend
  */
-router.get('/captcha', requireAuth, async (req, res) => {
+router.get('/captcha', requireAuth, captchaLimiter, async (req, res) => {
   try {
     const challenge = await qumsWeb.getVisualCaptcha(req.session.userId);
     const captchaImg = challenge?.captchaImage || challenge?.captcha || null;
@@ -42,7 +55,7 @@ router.get('/captcha', requireAuth, async (req, res) => {
  * POST /api/qums/start-login
  * Pre-fills username & password in Playwright and screenshots fresh CAPTCHA
  */
-router.post('/start-login', requireAuth, async (req, res) => {
+router.post('/start-login', requireAuth, portalSubmitLimiter, async (req, res) => {
   const { qid, password, isReconnect } = req.body;
   try {
     if (qid) {
@@ -64,7 +77,7 @@ router.post('/start-login', requireAuth, async (req, res) => {
  * POST /api/qums/submit-captcha
  * Submits human-solved CAPTCHA to active browser session
  */
-router.post('/submit-captcha', requireAuth, async (req, res) => {
+router.post('/submit-captcha', requireAuth, portalSubmitLimiter, async (req, res) => {
   const { qid, password } = req.body;
   const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
   try {
@@ -87,7 +100,7 @@ router.post('/submit-captcha', requireAuth, async (req, res) => {
  * POST /api/qums/login
  * Full login convenience handler: binds submit with fallback
  */
-router.post('/login', requireAuth, async (req, res) => {
+router.post('/login', requireAuth, portalSubmitLimiter, async (req, res) => {
   const { qid, password } = req.body;
   const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
 
@@ -128,7 +141,7 @@ router.post('/login', requireAuth, async (req, res) => {
  * POST /api/qums/reconnect
  * 1-Click Reconnect: Uses vaulted encrypted password with fresh CAPTCHA
  */
-router.post('/reconnect', requireAuth, async (req, res) => {
+router.post('/reconnect', requireAuth, portalSubmitLimiter, async (req, res) => {
   const { source } = req.body;
   const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
   if (!captchaAnswer) {

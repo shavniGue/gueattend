@@ -1,9 +1,11 @@
 /**
- * gueattend - Google AdSense & Advertisement Container Loader
- * Reads runtime config from /api/ads/config so Render environment variables
- * control live AdSense units without editing HTML templates.
+ * gueattend - Google AdSense & Public Advertisement Container Loader
+ * Strictly restricts ad rendering to public informational placements (`landing`, `guide`, `privacy`)
+ * and reads runtime configuration from `/api/ads/config`. Never claims AdSense approval.
  */
 (function () {
+  const ALLOWED_PUBLIC_PLACEMENTS = new Set(['landing', 'guide', 'privacy']);
+
   function loadAdSenseScript(clientId) {
     if (document.querySelector('script[data-gueattend-adsense="true"]')) return;
     const script = document.createElement('script');
@@ -35,13 +37,18 @@
       return;
     }
 
-    const clientId = /^ca-pub-\d+$/.test(config.clientId || '') ? config.clientId : '';
+    const clientId = /^ca-pub-\d{10,20}$/.test(config.clientId || '') ? config.clientId : '';
     if (clientId) {
       loadAdSenseScript(clientId);
     }
 
     containers.forEach((wrapper) => {
-      const placement = wrapper.getAttribute('data-ad-placement') || 'landing';
+      const placement = (wrapper.getAttribute('data-ad-placement') || '').trim().toLowerCase();
+      if (!ALLOWED_PUBLIC_PLACEMENTS.has(placement)) {
+        wrapper.style.display = 'none';
+        return;
+      }
+
       const labelEl = wrapper.querySelector('.ads-label');
       if (labelEl) {
         labelEl.textContent = 'Advertisement';
@@ -51,7 +58,7 @@
       const rawSlot = (config.slots && config.slots[placement]) || '';
       const slotId = /^\d+$/.test(rawSlot) ? rawSlot : '';
 
-      body.innerHTML = '';
+      body.textContent = '';
       if (clientId && slotId) {
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';

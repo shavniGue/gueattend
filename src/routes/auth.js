@@ -11,15 +11,25 @@ const router = express.Router();
 const db = require('../database/db');
 const { requireAuth } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/rate-limiter');
+const { getOrCreateCsrfToken } = require('../middleware/csrf');
 
 // In-memory CAPTCHA store with 5-minute expiry
 const captchaStore = new Map();
 
 /**
+ * GET /api/auth/csrf-token
+ * Issues a session-bound CSRF token for authenticated or pre-auth mutations
+ */
+router.get('/csrf-token', (req, res) => {
+  const token = getOrCreateCsrfToken(req);
+  res.json({ success: true, csrfToken: token });
+});
+
+/**
  * GET /api/auth/captcha
  * Generates a challenge token and simple text CAPTCHA
  */
-router.get('/captcha', (req, res) => {
+router.get('/captcha', rateLimit({ windowMs: 60000, maxRequests: 20, message: 'Too many CAPTCHA requests.' }), (req, res) => {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let text = '';
   for (let i = 0; i < 5; i++) {

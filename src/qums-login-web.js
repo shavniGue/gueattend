@@ -219,6 +219,9 @@ async function persistVerifiedPortalSession({ userId, qid, password, cookies, is
     [userId, isReconnect ? 'reconnect' : 'initial_setup']
   ).catch(() => {});
 
+  const alerts = require('./alerts');
+  await alerts.resolveSessionExpiry(userId);
+
   await db.recordAuditLog({
     userId,
     action: 'GUEID_VERIFIED_AND_CONNECTED',

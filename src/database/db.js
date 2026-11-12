@@ -6,15 +6,29 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const {
+  verifyDatabaseIsolation,
+  assertDatabaseIsolation,
+  resolvePgSslConfig,
+} = require('./identity');
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 let pool = null;
+const startupIsolation = verifyDatabaseIsolation();
 
-if (DATABASE_URL) {
+function getPool() {
+  return pool;
+}
+
+function setPool(customPool) {
+  pool = customPool || null;
+}
+
+if (DATABASE_URL && startupIsolation.ok) {
   pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    ssl: resolvePgSslConfig(DATABASE_URL),
     max: 10,
     idleTimeoutMillis: 15000,
     connectionTimeoutMillis: 15000,
@@ -25,31 +39,29 @@ if (DATABASE_URL) {
   pool.on('error', (err) => {
     console.error('[db] Unexpected idle client error:', err.message);
   });
+} else if (DATABASE_URL) {
+  console.error(`[db] CONNECTION BLOCKED: ${startupIsolation.reasons.join(' ')}`);
 }
 
 /**
  * Diagnostic database health check. Never simulates success.
  */
 async function checkDatabaseHealth() {
+  const isolation = verifyDatabaseIsolation();
   const result = {
-    configured: Boolean(DATABASE_URL),
+    configured: Boolean(DATABASE_URL) && !isolation.isPlaceholder,
+    isolated: isolation.ok,
+    expectedProjectRef: isolation.expectedRef,
+    detectedProjectRef: isolation.dbRef || null,
     connected: false,
     tablesExist: false,
     missingTables: [],
-    projectMismatch: false,
+    projectMismatch: !isolation.ok,
     details: '',
   };
 
-  const supabaseUrl = process.env.SUPABASE_URL || '';
-  const supabaseRef = supabaseUrl.match(/https?:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1] || '';
-  const dbRef = DATABASE_URL.match(/postgres\.([a-z0-9-]+):/i)?.[1] || DATABASE_URL.match(/@db\.([a-z0-9-]+)\.supabase\.co/i)?.[1] || '';
-  if (supabaseRef && dbRef && supabaseRef !== dbRef) {
-    result.projectMismatch = true;
-    console.warn(`[db] WARNING: DATABASE_URL points to Supabase project "${dbRef}", while SUPABASE_URL is "${supabaseRef}". Update DATABASE_URL so GUeAttend does not read another project's database.`);
-  }
-
-  if (!DATABASE_URL) {
-    result.details = 'DATABASE_URL environment variable is missing.';
+  if (!isolation.ok) {
+    result.details = isolation.reasons.join(' ');
     return result;
   }
 
@@ -80,11 +92,9 @@ async function checkDatabaseHealth() {
 
       result.missingTables = required.filter((t) => !existing.has(t));
       result.tablesExist = result.missingTables.length === 0;
-      result.details = result.projectMismatch
-        ? `WARNING: DATABASE_URL (${dbRef}) does not match SUPABASE_URL (${supabaseRef}).`
-        : result.tablesExist
-          ? 'All required university ERP tables are present.'
-          : `Connected, but missing tables: ${result.missingTables.join(', ')}`;
+      result.details = result.tablesExist
+        ? `Connected cleanly to isolated GUeAttend database (${isolation.expectedRef}).`
+        : `Connected to ${isolation.expectedRef}, but missing tables: ${result.missingTables.join(', ')}`;
     } finally {
       client.release();
     }
@@ -339,6 +349,7 @@ async function getTodayAttendance(studentId, dateStr) {
       COALESCE(sub.code, '-') AS subject_code,
       COALESCE(u_fac.full_name, '-') AS faculty_name,
       COALESCE(ar.status, 'not_marked') AS status,
+      ar.id AS record_id,
       ar.remarks
     FROM timetable_periods tp
     LEFT JOIN timetable tt ON tt.period_number = tp.period_number
@@ -362,25 +373,26 @@ async function getTodayAttendance(studentId, dateStr) {
 async function getMonthlyAttendance(studentId, month, year) {
   const sql = `
     SELECT 
-      att_s.class_date,
-      att_s.period_number,
-      tp.label AS period_label,
+      ar.id AS record_id,
+      COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date) AS class_date,
+      COALESCE(att_s.period_number, ar.period_number, 1) AS period_number,
+      COALESCE(tp.label, CONCAT('Period ', COALESCE(att_s.period_number, ar.period_number, 1))) AS period_label,
       sub.id AS subject_id,
-      sub.code AS subject_code,
-      sub.name AS subject_name,
-      u_fac.full_name AS faculty_name,
+      COALESCE(sub.code, ar.subject_code) AS subject_code,
+      COALESCE(sub.name, ar.subject_name, ar.subject_code) AS subject_name,
+      COALESCE(u_fac.full_name, ar.faculty_name, '-') AS faculty_name,
       ar.status,
       ar.remarks
     FROM attendance_records ar
-    JOIN attendance_sessions att_s ON ar.session_id = att_s.id
-    JOIN timetable_periods tp ON att_s.period_number = tp.period_number
-    JOIN subjects sub ON att_s.subject_id = sub.id
-    JOIN faculty fac ON att_s.faculty_id = fac.id
-    JOIN users u_fac ON fac.user_id = u_fac.id
+    LEFT JOIN attendance_sessions att_s ON ar.session_id = att_s.id
+    LEFT JOIN timetable_periods tp ON COALESCE(att_s.period_number, ar.period_number) = tp.period_number
+    LEFT JOIN subjects sub ON COALESCE(att_s.subject_id, '') = sub.id OR (att_s.subject_id IS NULL AND LOWER(sub.code) = LOWER(ar.subject_code))
+    LEFT JOIN faculty fac ON att_s.faculty_id = fac.id
+    LEFT JOIN users u_fac ON fac.user_id = u_fac.id
     WHERE ar.student_id = $1
-      AND EXTRACT(MONTH FROM att_s.class_date) = $2
-      AND EXTRACT(YEAR FROM att_s.class_date) = $3
-    ORDER BY att_s.class_date ASC, att_s.period_number ASC
+      AND EXTRACT(MONTH FROM COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date)) = $2
+      AND EXTRACT(YEAR FROM COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date)) = $3
+    ORDER BY COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date) ASC, COALESCE(att_s.period_number, ar.period_number, 1) ASC
   `;
   const res = await query(sql, [studentId, month, year]);
   return res.rows;
@@ -389,21 +401,22 @@ async function getMonthlyAttendance(studentId, month, year) {
 async function getAttendanceHistory(studentId, startDate, endDate) {
   const sql = `
     SELECT 
-      att_s.class_date,
-      att_s.period_number,
-      sub.code AS subject_code,
-      sub.name AS subject_name,
-      u_fac.full_name AS faculty_name,
+      ar.id AS record_id,
+      COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date) AS class_date,
+      COALESCE(att_s.period_number, ar.period_number, 1) AS period_number,
+      COALESCE(sub.code, ar.subject_code) AS subject_code,
+      COALESCE(sub.name, ar.subject_name, ar.subject_code) AS subject_name,
+      COALESCE(u_fac.full_name, ar.faculty_name, '-') AS faculty_name,
       ar.status,
       ar.remarks
     FROM attendance_records ar
-    JOIN attendance_sessions att_s ON ar.session_id = att_s.id
-    JOIN subjects sub ON att_s.subject_id = sub.id
-    JOIN faculty fac ON att_s.faculty_id = fac.id
-    JOIN users u_fac ON fac.user_id = u_fac.id
+    LEFT JOIN attendance_sessions att_s ON ar.session_id = att_s.id
+    LEFT JOIN subjects sub ON COALESCE(att_s.subject_id, '') = sub.id OR (att_s.subject_id IS NULL AND LOWER(sub.code) = LOWER(ar.subject_code))
+    LEFT JOIN faculty fac ON att_s.faculty_id = fac.id
+    LEFT JOIN users u_fac ON fac.user_id = u_fac.id
     WHERE ar.student_id = $1
-      AND att_s.class_date BETWEEN $2::date AND $3::date
-    ORDER BY att_s.class_date DESC, att_s.period_number ASC
+      AND COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date) BETWEEN $2::date AND $3::date
+    ORDER BY COALESCE(att_s.class_date, NULLIF(ar.class_date, '')::date) DESC, COALESCE(att_s.period_number, ar.period_number, 1) ASC
   `;
   const res = await query(sql, [studentId, startDate, endDate]);
   return res.rows;
@@ -452,8 +465,16 @@ async function getAttendanceSummary(studentId) {
       END AS percentage
     FROM subjects sub
     JOIN students s ON s.id = $1 AND s.course_id = sub.course_id AND s.semester_id = sub.semester_id
-    LEFT JOIN attendance_sessions att_s ON att_s.subject_id = sub.id AND att_s.section_id = s.section_id
-    LEFT JOIN attendance_records ar ON ar.session_id = att_s.id AND ar.student_id = s.id
+    LEFT JOIN LATERAL (
+      SELECT ar_inner.id, ar_inner.status
+      FROM attendance_records ar_inner
+      LEFT JOIN attendance_sessions att_s ON ar_inner.session_id = att_s.id
+      WHERE ar_inner.student_id = s.id
+        AND (
+          att_s.subject_id = sub.id
+          OR (ar_inner.session_id IS NULL AND LOWER(ar_inner.subject_code) = LOWER(sub.code))
+        )
+    ) ar ON TRUE
     GROUP BY sub.id, sub.code, sub.name
     ORDER BY sub.name ASC
   `;
@@ -921,7 +942,11 @@ async function recordSyncLog({ source, entityType, processed = 0, inserted = 0, 
 }
 
 module.exports = {
-  pool,
+  get pool() {
+    return pool;
+  },
+  getPool,
+  setPool,
   query,
   withTransaction,
   checkDatabaseHealth,
@@ -971,4 +996,7 @@ module.exports = {
   // Audit
   recordAuditLog,
   recordSyncLog,
+  // Isolation Guards
+  verifyDatabaseIsolation,
+  assertDatabaseIsolation,
 };

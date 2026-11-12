@@ -6,8 +6,10 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { assertDatabaseIsolation } = require('./identity');
 
 async function seedDatabase() {
+  assertDatabaseIsolation();
   console.log('[seed] Starting GUeAttend database seed...');
 
   const passwordHash = await bcrypt.hash('Password@123', 10);

@@ -30,22 +30,46 @@ async function shouldSendAlert(userId, dedupeKey, alertType = 'attendance_update
 }
 
 /**
- * Handle session expiry notification with inline reconnect button
+ * Handle session expiry notification cleanly across BIGINT epoch columns and TIMESTAMPTZ columns.
  */
 async function recordSessionExpiry(userId, note = 'College session expired.') {
+  const nowEpochMs = Date.now();
   await db.query(
-    `INSERT INTO session_expiry_state (user_id, expired_at, last_alert_at, alert_count, note)
-     VALUES ($1, NOW(), NOW(), 1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET 
-       last_alert_at = NOW(),
+    `INSERT INTO session_expiry_state (
+       user_id, expired_at, last_alert_at, alert_count, resolved_at,
+       note, is_expired, detected_at, expired_at_ts, last_alert_at_ts, resolved_at_ts
+     )
+     VALUES ($1, $2, $2, 1, NULL, $3, TRUE, NOW(), NOW(), NOW(), NULL)
+     ON CONFLICT (user_id) DO UPDATE SET
+       last_alert_at = $2,
+       last_alert_at_ts = NOW(),
        alert_count = session_expiry_state.alert_count + 1,
-       note = $2`,
-    [userId, note]
+       is_expired = TRUE,
+       detected_at = NOW(),
+       resolved_at = NULL,
+       resolved_at_ts = NULL,
+       note = $3`,
+    [userId, nowEpochMs, note]
   );
+}
+
+/**
+ * Mark an expired portal session as resolved after successful reconnect.
+ */
+async function resolveSessionExpiry(userId) {
+  const nowEpochMs = Date.now();
+  await db.query(
+    `UPDATE session_expiry_state
+     SET is_expired = FALSE,
+         resolved_at = $2,
+         resolved_at_ts = NOW()
+     WHERE user_id = $1`,
+    [userId, nowEpochMs]
+  ).catch(() => {});
 }
 
 module.exports = {
   shouldSendAlert,
   recordSessionExpiry,
+  resolveSessionExpiry,
 };
-

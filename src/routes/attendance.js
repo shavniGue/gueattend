@@ -161,31 +161,75 @@ router.get('/subject/:subjectId', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/attendance/corrections
+ * List logged-in student's attendance correction requests
+ */
+router.get('/corrections', requireAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT ac.*, ar.class_date, ar.subject_code, ar.subject_name, ar.period_number
+       FROM attendance_corrections ac
+       JOIN attendance_records ar ON ac.attendance_record_id = ar.id
+       WHERE ac.requested_by_user_id = $1
+       ORDER BY ac.created_at DESC
+       LIMIT 50`,
+      [req.session.userId]
+    );
+    res.json({ success: true, corrections: result.rows });
+  } catch (err) {
+    console.error('[attendance/corrections] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch correction requests.' });
+  }
+});
+
+/**
  * POST /api/attendance/correction
- * Submit attendance correction request
+ * Submit attendance correction request (strictly owner-scoped)
  */
 router.post('/correction', requireAuth, async (req, res) => {
-  const { recordId, newStatus, reason } = req.body;
-  if (!recordId || !newStatus || !reason) {
+  const { recordId, newStatus, reason } = req.body || {};
+  const allowedStatuses = ['present', 'absent', 'approved_leave'];
+  const normalizedStatus = String(newStatus || '').trim().toLowerCase();
+
+  if (!recordId || !normalizedStatus || !String(reason || '').trim()) {
     return res.status(400).json({ success: false, error: 'recordId, newStatus, and reason are required.' });
+  }
+  if (!allowedStatuses.includes(normalizedStatus)) {
+    return res.status(400).json({ success: false, error: 'newStatus must be present, absent, or approved_leave.' });
   }
 
   try {
+    const student = await db.getStudentByUserId(req.session.userId);
     const recRes = await db.query('SELECT * FROM attendance_records WHERE id = $1', [recordId]);
     if (recRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Attendance record not found.' });
     }
 
     const rec = recRes.rows[0];
-    const correctionId = `corr_${Date.now()}`;
+    const ownsRecord = rec.user_id === req.session.userId || (student && rec.student_id === student.id);
+    if (!ownsRecord && req.session.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'You may only request corrections for your own attendance records.' });
+    }
 
-    await db.query(
+    const correctionId = `corr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+    const insRes = await db.query(
       `INSERT INTO attendance_corrections (id, attendance_record_id, requested_by_user_id, old_status, new_status, reason, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())`,
-      [correctionId, recordId, req.session.userId, rec.status, newStatus, reason]
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())
+       RETURNING *`,
+      [correctionId, recordId, req.session.userId, rec.status, normalizedStatus, String(reason).trim()]
     );
 
-    res.json({ success: true, message: 'Correction request submitted for faculty review.' });
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'ATTENDANCE_CORRECTION_REQUESTED',
+      resource: `attendance_records:${recordId}`,
+      details: { correctionId, oldStatus: rec.status, newStatus: normalizedStatus },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ success: true, correction: insRes.rows[0], message: 'Correction request submitted for faculty review.' });
   } catch (err) {
     console.error('[attendance/correction] Error:', err.message);
     res.status(500).json({ success: false, error: 'Failed to submit correction request.' });

@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="shortcut icon" href="/favicon.ico">
+  <script src="/js/security.js"></script>
 </head>
 <body>
 
@@ -38,9 +39,11 @@
         <h1 class="admin-title">Faculty Attendance Portal</h1>
         <p class="admin-subtitle">Mark class attendance, review correction requests, and inspect allocated sections</p>
       </div>
-      <div class="admin-ops-tabs" style="margin-bottom: 0;">
+      <div class="admin-ops-tabs" style="margin-bottom: 0; flex-wrap: wrap;">
         <button type="button" class="admin-op-tab active" onclick="switchFacultyTab('markTab', this)">Mark Attendance</button>
         <button type="button" class="admin-op-tab" onclick="switchFacultyTab('correctionsTab', this)">Review Corrections</button>
+        <button type="button" class="admin-op-tab" onclick="switchFacultyTab('substitutionsTab', this)">Substitutions</button>
+        <button type="button" class="admin-op-tab" onclick="switchFacultyTab('academicsFacTab', this)">Academics &amp; Marks</button>
         <button type="button" class="admin-op-tab" onclick="switchFacultyTab('classesTab', this)">My Assigned Classes</button>
       </div>
     </div>
@@ -138,6 +141,76 @@
       </div>
     </section>
 
+    <!-- TAB 4: CLASS SUBSTITUTIONS -->
+    <section id="substitutionsTab" class="view-panel">
+      <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><span class="card-title">Schedule Class Substitution</span></div>
+        <div class="card-body">
+          <form id="facSubForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+            <select id="subTimetableId" class="form-select" required><option value="">Select timetable slot...</option></select>
+            <input type="date" id="subDateInput" class="form-input" required>
+            <select id="subFacultyId" class="form-select" required><option value="">Substitute faculty...</option></select>
+            <input type="text" id="subReasonInput" class="form-input" placeholder="Reason (e.g. Academic Duty)">
+            <button type="submit" class="btn btn-primary">Assign Substitution</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Scheduled Substitutions</span></div>
+        <div class="card-body" style="padding: 0;">
+          <table class="data-table">
+            <thead>
+              <tr><th>Date</th><th>Slot</th><th>Subject</th><th>Original</th><th>Substitute</th><th>Status</th></tr>
+            </thead>
+            <tbody id="facSubsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: ACADEMICS, ASSIGNMENTS & EXAM MARKS -->
+    <section id="academicsFacTab" class="view-panel">
+      <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><span class="card-title">Add Lecture Plan Topic</span></div>
+        <div class="card-body">
+          <form id="facLecturePlanForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+            <select id="lpClassSelect" class="form-select" required><option value="">Choose class...</option></select>
+            <input type="number" id="lpWeekInput" class="form-input" min="1" max="20" placeholder="Week #" required>
+            <input type="text" id="lpTopicInput" class="form-input" placeholder="Topic title" required>
+            <input type="date" id="lpDateInput" class="form-input" required>
+            <button type="submit" class="btn btn-primary">Save Topic</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><span class="card-title">Publish Assignment</span></div>
+        <div class="card-body">
+          <form id="facAsgnForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+            <select id="asgnClassSelect" class="form-select" required><option value="">Choose class...</option></select>
+            <input type="text" id="asgnTitleInput" class="form-input" placeholder="Assignment title" required>
+            <input type="date" id="asgnDueInput" class="form-input" required>
+            <input type="number" id="asgnMaxMarks" class="form-input" value="100" min="1" required>
+            <button type="submit" class="btn btn-primary">Publish Assignment</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Enter Student Exam Marks</span></div>
+        <div class="card-body">
+          <form id="facMarksForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
+            <select id="marksExamSelect" class="form-select" required><option value="">Select exam...</option></select>
+            <input type="text" id="marksStudentId" class="form-input" placeholder="Student DB ID (e.g. stu_1)" required>
+            <select id="marksSubjectSelect" class="form-select" required><option value="">Select subject...</option></select>
+            <input type="number" id="marksInternalInput" class="form-input" placeholder="Internal marks" step="0.5" required>
+            <input type="number" id="marksExternalInput" class="form-input" placeholder="External marks" step="0.5" required>
+            <button type="submit" class="btn btn-primary">Save Marks</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <!-- TAB 3: ASSIGNED CLASSES -->
     <section id="classesTab" class="view-panel">
       <div class="card">
@@ -152,11 +225,11 @@
   </main>
 
   <script>
+    const escFac = (v) => (window.GueSecurity ? window.GueSecurity.escapeHtml(v) : String(v || ''));
     let assignedClasses = [];
     let currentRoster = [];
 
     async function initFaculty() {
-      // Set default date to today
       document.getElementById('attDateInput').value = new Date().toISOString().split('T')[0];
 
       try {
@@ -166,24 +239,42 @@
           assignedClasses = data.classes;
           document.getElementById('facNameDisplay').textContent = data.faculty.full_name;
 
-          const sel = document.getElementById('facClassSelect');
-          sel.innerHTML = '<option value="">Select an assigned class...</option>';
-          data.classes.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = JSON.stringify({ sectionId: c.section_id, subjectId: c.subject_id });
-            opt.textContent = `${c.subject_code} - ${c.subject_name} (${c.section_name})`;
-            sel.appendChild(opt);
+          const classSelectors = ['facClassSelect', 'lpClassSelect', 'asgnClassSelect'];
+          classSelectors.forEach((selId) => {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Select an assigned class...</option>';
+            data.classes.forEach((c) => {
+              const opt = document.createElement('option');
+              opt.value = JSON.stringify({ sectionId: c.section_id, subjectId: c.subject_id });
+              opt.textContent = `${c.subject_code} - ${c.subject_name} (${c.section_name})`;
+              sel.appendChild(opt);
+            });
           });
 
-          // Render classes tab
+          const subSel = document.getElementById('marksSubjectSelect');
+          if (subSel) {
+            subSel.innerHTML = '<option value="">Select subject...</option>';
+            const seen = new Set();
+            data.classes.forEach((c) => {
+              if (!seen.has(c.subject_id)) {
+                seen.add(c.subject_id);
+                const opt = document.createElement('option');
+                opt.value = c.subject_id;
+                opt.textContent = `${c.subject_code} - ${c.subject_name}`;
+                subSel.appendChild(opt);
+              }
+            });
+          }
+
           const container = document.getElementById('facultyClassesContainer');
           let html = '<div class="admin-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">';
           data.classes.forEach(c => {
             html += `
               <div class="card" style="padding: 16px;">
-                <div style="font-size: 11px; color: var(--gold); font-weight: 700; text-transform: uppercase;">${c.course_name}</div>
-                <div style="font-size: 15px; font-weight: 700; color: var(--primary); margin: 4px 0;">${c.subject_name} (${c.subject_code})</div>
-                <div style="font-size: 12.5px; color: var(--text-muted);">Section: <strong>${c.section_name}</strong> | Semester: ${c.semester_number}</div>
+                <div style="font-size: 11px; color: var(--gold); font-weight: 700; text-transform: uppercase;">${escFac(c.course_name)}</div>
+                <div style="font-size: 15px; font-weight: 700; color: var(--primary); margin: 4px 0;">${escFac(c.subject_name)} (${escFac(c.subject_code)})</div>
+                <div style="font-size: 12.5px; color: var(--text-muted);">Section: <strong>${escFac(c.section_name)}</strong> | Semester: ${escFac(c.semester_number)}</div>
               </div>
             `;
           });
@@ -195,7 +286,147 @@
       }
 
       loadCorrections();
+      loadFacultySubstitutions();
+      loadFacultyExamManage();
     }
+
+    async function loadFacultySubstitutions() {
+      try {
+        const resp = await fetch('/api/faculty/substitutions');
+        const data = await resp.json();
+        if (!data.success) return;
+
+        const ttSel = document.getElementById('subTimetableId');
+        const facSel = document.getElementById('subFacultyId');
+        if (ttSel) {
+          ttSel.innerHTML = '<option value="">Select timetable slot...</option>';
+          (data.timetableSlots || []).forEach((s) => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `Day ${s.day_of_week} P${s.period_number} — ${s.subject_code} (${s.section_name})`;
+            ttSel.appendChild(opt);
+          });
+        }
+        if (facSel) {
+          facSel.innerHTML = '<option value="">Substitute faculty...</option>';
+          (data.facultyList || []).forEach((f) => {
+            const opt = document.createElement('option');
+            opt.value = f.id;
+            opt.textContent = `${f.full_name} (${f.employee_id})`;
+            facSel.appendChild(opt);
+          });
+        }
+
+        const tbody = document.getElementById('facSubsTbody');
+        if (tbody) {
+          const rows = data.substitutions || [];
+          tbody.innerHTML = rows.length
+            ? rows.map((s) => `
+                <tr>
+                  <td>${escFac(String(s.substitution_date).slice(0, 10))}</td>
+                  <td>${escFac(s.period_label)}</td>
+                  <td>${escFac(s.subject_code)} (${escFac(s.section_name)})</td>
+                  <td>${escFac(s.original_faculty_name)}</td>
+                  <td>${escFac(s.substitute_faculty_name)}</td>
+                  <td>${escFac(s.status)}</td>
+                </tr>`).join('')
+            : '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No substitutions scheduled.</td></tr>';
+        }
+      } catch (err) {}
+    }
+
+    async function loadFacultyExamManage() {
+      try {
+        const resp = await fetch('/api/exams/manage');
+        const data = await resp.json();
+        const sel = document.getElementById('marksExamSelect');
+        if (sel && data.success) {
+          sel.innerHTML = '<option value="">Select exam...</option>';
+          (data.examinations || []).forEach((ex) => {
+            const opt = document.createElement('option');
+            opt.value = ex.id;
+            opt.textContent = `${ex.name} (Sem ${ex.semester_number})`;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) {}
+    }
+
+    document.getElementById('facSubForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resp = await fetch('/api/faculty/substitutions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timetableId: document.getElementById('subTimetableId').value,
+          substitutionDate: document.getElementById('subDateInput').value,
+          substituteFacultyId: document.getElementById('subFacultyId').value,
+          reason: document.getElementById('subReasonInput').value.trim(),
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Substitution scheduled.' : data.error || 'Failed.');
+      if (data.success) loadFacultySubstitutions();
+    });
+
+    document.getElementById('facLecturePlanForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const clsVal = document.getElementById('lpClassSelect').value;
+      if (!clsVal) return;
+      const { sectionId, subjectId } = JSON.parse(clsVal);
+      const resp = await fetch('/api/academics/lecture-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectionId,
+          subjectId,
+          weekNumber: document.getElementById('lpWeekInput').value,
+          topicTitle: document.getElementById('lpTopicInput').value.trim(),
+          plannedDate: document.getElementById('lpDateInput').value,
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Lecture plan topic added.' : data.error || 'Failed.');
+      if (data.success) e.target.reset();
+    });
+
+    document.getElementById('facAsgnForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const clsVal = document.getElementById('asgnClassSelect').value;
+      if (!clsVal) return;
+      const { sectionId, subjectId } = JSON.parse(clsVal);
+      const resp = await fetch('/api/academics/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectionId,
+          subjectId,
+          title: document.getElementById('asgnTitleInput').value.trim(),
+          dueDate: document.getElementById('asgnDueInput').value,
+          maxMarks: document.getElementById('asgnMaxMarks').value,
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Assignment published.' : data.error || 'Failed.');
+      if (data.success) e.target.reset();
+    });
+
+    document.getElementById('facMarksForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resp = await fetch('/api/exams/marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examinationId: document.getElementById('marksExamSelect').value,
+          studentId: document.getElementById('marksStudentId').value.trim(),
+          subjectId: document.getElementById('marksSubjectSelect').value,
+          internalMarks: document.getElementById('marksInternalInput').value,
+          externalMarks: document.getElementById('marksExternalInput').value,
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Student marks recorded.' : data.error || 'Failed.');
+    });
 
     document.getElementById('loadRosterBtn').addEventListener('click', async () => {
       const val = document.getElementById('facClassSelect').value;
@@ -215,18 +446,18 @@
           data.students.forEach(s => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td>${s.roll_number || '-'}</td>
-              <td><strong>${s.student_id}</strong></td>
-              <td>${s.full_name}</td>
+              <td>${escFac(s.roll_number || '-')}</td>
+              <td><strong>${escFac(s.student_id)}</strong></td>
+              <td>${escFac(s.full_name)}</td>
               <td>
-                <select class="form-select status-select" data-student-id="${s.id}">
+                <select class="form-select status-select" data-student-id="${escFac(s.id)}">
                   <option value="present" selected>Present</option>
                   <option value="absent">Absent</option>
                   <option value="approved_leave">Approved Leave</option>
                 </select>
               </td>
               <td>
-                <input type="text" class="form-input remarks-input" data-student-id="${s.id}" placeholder="Optional note">
+                <input type="text" class="form-input remarks-input" data-student-id="${escFac(s.id)}" placeholder="Optional note">
               </td>
             `;
             tbody.appendChild(tr);
@@ -293,14 +524,14 @@
           data.corrections.forEach(c => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td>${c.student_name} (${c.student_id})</td>
-              <td>${c.class_date}</td>
-              <td>${c.subject_name} (${c.subject_code})</td>
-              <td><span class="badge-status badge-${c.new_status}">${c.new_status}</span></td>
-              <td>${c.reason}</td>
+              <td>${escFac(c.student_name)} (${escFac(c.student_id)})</td>
+              <td>${escFac(String(c.class_date).slice(0, 10))}</td>
+              <td>${escFac(c.subject_name)} (${escFac(c.subject_code)})</td>
+              <td><span class="badge-status badge-${escFac(c.new_status)}">${escFac(c.new_status)}</span></td>
+              <td>${escFac(c.reason)}</td>
               <td>
-                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${c.id}', 'approve')">Approve</button>
-                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${c.id}', 'reject')">Reject</button>
+                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${escFac(c.id)}', 'approve')">Approve</button>
+                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="handleCorrection('${escFac(c.id)}', 'reject')">Reject</button>
               </td>
             `;
             tbody.appendChild(tr);

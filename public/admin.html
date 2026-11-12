@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="shortcut icon" href="/favicon.ico">
+  <script src="/js/security.js"></script>
 </head>
 <body>
 
@@ -229,6 +230,96 @@
         </div>
       </div>
     </section>
+
+    <!-- Administrative ERP Modules (Circulars, Grievances, Exams, Fees, Import) -->
+    <section class="admin-section-card" style="margin-top: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <h2 class="admin-section-title" style="margin: 0;">University Modules Management</h2>
+        <div class="admin-ops-tabs" style="margin: 0; flex-wrap: wrap;">
+          <button type="button" class="admin-op-tab active" onclick="switchAdminSubTab('admCircularsTab', this)">Circulars</button>
+          <button type="button" class="admin-op-tab" onclick="switchAdminSubTab('admGrievancesTab', this)">Grievances</button>
+          <button type="button" class="admin-op-tab" onclick="switchAdminSubTab('admExamsFeesTab', this)">Exams &amp; Fees</button>
+          <button type="button" class="admin-op-tab" onclick="switchAdminSubTab('admImportInboxTab', this)">Excel Import &amp; Inbox</button>
+        </div>
+      </div>
+
+      <!-- Circulars -->
+      <div id="admCircularsTab" class="view-panel active">
+        <form id="adminCircularForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px;">
+          <input type="text" id="circTitle" class="form-input" placeholder="Circular title" required>
+          <input type="text" id="circNumber" class="form-input" placeholder="Ref # (e.g. GEU/2026/01)" required>
+          <select id="circCategory" class="form-select">
+            <option value="academic">Academic</option>
+            <option value="examination">Examination</option>
+            <option value="administrative">Administrative</option>
+            <option value="events">Events</option>
+          </select>
+          <select id="circAudience" class="form-select">
+            <option value="all">All Campus</option>
+            <option value="students">Students</option>
+            <option value="faculty">Faculty</option>
+          </select>
+          <input type="text" id="circContent" class="form-input" placeholder="Announcement details" required>
+          <button type="submit" class="btn-primary">Publish Circular</button>
+        </form>
+        <div id="adminCircularsList" style="font-size: 13px; color: var(--text-muted);">Loading circulars...</div>
+      </div>
+
+      <!-- Grievances -->
+      <div id="admGrievancesTab" class="view-panel">
+        <div id="adminGrievancesList" style="font-size: 13px; color: var(--text-muted);">Loading grievances...</div>
+      </div>
+
+      <!-- Exams & Fees -->
+      <div id="admExamsFeesTab" class="view-panel">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+          <div>
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Create Examination</h3>
+            <form id="adminExamForm" style="display: grid; gap: 8px;">
+              <select id="admExamSemSelect" class="form-select" required><option value="">Select semester...</option></select>
+              <input type="text" id="admExamName" class="form-input" placeholder="Exam name" required>
+              <select id="admExamType" class="form-select">
+                <option value="mid_term">Mid Term</option>
+                <option value="end_term">End Term</option>
+                <option value="practical">Practical</option>
+              </select>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <input type="date" id="admExamStart" class="form-input" required>
+                <input type="date" id="admExamEnd" class="form-input" required>
+              </div>
+              <button type="submit" class="btn-primary">Create Exam</button>
+            </form>
+          </div>
+          <div>
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Record Fee Payment</h3>
+            <form id="adminPaymentForm" style="display: grid; gap: 8px;">
+              <input type="text" id="admPayStudentFeeId" class="form-input" placeholder="Student Fee ID (e.g. sf_stu1)" required>
+              <input type="number" id="admPayAmount" class="form-input" placeholder="Amount (₹)" min="1" required>
+              <select id="admPayMethod" class="form-select">
+                <option value="online_gateway">Online Gateway</option>
+                <option value="upi">UPI</option>
+                <option value="bank_transfer">Bank Transfer</option>
+              </select>
+              <input type="text" id="admPayRef" class="form-input" placeholder="Transaction reference" required>
+              <button type="submit" class="btn-primary">Record Payment &amp; Receipt</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Excel Import & Contact Inbox -->
+      <div id="admImportInboxTab" class="view-panel">
+        <div style="margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Batch Import Students (Excel / CSV)</h3>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="file" id="adminExcelFile" accept=".xlsx,.xls,.csv" class="form-input" style="max-width: 320px;">
+            <button type="button" id="adminExcelUploadBtn" class="btn-primary">Upload &amp; Import</button>
+          </div>
+        </div>
+        <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Landing Page Support Inbox</h3>
+        <div id="adminContactInbox" style="font-size: 13px; color: var(--text-muted);">Loading messages...</div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -434,6 +525,11 @@
             <td>${escapeHtml(formatIst(u.created_at))}</td>
             <td>
               <div class="admin-actions-cell">
+                <select class="admin-control" style="padding: 3px 6px; font-size: 11px;" onchange="changeUserRole('${escapeHtml(u.id)}', this.value)" aria-label="Change user role">
+                  <option value="student" ${u.role === 'student' ? 'selected' : ''}>student</option>
+                  <option value="faculty" ${u.role === 'faculty' ? 'selected' : ''}>faculty</option>
+                  <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+                </select>
                 <button
                   type="button"
                   class="btn-table-action ${u.is_suspended ? 'btn-table-activate' : 'btn-table-suspend'}"
@@ -518,8 +614,173 @@
       document.getElementById(id).addEventListener('change', resetAndLoadUsers);
     });
 
+    async function changeUserRole(userId, nextRole) {
+      const resp = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        alert(data.error || 'Could not update role.');
+      }
+      await loadUsers();
+    }
+
+    function switchAdminSubTab(tabId, btnEl) {
+      document.querySelectorAll('#admCircularsTab, #admGrievancesTab, #admExamsFeesTab, #admImportInboxTab').forEach((el) => el.classList.remove('active'));
+      document.querySelectorAll('.admin-op-tab').forEach((b) => b.classList.remove('active'));
+      document.getElementById(tabId)?.classList.add('active');
+      if (btnEl) btnEl.classList.add('active');
+    }
+
+    async function loadAdminModules() {
+      try {
+        const [circRes, grvRes, metaRes, msgRes] = await Promise.all([
+          fetch('/api/admin/circulars'),
+          fetch('/api/admin/grievances'),
+          fetch('/api/admin/academics/metadata'),
+          fetch('/api/admin/contact-messages'),
+        ]);
+        const [circData, grvData, metaData, msgData] = await Promise.all([
+          circRes.json(),
+          grvRes.json(),
+          metaRes.json(),
+          msgRes.json(),
+        ]);
+
+        const circEl = document.getElementById('adminCircularsList');
+        if (circEl && circData.success) {
+          circEl.innerHTML = (circData.circulars || []).length
+            ? circData.circulars.map((c) => `
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+                  <div><strong>${escapeHtml(c.circular_number)}</strong> — ${escapeHtml(c.title)}</div>
+                  <button type="button" class="btn-table-action btn-table-delete" onclick="deleteCircular('${escapeHtml(c.id)}')">Delete</button>
+                </div>`).join('')
+            : 'No circulars published.';
+        }
+
+        const grvEl = document.getElementById('adminGrievancesList');
+        if (grvEl && grvData.success) {
+          grvEl.innerHTML = (grvData.grievances || []).length
+            ? grvData.grievances.map((g) => `
+                <div style="display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+                  <div>
+                    <strong>${escapeHtml(g.subject)}</strong> (${escapeHtml(g.student_name)} • ${escapeHtml(g.status)})
+                    <div style="font-size:12px;">${escapeHtml(g.description)}</div>
+                  </div>
+                  <button type="button" class="btn-table-action btn-table-activate" onclick="resolveGrievance('${escapeHtml(g.id)}')">Resolve</button>
+                </div>`).join('')
+            : 'No student grievances filed.';
+        }
+
+        const semSel = document.getElementById('admExamSemSelect');
+        if (semSel && metaData.success) {
+          semSel.innerHTML = '<option value="">Select semester...</option>';
+          (metaData.semesters || []).forEach((s) => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `Semester ${s.semester_number} (${s.id})`;
+            semSel.appendChild(opt);
+          });
+        }
+
+        const inboxEl = document.getElementById('adminContactInbox');
+        if (inboxEl && msgData.success) {
+          inboxEl.innerHTML = (msgData.messages || []).length
+            ? msgData.messages.map((m) => `<div style="padding:8px 0; border-bottom:1px solid var(--border);"><strong>${escapeHtml(m.name)}</strong> (${escapeHtml(m.email)}): ${escapeHtml(m.message)}</div>`).join('')
+            : 'No contact inquiries yet.';
+        }
+      } catch (err) {}
+    }
+
+    async function deleteCircular(id) {
+      await fetch(`/api/admin/circulars/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      loadAdminModules();
+    }
+
+    async function resolveGrievance(id) {
+      const resolutionNotes = prompt('Resolution notes:') || 'Resolved by administration';
+      await fetch(`/api/admin/grievances/${encodeURIComponent(id)}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved', resolutionNotes }),
+      });
+      loadAdminModules();
+    }
+
+    document.getElementById('adminCircularForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resp = await fetch('/api/admin/circulars/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('circTitle').value.trim(),
+          circularNumber: document.getElementById('circNumber').value.trim(),
+          category: document.getElementById('circCategory').value,
+          targetAudience: document.getElementById('circAudience').value,
+          content: document.getElementById('circContent').value.trim(),
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Circular published.' : data.error || 'Failed.');
+      if (data.success) {
+        e.target.reset();
+        loadAdminModules();
+      }
+    });
+
+    document.getElementById('adminExamForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resp = await fetch('/api/exams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          semesterId: document.getElementById('admExamSemSelect').value,
+          name: document.getElementById('admExamName').value.trim(),
+          examType: document.getElementById('admExamType').value,
+          startDate: document.getElementById('admExamStart').value,
+          endDate: document.getElementById('admExamEnd').value,
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? 'Examination created.' : data.error || 'Failed.');
+      if (data.success) e.target.reset();
+    });
+
+    document.getElementById('adminPaymentForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const resp = await fetch('/api/fees/admin/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentFeeId: document.getElementById('admPayStudentFeeId').value.trim(),
+          amount: document.getElementById('admPayAmount').value,
+          paymentMethod: document.getElementById('admPayMethod').value,
+          transactionReference: document.getElementById('admPayRef').value.trim(),
+        }),
+      });
+      const data = await resp.json();
+      alert(data.success ? `Receipt ${data.payment?.receipt_number} recorded.` : data.error || 'Failed.');
+      if (data.success) e.target.reset();
+    });
+
+    document.getElementById('adminExcelUploadBtn')?.addEventListener('click', async () => {
+      const file = document.getElementById('adminExcelFile')?.files?.[0];
+      if (!file) return alert('Choose an Excel/CSV file first.');
+      const buf = await file.arrayBuffer();
+      const resp = await fetch('/api/admin/import/excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buf,
+      });
+      const data = await resp.json();
+      alert(data.message || data.error || 'Done.');
+      if (data.success) refreshAllAdmin();
+    });
+
     async function refreshAllAdmin() {
-      await Promise.all([loadOverview(), loadUsers()]);
+      await Promise.all([loadOverview(), loadUsers(), loadAdminModules()]);
     }
 
     async function logout() {

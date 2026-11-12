@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="shortcut icon" href="/favicon.ico">
+  <script src="/js/security.js"></script>
 </head>
 <body>
 
@@ -126,7 +127,9 @@
           badge.textContent = 'Connected ✔';
           linkedBox.style.display = 'block';
           unlinkedBox.style.display = 'none';
-          details.innerHTML = `Connected as <strong>${data.account.username ? '@' + data.account.username : data.account.firstName || 'User'}</strong> (Chat ID: <code>${data.account.chatId}</code>)`;
+          const esc = window.GueSecurity ? window.GueSecurity.escapeHtml : (v) => String(v || '');
+          const label = data.account.username ? '@' + esc(data.account.username) : esc(data.account.firstName || 'User');
+          details.innerHTML = `Connected as <strong>${label}</strong> (Chat ID: <code>${esc(data.account.chatId)}</code>)`;
         } else {
           badge.className = 'status-tag attention';
           badge.textContent = 'Not Connected';

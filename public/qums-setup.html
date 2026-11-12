@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="shortcut icon" href="/favicon.ico">
+  <script src="/js/security.js"></script>
 </head>
 <body>
 
@@ -147,6 +148,23 @@
     });
 
     // Load live CAPTCHA from student.geu.ac.in
+    function renderCaptchaImage(container, rawDataUri) {
+      const safeSrc = window.GueSecurity ? window.GueSecurity.safeCaptchaDataUri(rawDataUri) : '';
+      container.textContent = '';
+      if (!safeSrc) {
+        const span = document.createElement('span');
+        span.style.cssText = 'font-size: 12px; color: var(--danger);';
+        span.textContent = 'Invalid CAPTCHA image response';
+        container.appendChild(span);
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = safeSrc;
+      img.alt = 'Security CAPTCHA';
+      img.style.cssText = 'max-height: 48px; border-radius: 4px; display: block;';
+      container.appendChild(img);
+    }
+
     async function loadCaptcha(targetContainerId) {
       const container = document.getElementById(targetContainerId);
       if (!container) return;
@@ -155,9 +173,10 @@
         const res = await fetch('/api/geu/captcha');
         const data = await res.json();
         if (data.success && (data.captcha || data.captchaImage)) {
-          container.innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+          renderCaptchaImage(container, data.captcha || data.captchaImage);
         } else {
-          container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">${data.error || 'Could not load CAPTCHA'}</span>`;
+          const esc = window.GueSecurity ? window.GueSecurity.escapeHtml : (v) => String(v || '');
+          container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">${esc(data.error || 'Could not load CAPTCHA')}</span>`;
         }
       } catch (err) {
         container.innerHTML = `<span style="font-size: 12px; color: var(--danger);">Error loading CAPTCHA</span>`;
@@ -183,7 +202,8 @@
           banner.style.display = 'block';
           banner.style.background = 'var(--success-bg)';
           banner.style.color = 'var(--success-text)';
-          banner.innerHTML = `Connected for GUeID: <strong>${data.studentQid || ''}</strong>`;
+          const esc = window.GueSecurity ? window.GueSecurity.escapeHtml : (v) => String(v || '');
+          banner.innerHTML = `Connected for GUeID: <strong>${esc(data.studentQid || '')}</strong>`;
         }
 
         if (data.studentQid) {
@@ -222,7 +242,7 @@
         } else {
           showSetupMessage(data.error || 'Invalid GUeID, password, or CAPTCHA.');
           if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
-            document.getElementById('setupCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+            renderCaptchaImage(document.getElementById('setupCaptchaContainer'), data.captcha || data.captchaImage);
           } else {
             loadCaptcha('setupCaptchaContainer');
           }
@@ -258,7 +278,7 @@
         } else {
           showSetupMessage(data.error || 'Invalid CAPTCHA code.');
           if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
-            document.getElementById('reconnectCaptchaContainer').innerHTML = `<img src="${data.captcha || data.captchaImage}" alt="Security CAPTCHA" style="max-height: 48px; border-radius: 4px; display: block;">`;
+            renderCaptchaImage(document.getElementById('reconnectCaptchaContainer'), data.captcha || data.captchaImage);
           } else {
             loadCaptcha('reconnectCaptchaContainer');
           }

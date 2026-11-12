@@ -26,11 +26,12 @@ async function scrapeSubjectWiseAttendance(userId) {
   const summary = await db.getAttendanceSummary(student.id);
   const analyzed = calculator.analyzeSubjectsAttendance(summary.subjects);
 
-  // Update known_attendance cache for diffing in watcher loop
+  // Update known_attendance snapshot cache cleanly against (user_id, subject_code, attendance_date, period_label)
   await db.query(
-    `INSERT INTO known_attendance (user_id, records) 
-     VALUES ($1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET records = $2`,
+    `INSERT INTO known_attendance (user_id, subject_code, attendance_date, period_label, status, records, updated_at)
+     VALUES ($1, '__SUMMARY__', '', '', 'synced', $2, NOW())
+     ON CONFLICT (user_id, subject_code, attendance_date, period_label)
+     DO UPDATE SET records = EXCLUDED.records, status = EXCLUDED.status, updated_at = NOW()`,
     [userId, JSON.stringify(analyzed.subjects)]
   );
 
@@ -90,11 +91,12 @@ async function scrapeAssignments(userId) {
     isDueTonight: new Date(r.due_date).toDateString() === new Date().toDateString(),
   }));
 
-  // Update known_assignments cache
+  // Update known_assignments snapshot cache cleanly against (user_id, assignment_key)
   await db.query(
-    `INSERT INTO known_assignments (user_id, records)
-     VALUES ($1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET records = $2`,
+    `INSERT INTO known_assignments (user_id, assignment_key, title, due_date, records)
+     VALUES ($1, '__SUMMARY__', 'Snapshot', '', $2)
+     ON CONFLICT (user_id, assignment_key)
+     DO UPDATE SET records = EXCLUDED.records, title = EXCLUDED.title`,
     [userId, JSON.stringify(assignments)]
   );
 

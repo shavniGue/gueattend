@@ -4,13 +4,14 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const XLSX = require('xlsx');
-const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const db = require('../database/db');
 const { requireAdmin } = require('../middleware/auth');
 const { checkFirebaseHealth } = require('../config/firebase');
+const { FIREBASE_PASSWORD_SENTINEL } = require('../firebaseAuth');
 
 const CONNECTED_SESSION_SQL = "IN ('active', 'connected')";
 
@@ -417,22 +418,34 @@ router.post('/import/excel', requireAdmin, express.raw({ type: '*/*', limit: '10
         const enrollment = String(row.EnrollmentNo || row.enrollment || `GEU/${Date.now()}/${processed}`);
 
         if (email && studentId) {
-          const userId = `usr_${Date.now()}_${processed}`;
-          const hash = await bcrypt.hash('Password@123', 10);
+          const userId = `usr_${crypto.randomUUID()}`;
 
           await client.query(
-            `INSERT INTO users (id, email, password_hash, role, full_name, is_active, email_verified)
-             VALUES ($1, LOWER($2), $3, 'student', $4, TRUE, TRUE)
+            `INSERT INTO users (id, email, password_hash, role, is_admin, full_name, is_active, email_verified)
+             VALUES ($1, LOWER($2), $3, 'student', FALSE, $4, TRUE, TRUE)
              ON CONFLICT (email) DO NOTHING`,
-            [userId, email, hash, fullName]
+            [userId, email, FIREBASE_PASSWORD_SENTINEL, fullName]
           );
 
-          await client.query(
-            `INSERT INTO students (id, user_id, student_id, enrollment_number, roll_number, department_id, course_id, semester_id, section_id, academic_session_id)
-             VALUES ($1, (SELECT id FROM users WHERE email = LOWER($2)), $3, $4, $5, 'dept_cse', 'course_btech_cse', 'sem_btech_cse_5', 'sec_btech_cse_5_g4', 'sess_2026_2027')
-             ON CONFLICT (student_id) DO NOTHING`,
-            [`stu_${Date.now()}_${processed}`, email, studentId, enrollment, studentId]
-          );
+          const hierarchy = await client.query(`
+            SELECT sec.id AS section_id, sem.id AS semester_id, c.id AS course_id, d.id AS department_id, sess.id AS academic_session_id
+            FROM sections sec
+            JOIN semesters sem ON sec.semester_id = sem.id
+            JOIN courses c ON sem.course_id = c.id
+            JOIN departments d ON c.department_id = d.id
+            JOIN academic_sessions sess ON sem.academic_session_id = sess.id
+            ORDER BY sess.is_current DESC, sec.id ASC
+            LIMIT 1
+          `);
+          if (hierarchy.rows.length > 0) {
+            const h = hierarchy.rows[0];
+            await client.query(
+              `INSERT INTO students (id, user_id, student_id, enrollment_number, roll_number, department_id, course_id, semester_id, section_id, academic_session_id)
+               VALUES ($1, (SELECT id FROM users WHERE email = LOWER($2)), $3, $4, $5, $6, $7, $8, $9, $10)
+               ON CONFLICT (student_id) DO NOTHING`,
+              [`stu_${crypto.randomUUID()}`, email, studentId, enrollment, studentId, h.department_id, h.course_id, h.semester_id, h.section_id, h.academic_session_id]
+            );
+          }
           inserted++;
         }
       }
@@ -459,6 +472,165 @@ router.post('/import/excel', requireAdmin, express.raw({ type: '*/*', limit: '10
 });
 
 /**
+ * POST /api/admin/users/:id/role
+ * Fine-grained RBAC role update with self-demotion protection & audit log
+ */
+router.post('/users/:id/role', requireAdmin, async (req, res) => {
+  const targetId = req.params.id;
+  const nextRole = String(req.body?.role || '').trim().toLowerCase();
+  if (!['student', 'faculty', 'admin'].includes(nextRole)) {
+    return res.status(400).json({ success: false, error: 'Role must be student, faculty, or admin.' });
+  }
+  if (targetId === req.session.userId && nextRole !== 'admin') {
+    return res.status(400).json({ success: false, error: 'Cannot demote your own active administrator account.' });
+  }
+
+  try {
+    const existing = await db.getUserById(targetId);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    const isAdminFlag = nextRole === 'admin';
+    const upd = await db.query(
+      `UPDATE users SET role = $1, is_admin = $2, updated_at = NOW() WHERE id = $3 RETURNING id, email, role, is_admin`,
+      [nextRole, isAdminFlag, targetId]
+    );
+
+    if (nextRole === 'faculty') {
+      const dept = (await db.query('SELECT id FROM departments LIMIT 1')).rows[0];
+      if (dept) {
+        await db.query(
+          `INSERT INTO faculty (id, user_id, employee_id, department_id, designation)
+           VALUES ($1, $2, $3, $4, 'Faculty Member')
+           ON CONFLICT (user_id) DO NOTHING`,
+          [`fac_${crypto.randomUUID()}`, targetId, `EMP-${Date.now().toString().slice(-6)}`, dept.id]
+        ).catch(() => {});
+      }
+    }
+
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'UPDATE_USER_ROLE',
+      resource: `users:${targetId}`,
+      details: { previousRole: existing.role, nextRole, isAdmin: isAdminFlag },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ success: true, user: upd.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update user role.' });
+  }
+});
+
+/**
+ * GET /api/admin/academics/metadata
+ */
+router.get('/academics/metadata', requireAdmin, async (req, res) => {
+  try {
+    const [depts, courses, sems, secs, subjects, faculty] = await Promise.all([
+      db.query('SELECT * FROM departments ORDER BY name ASC'),
+      db.query('SELECT * FROM courses ORDER BY name ASC'),
+      db.query('SELECT * FROM semesters ORDER BY semester_number ASC'),
+      db.query('SELECT * FROM sections ORDER BY name ASC'),
+      db.query('SELECT * FROM subjects ORDER BY code ASC'),
+      db.query('SELECT f.id, f.employee_id, u.full_name, u.email FROM faculty f JOIN users u ON f.user_id = u.id ORDER BY u.full_name ASC'),
+    ]);
+    res.json({
+      success: true,
+      departments: depts.rows,
+      courses: courses.rows,
+      semesters: sems.rows,
+      sections: secs.rows,
+      subjects: subjects.rows,
+      faculty: faculty.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to load academic metadata.' });
+  }
+});
+
+/**
+ * GET /api/admin/circulars & DELETE /api/admin/circulars/:id
+ */
+router.get('/circulars', requireAdmin, async (req, res) => {
+  try {
+    const resCirc = await db.query(
+      `SELECT c.*, u.full_name AS published_by_name
+       FROM circulars c
+       LEFT JOIN users u ON c.published_by_user_id = u.id
+       ORDER BY c.is_pinned DESC, c.published_at DESC
+       LIMIT 50`
+    );
+    res.json({ success: true, circulars: resCirc.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch circulars.' });
+  }
+});
+
+router.delete('/circulars/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.query('DELETE FROM circulars WHERE id = $1', [req.params.id]);
+    res.json({ success: true, message: 'Circular removed.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete circular.' });
+  }
+});
+
+/**
+ * GET /api/admin/grievances & POST /api/admin/grievances/:id/status
+ */
+router.get('/grievances', requireAdmin, async (req, res) => {
+  try {
+    const resGrv = await db.query(
+      `SELECT g.*, s.student_id AS gueid, u.full_name AS student_name, u.email AS student_email
+       FROM grievances g
+       JOIN students s ON g.student_id = s.id
+       JOIN users u ON s.user_id = u.id
+       ORDER BY CASE WHEN g.status = 'submitted' THEN 0 ELSE 1 END, g.created_at DESC
+       LIMIT 100`
+    );
+    res.json({ success: true, grievances: resGrv.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch grievances.' });
+  }
+});
+
+router.post('/grievances/:id/status', requireAdmin, async (req, res) => {
+  const status = String(req.body?.status || '').trim().toLowerCase();
+  const notes = String(req.body?.resolutionNotes || '').trim();
+  if (!['submitted', 'under_review', 'resolved', 'closed'].includes(status)) {
+    return res.status(400).json({ success: false, error: 'Invalid grievance status.' });
+  }
+
+  try {
+    const upd = await db.query(
+      `UPDATE grievances
+       SET status = $1,
+           resolution_notes = CASE WHEN $2 <> '' THEN $2 ELSE resolution_notes END,
+           assigned_to_user_id = COALESCE(assigned_to_user_id, $3),
+           resolved_at = CASE WHEN $1 IN ('resolved', 'closed') THEN NOW() ELSE resolved_at END
+       WHERE id = $4
+       RETURNING *`,
+      [status, notes, req.session.userId, req.params.id]
+    );
+    if (upd.rows.length === 0) return res.status(404).json({ success: false, error: 'Grievance not found.' });
+
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'GRIEVANCE_STATUS_UPDATED',
+      resource: `grievances:${req.params.id}`,
+      details: { status },
+    });
+
+    res.json({ success: true, grievance: upd.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update grievance.' });
+  }
+});
+
+/**
  * GET /api/admin/audit-logs
  */
 router.get('/audit-logs', requireAdmin, async (req, res) => {
@@ -474,6 +646,18 @@ router.get('/audit-logs', requireAdmin, async (req, res) => {
     res.json({ success: true, logs: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/contact-messages
+ */
+router.get('/contact-messages', requireAdmin, async (req, res) => {
+  try {
+    const resMsg = await db.query('SELECT * FROM contact_messages ORDER BY created_at DESC LIMIT 50');
+    res.json({ success: true, messages: resMsg.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch contact messages.' });
   }
 });
 

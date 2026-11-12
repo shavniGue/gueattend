@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /attendance-calculator-guide
+Allow: /privacy-policy
+Allow: /ads.txt
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /faculty
+Disallow: /geu-setup
+Disallow: /qums-setup
+Disallow: /telegram-setup
+Disallow: /api/
+
+Sitemap: https://gueattend.onrender.com/sitemap.xml

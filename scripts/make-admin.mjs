@@ -13,12 +13,9 @@ import { createRequire } from 'module';
 import { getAuth } from 'firebase-admin/auth';
 
 const require = createRequire(import.meta.url);
-const { getFirebaseApp, isAdminEmail } = require('../src/config/firebase');
-const { FIREBASE_PASSWORD_SENTINEL, setAuthenticatedUserClaim } = (() => {
-  const fb = require('../src/config/firebase');
-  const fba = require('../src/firebaseAuth');
-  return { ...fb, ...fba };
-})();
+const { getFirebaseApp, isAdminEmail, setAuthenticatedUserClaim } = require('../src/config/firebase');
+const { FIREBASE_PASSWORD_SENTINEL } = require('../src/firebaseAuth');
+const { assertDatabaseIsolation, resolvePgSslConfig } = require('../src/database/identity');
 
 function parseCliArgs(argv) {
   let email = null;
@@ -77,16 +74,12 @@ async function run() {
     process.exit(1);
   }
 
+  assertDatabaseIsolation();
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    console.warn('⚠️ DATABASE_URL not set. Skipped PostgreSQL update.');
-    return;
-  }
-
   const pool = new pg.Pool({
     connectionString,
     connectionTimeoutMillis: 15000,
-    ssl: { rejectUnauthorized: false },
+    ssl: resolvePgSslConfig(connectionString),
   });
 
   try {

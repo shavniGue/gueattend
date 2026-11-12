@@ -89,17 +89,28 @@ router.post('/attendance/mark', requireFaculty, async (req, res) => {
     const sessionId = `att_sess_${Date.now()}`;
 
     await db.withTransaction(async (client) => {
+      // Resolve active academic session from section's semester or current academic_session
+      const sessLookup = await client.query(
+        `SELECT COALESCE(
+           (SELECT sem.academic_session_id FROM sections sec JOIN semesters sem ON sec.semester_id = sem.id WHERE sec.id = $1 LIMIT 1),
+           (SELECT id FROM academic_sessions WHERE is_current = TRUE LIMIT 1),
+           'sess_2026_2027'
+         ) AS academic_session_id`,
+        [sectionId]
+      );
+      const academicSessionId = sessLookup.rows[0]?.academic_session_id || 'sess_2026_2027';
+
       // 1. Create or update session
       await client.query(
         `INSERT INTO attendance_sessions (id, academic_session_id, section_id, subject_id, faculty_id, class_date, period_number, topic_taught, marked_at)
-         VALUES ($1, 'sess_2026_2027', $2, $3, $4, $5::date, $6, $7, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8, NOW())
          ON CONFLICT (academic_session_id, section_id, class_date, period_number)
          DO UPDATE SET 
            subject_id = EXCLUDED.subject_id,
            faculty_id = EXCLUDED.faculty_id,
            topic_taught = EXCLUDED.topic_taught,
            updated_at = NOW()`,
-        [sessionId, sectionId, subjectId, faculty ? faculty.id : 'fac_1', classDate, periodNumber, topicTaught || '']
+        [sessionId, academicSessionId, sectionId, subjectId, faculty ? faculty.id : 'fac_1', classDate, periodNumber, topicTaught || '']
       );
 
       // 2. Fetch subject code & name
@@ -224,6 +235,82 @@ router.post('/corrections/:id/action', requireFaculty, async (req, res) => {
   } catch (err) {
     console.error('[faculty/corrections/action] Error:', err.message);
     res.status(500).json({ success: false, error: 'Failed to process correction action.' });
+  }
+});
+
+/**
+ * GET /api/faculty/substitutions
+ */
+router.get('/substitutions', requireFaculty, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT cs.*, tt.day_of_week, tp.label AS period_label, tp.start_time, tp.end_time,
+              sub.code AS subject_code, sub.name AS subject_name, sec.name AS section_name,
+              u_orig.full_name AS original_faculty_name, u_sub.full_name AS substitute_faculty_name
+       FROM class_substitutions cs
+       JOIN timetable tt ON cs.timetable_id = tt.id
+       JOIN timetable_periods tp ON tt.period_number = tp.period_number
+       JOIN subjects sub ON tt.subject_id = sub.id
+       JOIN sections sec ON tt.section_id = sec.id
+       JOIN faculty f1 ON cs.original_faculty_id = f1.id
+       JOIN users u_orig ON f1.user_id = u_orig.id
+       JOIN faculty f2 ON cs.substitute_faculty_id = f2.id
+       JOIN users u_sub ON f2.user_id = u_sub.id
+       ORDER BY cs.substitution_date DESC
+       LIMIT 50`
+    );
+    const facRes = await db.query(
+      `SELECT f.id, u.full_name, f.employee_id FROM faculty f JOIN users u ON f.user_id = u.id ORDER BY u.full_name ASC`
+    );
+    const ttRes = await db.query(
+      `SELECT tt.id, tt.day_of_week, tt.period_number, sub.code AS subject_code, sub.name AS subject_name, sec.name AS section_name
+       FROM timetable tt
+       JOIN subjects sub ON tt.subject_id = sub.id
+       JOIN sections sec ON tt.section_id = sec.id
+       ORDER BY tt.day_of_week ASC, tt.period_number ASC`
+    );
+    res.json({ success: true, substitutions: result.rows, facultyList: facRes.rows, timetableSlots: ttRes.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch faculty substitutions.' });
+  }
+});
+
+/**
+ * POST /api/faculty/substitutions
+ */
+router.post('/substitutions', requireFaculty, async (req, res) => {
+  const { timetableId, substitutionDate, substituteFacultyId, reason } = req.body || {};
+  if (!timetableId || !substitutionDate || !substituteFacultyId) {
+    return res.status(400).json({ success: false, error: 'timetableId, substitutionDate, and substituteFacultyId are required.' });
+  }
+
+  try {
+    const ttRes = await db.query('SELECT id, faculty_id FROM timetable WHERE id = $1', [timetableId]);
+    if (ttRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Timetable slot not found.' });
+
+    const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const upsert = await db.query(
+      `INSERT INTO class_substitutions (id, timetable_id, substitution_date, original_faculty_id, substitute_faculty_id, reason, status, created_at)
+       VALUES ($1, $2, $3::date, $4, $5, $6, 'scheduled', NOW())
+       ON CONFLICT (timetable_id, substitution_date)
+       DO UPDATE SET
+         substitute_faculty_id = EXCLUDED.substitute_faculty_id,
+         reason = EXCLUDED.reason,
+         status = 'scheduled'
+       RETURNING *`,
+      [id, timetableId, substitutionDate, ttRes.rows[0].faculty_id, substituteFacultyId, String(reason || '').trim()]
+    );
+
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'SCHEDULE_CLASS_SUBSTITUTION',
+      resource: `class_substitutions:${upsert.rows[0].id}`,
+      details: { timetableId, substitutionDate, substituteFacultyId },
+    });
+
+    res.json({ success: true, substitution: upsert.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to schedule substitution.' });
   }
 });
 
