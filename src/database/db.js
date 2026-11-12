@@ -377,7 +377,7 @@ async function getAttendanceSummary(studentId) {
     LEFT JOIN attendance_sessions att_s ON att_s.subject_id = sub.id AND att_s.section_id = s.section_id
     LEFT JOIN attendance_records ar ON ar.session_id = att_s.id AND ar.student_id = s.id
     GROUP BY sub.id, sub.code, sub.name
-    ORDER BY sub.code ASC
+    ORDER BY sub.name ASC
   `;
   const res = await query(sql, [studentId]);
   const subjects = res.rows;
@@ -534,7 +534,7 @@ async function getCourseProgress(sectionId) {
     FROM subjects sub
     JOIN lecture_plans lp ON lp.subject_id = sub.id AND lp.section_id = $1
     GROUP BY sub.id, sub.code, sub.name
-    ORDER BY sub.code ASC
+    ORDER BY sub.name ASC
   `;
   const res = await query(sql, [sectionId]);
   return res.rows;

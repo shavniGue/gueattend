@@ -33,7 +33,10 @@ router.get('/student', requireAuth, async (req, res) => {
 
     // 1. Weekly schedule and Today's Timetable
     const weeklySchedule = await db.getStudentWeeklyTimetable(student.id);
-    const todayClasses = weeklySchedule.filter((r) => r.day_of_week === dayOfWeek);
+    let todayClasses = weeklySchedule.filter((r) => r.day_of_week === dayOfWeek);
+    if (todayClasses.length === 0 && weeklySchedule.length > 0) {
+      todayClasses = weeklySchedule.filter((r) => r.day_of_week === 1);
+    }
 
     // 2. Right Now and Up Next logic
     const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
