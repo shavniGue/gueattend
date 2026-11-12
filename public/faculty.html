@@ -12,161 +12,144 @@
 </head>
 <body>
 
-  <div class="app-container">
-    <aside class="app-sidebar">
-      <div class="sidebar-brand" style="display: flex; align-items: center; gap: 10px;">
-        <div class="brand-logo" style="width: 32px; height: 32px; flex-shrink: 0; background: transparent;">
-          <img src="/images/logo.svg" alt="gueattend logo" class="brand-logo-img" width="32" height="32">
+  <!-- Top Navigation Bar (Unified Inner UI) -->
+  <header class="site-navbar dash-navbar">
+    <a href="/faculty" class="brand-wrapper">
+      <div class="brand-icon">
+        <img src="/images/logo.svg" alt="gueattend logo" class="brand-logo-img" width="30" height="30">
+      </div>
+      <div class="brand-title">gueattend Faculty</div>
+    </a>
+
+    <nav class="nav-links">
+      <a href="/faculty" class="nav-link active">Faculty Portal</a>
+      <a href="/dashboard" class="nav-link">Student View</a>
+    </nav>
+
+    <div class="nav-right">
+      <span class="user-tag" id="facNameDisplay">FACULTY</span>
+      <button id="logoutBtnFac" class="btn-nav-logout" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <main class="admin-container">
+    <div class="admin-header-row">
+      <div>
+        <h1 class="admin-title">Faculty Attendance Portal</h1>
+        <p class="admin-subtitle">Mark class attendance, review correction requests, and inspect allocated sections</p>
+      </div>
+      <div class="admin-ops-tabs" style="margin-bottom: 0;">
+        <button type="button" class="admin-op-tab active" onclick="switchFacultyTab('markTab', this)">Mark Attendance</button>
+        <button type="button" class="admin-op-tab" onclick="switchFacultyTab('correctionsTab', this)">Review Corrections</button>
+        <button type="button" class="admin-op-tab" onclick="switchFacultyTab('classesTab', this)">My Assigned Classes</button>
+      </div>
+    </div>
+
+    <!-- TAB 1: MARK ATTENDANCE -->
+    <section id="markTab" class="view-panel active">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Mark Class Attendance</span>
         </div>
-        <div class="brand-text">
-          <h2>gueattend</h2>
-          <span>Faculty Portal</span>
+        <div class="card-body">
+          <div class="month-filter-bar">
+            <div>
+              <label class="form-label">Subject &amp; Section</label>
+              <select id="facClassSelect" class="form-select">
+                <option value="">Select an assigned class...</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Date</label>
+              <input type="date" id="attDateInput" class="form-input" style="width: 100%; height: 38px;">
+            </div>
+            <div>
+              <label class="form-label">Period</label>
+              <select id="attPeriodSelect" class="form-select">
+                <option value="1">Period 1 (09:00 - 09:55)</option>
+                <option value="2">Period 2 (09:55 - 10:50)</option>
+                <option value="3">Period 3 (11:05 - 12:00)</option>
+                <option value="4">Period 4 (12:00 - 12:55)</option>
+                <option value="5">Period 5 (13:45 - 14:40)</option>
+                <option value="6">Period 6 (14:40 - 15:35)</option>
+              </select>
+            </div>
+            <div style="align-self: flex-end;">
+              <button type="button" id="loadRosterBtn" class="btn btn-primary" style="width: 100%; height: 38px;">Load Student Roster</button>
+            </div>
+          </div>
         </div>
       </div>
-      <nav class="sidebar-nav">
-        <div class="nav-category">Teaching</div>
-        <a class="nav-item active" onclick="switchFacultyTab('markTab')">
-          <span class="nav-icon">📝</span>
-          <span>Mark Attendance</span>
-        </a>
-        <a class="nav-item" onclick="switchFacultyTab('correctionsTab')">
-          <span class="nav-icon">⚖️</span>
-          <span>Review Corrections</span>
-        </a>
-        <a class="nav-item" onclick="switchFacultyTab('classesTab')">
-          <span class="nav-icon">📚</span>
-          <span>My Assigned Classes</span>
-        </a>
-      </nav>
-      <div class="sidebar-footer">
-        <button id="logoutBtnFac" style="background:none; border:none; color:#cbd5e1; cursor:pointer;" onclick="logout()">Logout 🚪</button>
-      </div>
-    </aside>
 
-    <main class="app-main">
-      <header class="app-topbar">
-        <div class="topbar-left">
-          <div class="university-title">
-            <h1>Faculty Portal • Graphic Era University</h1>
-            <p>Attendance Marking & Student Academic Performance</p>
+      <!-- Roster Table -->
+      <div class="card" id="rosterCard" style="display: none;">
+        <div class="card-header">
+          <span class="card-title">Student Roster (<span id="rosterCount">0</span> Students)</span>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="markAll('present')">All Present</button>
+            <button type="button" class="btn btn-secondary" onclick="markAll('absent')">All Absent</button>
           </div>
         </div>
-        <div class="topbar-right">
-          <span id="facNameDisplay" style="font-weight: 600; font-size: 13px;">Dr. Rajesh Sharma</span>
-          <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        <div class="card-body" style="padding: 0;">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Roll No</th>
+                  <th>Student ID</th>
+                  <th>Student Name</th>
+                  <th>Attendance Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody id="studentRosterTbody"></tbody>
+            </table>
+          </div>
+          <div style="padding: 16px; display: flex; justify-content: flex-end;">
+            <button type="button" id="submitAttendanceBtn" class="btn btn-primary" style="padding: 10px 24px;">Submit Attendance</button>
+          </div>
         </div>
-      </header>
-
-      <div class="app-content">
-
-        <!-- TAB 1: MARK ATTENDANCE -->
-        <section id="markTab" class="view-panel active">
-          <div class="card" style="margin-bottom: 24px;">
-            <div class="card-header">
-              <span class="card-title">📝 Mark Class Attendance</span>
-            </div>
-            <div class="card-body">
-              <div class="month-filter-bar">
-                <div>
-                  <label class="form-label">Subject & Section</label>
-                  <select id="facClassSelect" class="form-select">
-                    <option value="">Select an assigned class...</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label">Date</label>
-                  <input type="date" id="attDateInput" class="form-input">
-                </div>
-                <div>
-                  <label class="form-label">Period</label>
-                  <select id="attPeriodSelect" class="form-select">
-                    <option value="1">Period 1 (09:00 - 09:55)</option>
-                    <option value="2">Period 2 (09:55 - 10:50)</option>
-                    <option value="3">Period 3 (11:05 - 12:00)</option>
-                    <option value="4">Period 4 (12:00 - 12:55)</option>
-                    <option value="5">Period 5 (13:45 - 14:40)</option>
-                    <option value="6">Period 6 (14:40 - 15:35)</option>
-                  </select>
-                </div>
-                <div style="align-self: flex-end;">
-                  <button id="loadRosterBtn" class="btn btn-primary">Load Student Roster</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Roster Table -->
-          <div class="card" id="rosterCard" style="display: none;">
-            <div class="card-header">
-              <span class="card-title">👥 Student Roster (<span id="rosterCount">0</span> Students)</span>
-              <div>
-                <button class="btn btn-secondary" onclick="markAll('present')">All Present</button>
-                <button class="btn btn-secondary" onclick="markAll('absent')">All Absent</button>
-              </div>
-            </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Roll No</th>
-                      <th>Student ID</th>
-                      <th>Student Name</th>
-                      <th>Attendance Status</th>
-                      <th>Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody id="studentRosterTbody"></tbody>
-                </table>
-              </div>
-              <div style="padding: 16px; display: flex; justify-content: flex-end;">
-                <button id="submitAttendanceBtn" class="btn btn-primary" style="padding: 10px 24px;">Submit Attendance to Supabase</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 2: REVIEW CORRECTIONS -->
-        <section id="correctionsTab" class="view-panel">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">⚖️ Pending Attendance Correction Requests</span>
-            </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Class Date</th>
-                      <th>Subject</th>
-                      <th>Requested Status</th>
-                      <th>Reason</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="facultyCorrectionsTbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 3: ASSIGNED CLASSES -->
-        <section id="classesTab" class="view-panel">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">📚 Faculty Subject Allocation</span>
-            </div>
-            <div class="card-body" id="facultyClassesContainer">
-              <p style="color: var(--text-muted);">Loading assigned courses...</p>
-            </div>
-          </div>
-        </section>
-
       </div>
-    </main>
-  </div>
+    </section>
+
+    <!-- TAB 2: REVIEW CORRECTIONS -->
+    <section id="correctionsTab" class="view-panel">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Pending Attendance Correction Requests</span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Class Date</th>
+                  <th>Subject</th>
+                  <th>Requested Status</th>
+                  <th>Reason</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="facultyCorrectionsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: ASSIGNED CLASSES -->
+    <section id="classesTab" class="view-panel">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Faculty Subject Allocation</span>
+        </div>
+        <div class="card-body" id="facultyClassesContainer">
+          <p style="color: var(--text-muted);">Loading assigned courses...</p>
+        </div>
+      </div>
+    </section>
+  </main>
 
   <script>
     let assignedClasses = [];
@@ -194,7 +177,7 @@
 
           // Render classes tab
           const container = document.getElementById('facultyClassesContainer');
-          let html = '<div class="widget-grid-top">';
+          let html = '<div class="admin-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">';
           data.classes.forEach(c => {
             html += `
               <div class="card" style="padding: 16px;">
@@ -344,9 +327,11 @@
       }
     }
 
-    function switchFacultyTab(tabId) {
+    function switchFacultyTab(tabId, btnEl) {
       document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.admin-op-tab').forEach(b => b.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
+      if (btnEl) btnEl.classList.add('active');
     }
 
     async function logout() {

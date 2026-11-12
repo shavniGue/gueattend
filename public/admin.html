@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>gueattend | Administrator Console</title>
+  <title>Admin Dashboard — gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -12,259 +12,627 @@
 </head>
 <body>
 
-  <div class="app-container">
-    <aside class="app-sidebar">
-      <div class="sidebar-brand" style="display: flex; align-items: center; gap: 10px;">
-        <div class="brand-logo" style="width: 32px; height: 32px; flex-shrink: 0; background: transparent;">
-          <img src="/images/logo.svg" alt="gueattend logo" class="brand-logo-img" width="32" height="32">
+  <!-- Top Navigation Bar (Matches Student Dashboard & QAttend Admin Theme) -->
+  <header class="site-navbar dash-navbar">
+    <a href="/admin" class="brand-wrapper">
+      <div class="brand-icon">
+        <img src="/images/logo.svg" alt="gueattend logo" class="brand-logo-img" width="30" height="30">
+      </div>
+      <div class="brand-title">gueattend Admin</div>
+    </a>
+
+    <nav class="nav-links">
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/admin" class="nav-link active">Admin</a>
+      <a href="/qums-setup" class="nav-link">QUMS Setup</a>
+      <a href="/telegram-setup" class="nav-link">Telegram</a>
+    </nav>
+
+    <div class="nav-right">
+      <button id="logoutBtn" class="btn-nav-logout" onclick="logout()" title="Sign out">Logout</button>
+    </div>
+  </header>
+
+  <main class="admin-container">
+
+    <!-- Header Row -->
+    <div class="admin-header-row">
+      <div>
+        <h1 class="admin-title">Admin Portal &amp; System Health</h1>
+        <p class="admin-subtitle">Live system status, background watchers, and user synchronization metrics</p>
+      </div>
+      <button type="button" id="refreshAllBtn" class="btn-refresh-blue" onclick="refreshAllAdmin()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        <span>Refresh Data</span>
+      </button>
+    </div>
+
+    <!-- 8 Live KPI Cards -->
+    <section class="admin-kpi-grid" aria-label="System KPI Metrics">
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">Total Users</div>
+        <div class="admin-kpi-value" id="kpiTotalUsers">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">QUMS Connected</div>
+        <div class="admin-kpi-value kpi-green" id="kpiQumsConnected">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">Session Expired</div>
+        <div class="admin-kpi-value kpi-amber" id="kpiSessionExpired">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">Telegram Linked</div>
+        <div class="admin-kpi-value kpi-blue" id="kpiTelegramLinked">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          Reconnected via Telegram
         </div>
-        <div class="brand-text">
-          <h2>gueattend</h2>
-          <span>Admin Console</span>
+        <div class="admin-kpi-value kpi-cyan" id="kpiReconnTelegram">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          Reconnected via Webpage
+        </div>
+        <div class="admin-kpi-value kpi-purple" id="kpiReconnWeb">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">Suspended Users</div>
+        <div class="admin-kpi-value kpi-red" id="kpiSuspended">--</div>
+      </div>
+      <div class="admin-kpi-card">
+        <div class="admin-kpi-label">Notifications Sent</div>
+        <div class="admin-kpi-value kpi-indigo" id="kpiNotifications">--</div>
+      </div>
+    </section>
+
+    <!-- System Health & Background Services -->
+    <section class="admin-section-card">
+      <h2 class="admin-section-title">System Health &amp; Background Services</h2>
+      <div class="admin-services-grid" id="servicesGrid">
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Database</span>
+            <span class="status-pill pill-green" id="svcDbPill">ONLINE</span>
+          </div>
+          <div class="admin-service-desc" id="svcDbDesc">Checking connection...</div>
+        </div>
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Telegram Bot</span>
+            <span class="status-pill pill-slate" id="svcTgPill">--</span>
+          </div>
+          <div class="admin-service-desc" id="svcTgDesc">Checking daemon...</div>
+        </div>
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Attendance Watcher</span>
+            <span class="status-pill pill-green" id="svcAttPill">ACTIVE</span>
+          </div>
+          <div class="admin-service-desc" id="svcAttDesc">Periodic loop</div>
+        </div>
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Assignment Watcher</span>
+            <span class="status-pill pill-green" id="svcAssignPill">ACTIVE</span>
+          </div>
+          <div class="admin-service-desc" id="svcAssignDesc">Periodic 30m check</div>
+        </div>
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Morning Scheduler</span>
+            <span class="status-pill pill-green" id="svcSchedPill">SCHEDULED</span>
+          </div>
+          <div class="admin-service-desc" id="svcSchedDesc">08:30 IST morning classes (Asia/Kolkata)</div>
+        </div>
+        <div class="admin-service-card">
+          <div class="admin-service-top">
+            <span class="admin-service-name">Firebase Admin</span>
+            <span class="status-pill pill-amber" id="svcFbPill">--</span>
+          </div>
+          <div class="admin-service-desc" id="svcFbDesc">Checking Firebase config...</div>
         </div>
       </div>
-      <nav class="sidebar-nav">
-        <div class="nav-category">Management</div>
-        <a class="nav-item active" onclick="switchAdminTab('metricsTab')">
-          <span class="nav-icon">📊</span>
-          <span>Overview Metrics</span>
-        </a>
-        <a class="nav-item" onclick="switchAdminTab('usersTab')">
-          <span class="nav-icon">👥</span>
-          <span>Users & Students</span>
-        </a>
-        <a class="nav-item" onclick="switchAdminTab('importTab')">
-          <span class="nav-icon">📥</span>
-          <span>Excel / CSV Import</span>
-        </a>
-        <a class="nav-item" onclick="switchAdminTab('publishCircularTab')">
-          <span class="nav-icon">📢</span>
-          <span>Publish Circular</span>
-        </a>
-        <a class="nav-item" onclick="switchAdminTab('auditTab')">
-          <span class="nav-icon">📜</span>
-          <span>Audit Logs</span>
-        </a>
-      </nav>
-      <div class="sidebar-footer">
-        <button style="background:none; border:none; color:#cbd5e1; cursor:pointer;" onclick="logout()">Logout 🚪</button>
+    </section>
+
+    <!-- User Accounts Directory -->
+    <section class="admin-section-card">
+      <h2 class="admin-section-title">User Accounts</h2>
+
+      <div class="admin-toolbar-row">
+        <input
+          type="text"
+          id="userSearchInput"
+          class="admin-control"
+          placeholder="Search by name, email, or QID..."
+        >
+        <select id="filterQums" class="admin-control">
+          <option value="">ERP / QUMS: All Status</option>
+          <option value="connected">ERP / QUMS: Connected</option>
+          <option value="expired">ERP / QUMS: Expired</option>
+          <option value="disconnected">ERP / QUMS: Disconnected</option>
+        </select>
+        <select id="filterTelegram" class="admin-control">
+          <option value="">Telegram: All</option>
+          <option value="linked">Telegram: Linked</option>
+          <option value="unlinked">Telegram: Unlinked</option>
+        </select>
+        <select id="filterReconnect" class="admin-control">
+          <option value="">Reconnect: All</option>
+          <option value="telegram">Reconnect: Telegram</option>
+          <option value="web">Reconnect: Webpage</option>
+          <option value="none">Reconnect: None</option>
+        </select>
+        <select id="filterStatus" class="admin-control">
+          <option value="">Status: All</option>
+          <option value="active">Status: Active</option>
+          <option value="suspended">Status: Suspended</option>
+        </select>
       </div>
-    </aside>
 
-    <main class="app-main">
-      <header class="app-topbar">
-        <div class="topbar-left">
-          <div class="university-title">
-            <h1>University Administration Console</h1>
-            <p>Graphic Era University • gueattend Admin</p>
-          </div>
-        </div>
-        <div class="topbar-right">
-          <span class="badge-status badge-present">Role: Administrator</span>
-          <button class="btn btn-secondary" onclick="logout()">Logout</button>
-        </div>
-      </header>
-
-      <div class="app-content">
-
-        <!-- TAB 1: METRICS -->
-        <section id="metricsTab" class="view-panel active">
-          <div class="widget-grid-top" id="metricsCardsContainer">
-            <div class="card stat-circle" style="text-align: left; background: #fff;">
-              <div style="font-size: 12px; color: var(--text-muted);">Total Users</div>
-              <div class="stat-val" id="metricUsers" style="color: var(--primary);">--</div>
-            </div>
-            <div class="card stat-circle" style="text-align: left; background: #fff;">
-              <div style="font-size: 12px; color: var(--text-muted);">Total Enrolled Students</div>
-              <div class="stat-val" id="metricStudents" style="color: var(--accent);">--</div>
-            </div>
-            <div class="card stat-circle" style="text-align: left; background: #fff;">
-              <div style="font-size: 12px; color: var(--text-muted);">Total Attendance Records</div>
-              <div class="stat-val" id="metricAttendance" style="color: var(--success);">--</div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 2: USERS & STUDENTS -->
-        <section id="usersTab" class="view-panel">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">👥 University User Directory</span>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" id="userSearchInput" class="form-input" placeholder="Search email, name, student ID...">
-                <button class="btn btn-primary" onclick="loadUsers()">Search</button>
-              </div>
-            </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Student / Emp ID</th>
-                      <th>Role</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminUsersTbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 3: EXCEL IMPORT -->
-        <section id="importTab" class="view-panel">
-          <div class="card" style="max-width: 650px;">
-            <div class="card-header">
-              <span class="card-title">📥 Bulk Excel / CSV Data Ingestion</span>
-            </div>
-            <div class="card-body">
-              <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
-                Upload authorized university Excel worksheets (e.g. <code>.xlsx</code> or <code>.csv</code>) containing student enrollments, sections, and emails.
-              </p>
-              <div class="form-group">
-                <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="form-input" style="width: 100%;">
-              </div>
-              <button id="uploadExcelBtn" class="btn btn-primary">Process & Ingest Records</button>
-              <div id="importOutputBox" style="margin-top: 16px; display: none;" class="alert-box alert-success"></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 4: PUBLISH CIRCULAR -->
-        <section id="publishCircularTab" class="view-panel">
-          <div class="card" style="max-width: 700px;">
-            <div class="card-header">
-              <span class="card-title">📢 Issue Official University Circular</span>
-            </div>
-            <div class="card-body">
-              <form id="circularForm">
-                <div class="form-group">
-                  <label class="form-label">Circular Title</label>
-                  <input type="text" id="circTitle" class="form-input" style="width: 100%;" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Circular Number / Reference</label>
-                  <input type="text" id="circNum" class="form-input" style="width: 100%;" placeholder="e.g. GEU/RO/2026/120" required>
-                </div>
-                <div class="month-filter-bar">
-                  <div>
-                    <label class="form-label">Category</label>
-                    <select id="circCat" class="form-select">
-                      <option value="academic">Academic</option>
-                      <option value="examination">Examination</option>
-                      <option value="administrative">Administrative</option>
-                      <option value="holiday">Holiday</option>
-                      <option value="events">Events & Sports</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="form-label">Audience</label>
-                    <select id="circAud" class="form-select">
-                      <option value="all">All Campus</option>
-                      <option value="students">Students Only</option>
-                      <option value="faculty">Faculty Only</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Circular Text Content</label>
-                  <textarea id="circContent" class="form-input" style="width: 100%; height: 120px;" required></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Publish Campus Announcement</button>
-              </form>
-            </div>
-          </div>
-        </section>
-
-        <!-- TAB 5: AUDIT LOGS -->
-        <section id="auditTab" class="view-panel">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">📜 System Security & Administrative Audit Trail</span>
-            </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Time</th>
-                      <th>Action</th>
-                      <th>User</th>
-                      <th>Resource</th>
-                      <th>IP Address</th>
-                    </tr>
-                  </thead>
-                  <tbody id="auditLogsTbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
+      <div class="admin-export-row">
+        <button type="button" id="downloadExcelBtn" class="btn-excel-export" onclick="downloadUsersExcel()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download Excel (.xlsx)</span>
+        </button>
+        <div class="admin-showing-text" id="showingCountText">Loading users...</div>
       </div>
-    </main>
-  </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th style="width: 34px;"><input type="checkbox" id="selectAllUsers" aria-label="Select all visible users"></th>
+              <th>Student Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>QID</th>
+              <th>QUMS Session</th>
+              <th>Telegram</th>
+              <th>Last Reconnect</th>
+              <th>Attendance Last Checked</th>
+              <th>Assignment Last Checked</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="adminUsersTbody">
+            <tr>
+              <td colspan="12" style="text-align: center; padding: 28px; color: #64748b;">Loading user accounts...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="admin-pagination">
+        <div id="pageInfoText">Page 1</div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="prevPageBtn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="changePage(-1)">Previous</button>
+          <button type="button" id="nextPageBtn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="changePage(1)">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secondary Admin Operations (Audit Logs, Circulars, Excel Import) -->
+    <section class="admin-section-card">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
+        <h2 class="admin-section-title" style="margin-bottom: 0;">Admin Operations &amp; Audit Trail</h2>
+        <div class="admin-ops-tabs" style="margin-bottom: 0;">
+          <button type="button" class="admin-op-tab active" data-op-tab="auditTab" onclick="switchOpTab('auditTab', this)">Audit Logs</button>
+          <button type="button" class="admin-op-tab" data-op-tab="publishCircularTab" onclick="switchOpTab('publishCircularTab', this)">Publish Circular</button>
+          <button type="button" class="admin-op-tab" data-op-tab="importTab" onclick="switchOpTab('importTab', this)">Excel / CSV Import</button>
+        </div>
+      </div>
+
+      <!-- Op Tab 1: Audit Logs -->
+      <div id="auditTab" class="view-panel active">
+        <div class="admin-table-wrap">
+          <table class="data-table" style="min-width: 720px;">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>User</th>
+                <th>Resource</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Op Tab 2: Publish Circular -->
+      <div id="publishCircularTab" class="view-panel">
+        <form id="circularForm" style="max-width: 720px;">
+          <div class="form-group">
+            <label class="form-label">Circular Title</label>
+            <input type="text" id="circTitle" class="form-input" style="width: 100%;" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Circular Number / Reference</label>
+            <input type="text" id="circNum" class="form-input" style="width: 100%;" placeholder="e.g. GEU/RO/2026/120" required>
+          </div>
+          <div class="month-filter-bar">
+            <div>
+              <label class="form-label">Category</label>
+              <select id="circCat" class="form-select">
+                <option value="academic">Academic</option>
+                <option value="examination">Examination</option>
+                <option value="administrative">Administrative</option>
+                <option value="holiday">Holiday</option>
+                <option value="events">Events &amp; Sports</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Audience</label>
+              <select id="circAud" class="form-select">
+                <option value="all">All Campus</option>
+                <option value="students">Students Only</option>
+                <option value="faculty">Faculty Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Circular Text Content</label>
+            <textarea id="circContent" class="form-input" style="width: 100%; height: 110px; padding: 10px;" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Publish Campus Announcement</button>
+          <div id="circularOutputBox" style="margin-top: 12px; display: none;" class="alert-box"></div>
+        </form>
+      </div>
+
+      <!-- Op Tab 3: Excel Import -->
+      <div id="importTab" class="view-panel">
+        <div style="max-width: 650px;">
+          <p style="color: #64748b; font-size: 13px; margin-bottom: 14px;">
+            Upload university Excel or CSV worksheets (<code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>) containing student emails, names, and student IDs.
+          </p>
+          <div class="form-group">
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="form-input" style="width: 100%; padding: 8px;">
+          </div>
+          <button type="button" id="uploadExcelBtn" class="btn btn-primary">Process &amp; Ingest Records</button>
+          <div id="importOutputBox" style="margin-top: 14px; display: none;" class="alert-box"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
 
   <script>
-    async function initAdmin() {
-      loadMetrics();
-      loadUsers();
-      loadAuditLogs();
+    let currentPage = 1;
+    const PAGE_LIMIT = 25;
+    let totalFilteredUsers = 0;
+
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
-    async function loadMetrics() {
+    function formatIst(isoStr) {
+      if (!isoStr) return '-';
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return '-';
+      const datePart = d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Asia/Kolkata',
+      });
+      const timePart = d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata',
+      });
+      return `${datePart}, ${timePart} IST`;
+    }
+
+    function buildFilterQueryString(includePaging = true) {
+      const params = new URLSearchParams();
+      const search = document.getElementById('userSearchInput').value.trim();
+      const qumsStatus = document.getElementById('filterQums').value;
+      const telegram = document.getElementById('filterTelegram').value;
+      const reconnect = document.getElementById('filterReconnect').value;
+      const accountStatus = document.getElementById('filterStatus').value;
+
+      if (search) params.set('search', search);
+      if (qumsStatus) params.set('qumsStatus', qumsStatus);
+      if (telegram) params.set('telegram', telegram);
+      if (reconnect) params.set('reconnect', reconnect);
+      if (accountStatus) params.set('accountStatus', accountStatus);
+      if (includePaging) {
+        params.set('page', String(currentPage));
+        params.set('limit', String(PAGE_LIMIT));
+      }
+      return params.toString();
+    }
+
+    async function loadOverview() {
       try {
-        const resp = await fetch('/api/admin/metrics');
+        const resp = await fetch('/api/admin/overview');
         const data = await resp.json();
-        if (data.success) {
-          document.getElementById('metricUsers').textContent = data.metrics.totalUsers;
-          document.getElementById('metricStudents').textContent = data.metrics.totalStudents;
-          document.getElementById('metricAttendance').textContent = data.metrics.totalAttendanceRecords;
+        if (!data.success) return;
+
+        const k = data.kpis || {};
+        document.getElementById('kpiTotalUsers').textContent = k.totalUsers ?? '--';
+        document.getElementById('kpiQumsConnected').textContent = k.qumsConnected ?? '--';
+        document.getElementById('kpiSessionExpired').textContent = k.sessionExpired ?? '--';
+        document.getElementById('kpiTelegramLinked').textContent = k.telegramLinked ?? '--';
+        document.getElementById('kpiReconnTelegram').textContent = k.reconnectedTelegram ?? '--';
+        document.getElementById('kpiReconnWeb').textContent = k.reconnectedWeb ?? '--';
+        document.getElementById('kpiSuspended').textContent = k.suspendedUsers ?? '--';
+        document.getElementById('kpiNotifications').textContent = k.notificationsSent ?? '--';
+
+        const s = data.services || {};
+        if (s.database) {
+          const pill = document.getElementById('svcDbPill');
+          pill.textContent = s.database.status || 'ONLINE';
+          pill.className = `status-pill ${s.database.status === 'ONLINE' ? 'pill-green' : 'pill-red'}`;
+          document.getElementById('svcDbDesc').textContent = `Mode: ${s.database.mode} (${s.database.latencyMs}ms latency)`;
         }
-      } catch (err) {}
+        if (s.telegramBot) {
+          const pill = document.getElementById('svcTgPill');
+          pill.textContent = s.telegramBot.status || 'OFF';
+          pill.className = `status-pill ${s.telegramBot.polling ? 'pill-green' : s.telegramBot.configured ? 'pill-blue' : 'pill-slate'}`;
+          const uname = s.telegramBot.username ? `@${s.telegramBot.username}` : 'Bot token';
+          document.getElementById('svcTgDesc').textContent = s.telegramBot.configured
+            ? `${uname} (${s.telegramBot.polling ? 'polling ready' : 'webhook / standby'})`
+            : 'TELEGRAM_BOT_TOKEN not configured';
+        }
+        if (s.attendanceWatcher) {
+          document.getElementById('svcAttDesc').textContent = s.attendanceWatcher.lastCheckedAt
+            ? `Last loop: ${formatIst(s.attendanceWatcher.lastCheckedAt)}`
+            : 'Periodic 5m-10m check';
+        }
+        if (s.assignmentWatcher) {
+          document.getElementById('svcAssignDesc').textContent = s.assignmentWatcher.lastCheckedAt
+            ? `Last check: ${formatIst(s.assignmentWatcher.lastCheckedAt)}`
+            : 'Periodic 30m check';
+        }
+        if (s.morningScheduler) {
+          document.getElementById('svcSchedDesc').textContent = s.morningScheduler.scheduleLabel || '08:30 IST morning classes (Asia/Kolkata)';
+        }
+        if (s.firebaseAdmin) {
+          const pill = document.getElementById('svcFbPill');
+          pill.textContent = s.firebaseAdmin.status || 'PROJECT SCOPE';
+          pill.className = `status-pill ${s.firebaseAdmin.hasServiceAccount ? 'pill-green' : 'pill-amber'}`;
+          document.getElementById('svcFbDesc').textContent = s.firebaseAdmin.hasServiceAccount
+            ? `Project: ${s.firebaseAdmin.projectId} (Service Account ready)`
+            : `Project: ${s.firebaseAdmin.projectId} • Web API key: ${s.firebaseAdmin.hasApiKey ? 'Set' : 'Missing'}`;
+        }
+      } catch (err) {
+        console.error('[Admin] Failed to load overview:', err);
+      }
+    }
+
+    function renderSessionBadge(user) {
+      const erpType = String(user.active_erp_type || 'OLD').toUpperCase();
+      const rawStatus = (erpType === 'NEW' ? user.new_erp_session_status : user.qums_session_status) || user.qums_session_status || 'disconnected';
+      const st = rawStatus.toLowerCase();
+      if (st === 'active' || st === 'connected') {
+        return '<span class="status-pill pill-green">CONNECTED</span>';
+      }
+      if (st === 'expired') {
+        return `<span class="status-pill pill-amber">${escapeHtml(erpType)} ERP EXPIRED</span>`;
+      }
+      return '<span class="status-pill pill-slate">DISCONNECTED</span>';
+    }
+
+    function renderReconnectCell(user) {
+      const src = String(user.last_reconnect_source || '').toLowerCase();
+      const tgCount = user.reconnect_count_telegram || 0;
+      const webCount = user.reconnect_count_web || 0;
+      let pill = '<span class="status-pill pill-slate">None</span>';
+      if (src === 'telegram') {
+        pill = '<span class="status-pill pill-green">Telegram</span>';
+      } else if (src === 'web' || src === 'webpage') {
+        pill = '<span class="status-pill pill-blue">Web</span>';
+      }
+      return `<div>${pill}</div><div class="admin-sub-meta">${tgCount} tg / ${webCount} web</div>`;
     }
 
     async function loadUsers() {
-      const search = document.getElementById('userSearchInput').value;
+      const tbody = document.getElementById('adminUsersTbody');
       try {
-        const resp = await fetch(`/api/admin/users?search=${encodeURIComponent(search)}`);
+        const qs = buildFilterQueryString(true);
+        const resp = await fetch(`/api/admin/users?${qs}`);
         const data = await resp.json();
-        const tbody = document.getElementById('adminUsersTbody');
+        if (!data.success) return;
+
+        const users = data.users || [];
+        totalFilteredUsers = data.filteredTotal ?? data.total ?? users.length;
+        const showingStart = users.length > 0 ? (currentPage - 1) * PAGE_LIMIT + 1 : 0;
+        const showingEnd = (currentPage - 1) * PAGE_LIMIT + users.length;
+        document.getElementById('showingCountText').textContent =
+          `Showing ${showingStart}-${showingEnd} of ${totalFilteredUsers} user(s) (${data.total} total)`;
+
+        const totalPages = Math.max(1, Math.ceil(totalFilteredUsers / PAGE_LIMIT));
+        document.getElementById('pageInfoText').textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+        document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+
         tbody.innerHTML = '';
-        if (data.success && data.users.length > 0) {
-          data.users.forEach(u => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td><strong>${u.full_name || 'User'}</strong></td>
-              <td>${u.email}</td>
-              <td>${u.student_id || u.employee_id || '-'}</td>
-              <td><span class="badge-status badge-present">${u.role}</span></td>
-              <td>${u.is_suspended ? '<span style="color:var(--danger)">Suspended</span>' : '<span style="color:var(--success)">Active</span>'}</td>
-              <td>
-                <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px;" onclick="toggleSuspend('${u.id}', ${!u.is_suspended})">
-                  ${u.is_suspended ? 'Unsuspend' : 'Suspend'}
-                </button>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 26px; color: #64748b;">No matching users found.</td></tr>';
+          return;
         }
-      } catch (err) {}
+
+        users.forEach((u) => {
+          const displayName = u.student_name || u.new_erp_student_name || u.full_name || u.email.split('@')[0];
+          const erpLabel = String(u.active_erp_type || 'OLD').toUpperCase();
+          const qid = u.qums_qid || u.new_erp_qid || u.student_id || u.employee_id || '-';
+          const rolePill = u.role && u.role !== 'student'
+            ? `<span class="status-pill ${u.role === 'admin' ? 'pill-amber' : 'pill-purple'}" style="margin-left: 5px;">${escapeHtml(u.role)}</span>`
+            : '';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><input type="checkbox" class="row-user-checkbox" value="${escapeHtml(u.id)}" aria-label="Select user"></td>
+            <td>
+              <div class="admin-name-cell">
+                <span class="admin-student-name">${escapeHtml(displayName)}</span>
+                <div class="admin-badge-strip">
+                  <span class="status-pill pill-slate">${escapeHtml(erpLabel)} ERP</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span>${escapeHtml(u.email)}</span>${rolePill}
+            </td>
+            <td>
+              ${u.is_suspended
+                ? '<span class="status-pill pill-red">SUSPENDED</span>'
+                : '<span class="status-pill pill-green">ACTIVE</span>'}
+            </td>
+            <td><strong>${escapeHtml(qid)}</strong></td>
+            <td>${renderSessionBadge(u)}</td>
+            <td>
+              ${u.telegram_chat_id
+                ? '<span class="status-pill pill-green">LINKED</span>'
+                : '<span class="status-pill pill-slate">UNLINKED</span>'}
+            </td>
+            <td>${renderReconnectCell(u)}</td>
+            <td>${escapeHtml(formatIst(u.attendance_last_checked_at))}</td>
+            <td>${escapeHtml(formatIst(u.assignment_last_checked_at))}</td>
+            <td>${escapeHtml(formatIst(u.created_at))}</td>
+            <td>
+              <div class="admin-actions-cell">
+                <button
+                  type="button"
+                  class="btn-table-action ${u.is_suspended ? 'btn-table-activate' : 'btn-table-suspend'}"
+                  onclick="toggleSuspend('${escapeHtml(u.id)}', ${!u.is_suspended})"
+                >
+                  ${u.is_suspended ? 'Activate' : 'Suspend'}
+                </button>
+                <button
+                  type="button"
+                  class="btn-table-action btn-table-delete"
+                  onclick="deleteUser('${escapeHtml(u.id)}', '${escapeHtml(u.email)}')"
+                >
+                  Delete
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('[Admin] Failed to load users:', err);
+      }
+    }
+
+    function changePage(delta) {
+      const next = currentPage + delta;
+      if (next < 1) return;
+      currentPage = next;
+      loadUsers();
+    }
+
+    function resetAndLoadUsers() {
+      currentPage = 1;
+      loadUsers();
+    }
+
+    function downloadUsersExcel() {
+      const qs = buildFilterQueryString(false);
+      window.location.href = `/api/admin/users/export.xlsx${qs ? `?${qs}` : ''}`;
     }
 
     async function toggleSuspend(userId, isSuspended) {
-      if (!confirm(`Are you sure you want to change suspension status?`)) return;
-      await fetch(`/api/admin/users/${userId}/suspend`, {
+      if (!confirm(`Are you sure you want to ${isSuspended ? 'suspend' : 'activate'} this account?`)) return;
+      const resp = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isSuspended }),
       });
-      loadUsers();
+      const data = await resp.json();
+      if (!data.success) {
+        alert(data.error || 'Could not update user status.');
+        return;
+      }
+      await Promise.all([loadOverview(), loadUsers(), loadAuditLogs()]);
     }
+
+    async function deleteUser(userId, email) {
+      if (!confirm(`Delete account for ${email}? This cannot be undone.`)) return;
+      const resp = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        alert(data.error || 'Could not delete user.');
+        return;
+      }
+      await Promise.all([loadOverview(), loadUsers(), loadAuditLogs()]);
+    }
+
+    async function loadAuditLogs() {
+      try {
+        const resp = await fetch('/api/admin/audit-logs');
+        const data = await resp.json();
+        const tbody = document.getElementById('auditLogsTbody');
+        tbody.innerHTML = '';
+        if (data.success && data.logs.length > 0) {
+          data.logs.forEach((l) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${escapeHtml(formatIst(l.created_at))}</td>
+              <td><strong>${escapeHtml(l.action)}</strong></td>
+              <td>${escapeHtml(l.email || l.user_id || 'System')}</td>
+              <td><code>${escapeHtml(l.resource || '-')}</code></td>
+              <td>${escapeHtml(l.ip_address || '-')}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#64748b;padding:18px;">No audit logs yet.</td></tr>';
+        }
+      } catch (err) {}
+    }
+
+    function switchOpTab(tabId, btnEl) {
+      document.querySelectorAll('.view-panel').forEach((p) => p.classList.remove('active'));
+      document.querySelectorAll('.admin-op-tab').forEach((b) => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      if (btnEl) btnEl.classList.add('active');
+    }
+
+    document.getElementById('selectAllUsers').addEventListener('change', (e) => {
+      document.querySelectorAll('.row-user-checkbox').forEach((cb) => {
+        cb.checked = e.target.checked;
+      });
+    });
+
+    let searchDebounce = null;
+    document.getElementById('userSearchInput').addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(resetAndLoadUsers, 250);
+    });
+    ['filterQums', 'filterTelegram', 'filterReconnect', 'filterStatus'].forEach((id) => {
+      document.getElementById(id).addEventListener('change', resetAndLoadUsers);
+    });
 
     document.getElementById('uploadExcelBtn').addEventListener('click', async () => {
       const file = document.getElementById('excelFileInput').files[0];
@@ -286,8 +654,7 @@
         if (data.success) {
           out.className = 'alert-box alert-success';
           out.textContent = data.message;
-          loadMetrics();
-          loadUsers();
+          refreshAllAdmin();
         } else {
           out.className = 'alert-box alert-danger';
           out.textContent = data.error;
@@ -302,6 +669,7 @@
 
     document.getElementById('circularForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const out = document.getElementById('circularOutputBox');
       try {
         const resp = await fetch('/api/admin/circulars/create', {
           method: 'POST',
@@ -315,42 +683,24 @@
           }),
         });
         const data = await resp.json();
+        out.style.display = 'block';
         if (data.success) {
-          alert('✓ Circular published campus-wide.');
+          out.className = 'alert-box alert-success';
+          out.textContent = 'Circular published campus-wide.';
           document.getElementById('circularForm').reset();
         } else {
-          alert('Error: ' + data.error);
+          out.className = 'alert-box alert-danger';
+          out.textContent = data.error || 'Error publishing circular.';
         }
       } catch (err) {
-        alert('Failed to publish circular.');
+        out.style.display = 'block';
+        out.className = 'alert-box alert-danger';
+        out.textContent = 'Failed to publish circular.';
       }
     });
 
-    async function loadAuditLogs() {
-      try {
-        const resp = await fetch('/api/admin/audit-logs');
-        const data = await resp.json();
-        const tbody = document.getElementById('auditLogsTbody');
-        tbody.innerHTML = '';
-        if (data.success) {
-          data.logs.forEach(l => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${new Date(l.created_at).toLocaleString()}</td>
-              <td><strong>${l.action}</strong></td>
-              <td>${l.email || l.user_id || 'System'}</td>
-              <td><code>${l.resource}</code></td>
-              <td>${l.ip_address || '-'}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-        }
-      } catch (err) {}
-    }
-
-    function switchAdminTab(tabId) {
-      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
+    async function refreshAllAdmin() {
+      await Promise.all([loadOverview(), loadUsers(), loadAuditLogs()]);
     }
 
     async function logout() {
@@ -358,8 +708,7 @@
       window.location.href = '/login';
     }
 
-    window.addEventListener('DOMContentLoaded', initAdmin);
+    window.addEventListener('DOMContentLoaded', refreshAllAdmin);
   </script>
 </body>
 </html>
-

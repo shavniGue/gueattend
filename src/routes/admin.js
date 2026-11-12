@@ -10,6 +10,160 @@ const router = express.Router();
 
 const db = require('../database/db');
 const { requireAdmin } = require('../middleware/auth');
+const { checkFirebaseHealth } = require('../config/firebase');
+
+const CONNECTED_SESSION_SQL = "IN ('active', 'connected')";
+
+/**
+ * Shared parameterized WHERE builder for admin user directory & Excel export.
+ */
+function buildAdminUsersWhere(query) {
+  const clauses = ['1=1'];
+  const params = [];
+  let pIdx = 1;
+
+  const role = query.role ? String(query.role).trim() : null;
+  const search = query.search ? `%${String(query.search).trim().toLowerCase()}%` : null;
+  const qumsStatus = query.qumsStatus ? String(query.qumsStatus).trim().toLowerCase() : null;
+  const telegram = query.telegram ? String(query.telegram).trim().toLowerCase() : null;
+  const reconnect = query.reconnect ? String(query.reconnect).trim().toLowerCase() : null;
+  const accountStatus = query.accountStatus ? String(query.accountStatus).trim().toLowerCase() : null;
+
+  if (role) {
+    clauses.push(`u.role = $${pIdx++}`);
+    params.push(role);
+  }
+  if (search) {
+    clauses.push(
+      `(LOWER(u.email) LIKE $${pIdx} OR LOWER(COALESCE(u.full_name, '')) LIKE $${pIdx} OR LOWER(COALESCE(u.student_name, '')) LIKE $${pIdx} OR LOWER(COALESCE(u.qums_qid, '')) LIKE $${pIdx} OR LOWER(COALESCE(s.student_id, '')) LIKE $${pIdx} OR LOWER(COALESCE(u.new_erp_qid, '')) LIKE $${pIdx})`
+    );
+    params.push(search);
+    pIdx++;
+  }
+  if (qumsStatus === 'connected') {
+    clauses.push(`(u.qums_session_status ${CONNECTED_SESSION_SQL} OR u.new_erp_session_status ${CONNECTED_SESSION_SQL})`);
+  } else if (qumsStatus === 'expired') {
+    clauses.push(`(u.qums_session_status = 'expired' OR u.new_erp_session_status = 'expired')`);
+  } else if (qumsStatus === 'disconnected') {
+    clauses.push(
+      `(COALESCE(u.qums_session_status, 'disconnected') NOT IN ('active', 'connected', 'expired') AND COALESCE(u.new_erp_session_status, 'not_setup') NOT IN ('active', 'connected', 'expired'))`
+    );
+  }
+
+  if (telegram === 'linked') {
+    clauses.push(`(COALESCE(u.telegram_chat_id, '') <> '' OR COALESCE(ta.telegram_chat_id, '') <> '')`);
+  } else if (telegram === 'unlinked') {
+    clauses.push(`(COALESCE(u.telegram_chat_id, '') = '' AND COALESCE(ta.telegram_chat_id, '') = '')`);
+  }
+
+  if (reconnect === 'telegram') {
+    clauses.push(`LOWER(COALESCE(u.last_reconnect_source, '')) = 'telegram'`);
+  } else if (reconnect === 'web') {
+    clauses.push(`LOWER(COALESCE(u.last_reconnect_source, '')) IN ('web', 'webpage')`);
+  } else if (reconnect === 'none') {
+    clauses.push(`COALESCE(u.last_reconnect_source, '') = ''`);
+  }
+
+  if (accountStatus === 'active') {
+    clauses.push(`u.is_suspended = FALSE`);
+  } else if (accountStatus === 'suspended') {
+    clauses.push(`u.is_suspended = TRUE`);
+  }
+
+  return { whereSql: clauses.join(' AND '), params, nextParamIndex: pIdx };
+}
+
+/**
+ * GET /api/admin/overview
+ * Live KPI counts + background watcher / service health metrics
+ */
+router.get('/overview', requireAdmin, async (req, res) => {
+  try {
+    const startMs = Date.now();
+    const [kpiRes, notifRes, watcherRes] = await Promise.all([
+      db.query(`
+        SELECT
+          COUNT(*)::int AS total_users,
+          COUNT(*) FILTER (
+            WHERE qums_session_status ${CONNECTED_SESSION_SQL}
+               OR new_erp_session_status ${CONNECTED_SESSION_SQL}
+          )::int AS qums_connected,
+          COUNT(*) FILTER (
+            WHERE qums_session_status = 'expired'
+               OR new_erp_session_status = 'expired'
+          )::int AS session_expired,
+          COUNT(*) FILTER (WHERE COALESCE(telegram_chat_id, '') <> '')::int AS telegram_linked,
+          COALESCE(SUM(reconnect_count_telegram), 0)::int AS reconnected_telegram,
+          COALESCE(SUM(reconnect_count_web), 0)::int AS reconnected_web,
+          COUNT(*) FILTER (WHERE is_suspended = TRUE)::int AS suspended_users
+        FROM users
+      `),
+      db.query('SELECT COUNT(*)::int AS cnt FROM notification_log'),
+      db.query(`
+        SELECT
+          MAX(attendance_last_checked_at) AS last_attendance_check,
+          MAX(assignment_last_checked_at) AS last_assignment_check
+        FROM users
+      `),
+    ]);
+    const latencyMs = Date.now() - startMs;
+
+    const row = kpiRes.rows[0] || {};
+    const watchers = watcherRes.rows[0] || {};
+    const fbHealth = checkFirebaseHealth();
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const botConfigured = Boolean(botToken && botToken !== 'your_telegram_bot_token_from_botfather');
+    const pollingOn = String(process.env.TELEGRAM_POLLING || '').toLowerCase() === 'on';
+
+    res.json({
+      success: true,
+      kpis: {
+        totalUsers: row.total_users || 0,
+        qumsConnected: row.qums_connected || 0,
+        sessionExpired: row.session_expired || 0,
+        telegramLinked: row.telegram_linked || 0,
+        reconnectedTelegram: row.reconnected_telegram || 0,
+        reconnectedWeb: row.reconnected_web || 0,
+        suspendedUsers: row.suspended_users || 0,
+        notificationsSent: notifRes.rows[0]?.cnt || 0,
+      },
+      services: {
+        database: {
+          status: 'ONLINE',
+          mode: 'postgres',
+          latencyMs,
+        },
+        telegramBot: {
+          status: pollingOn ? 'POLLING' : botConfigured ? 'READY' : 'OFF',
+          configured: botConfigured,
+          polling: pollingOn,
+          username: (process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, ''),
+        },
+        attendanceWatcher: {
+          status: 'ACTIVE',
+          lastCheckedAt: watchers.last_attendance_check || null,
+        },
+        assignmentWatcher: {
+          status: 'ACTIVE',
+          lastCheckedAt: watchers.last_assignment_check || null,
+        },
+        morningScheduler: {
+          status: 'SCHEDULED',
+          scheduleLabel: '08:30 IST morning classes (Asia/Kolkata)',
+        },
+        firebaseAdmin: {
+          status: fbHealth.hasServiceAccount ? 'READY' : fbHealth.initialized ? 'PROJECT SCOPE' : 'KEY NEEDED',
+          projectId: fbHealth.projectId || 'gueattend',
+          hasApiKey: Boolean(fbHealth.hasApiKey),
+          hasServiceAccount: Boolean(fbHealth.hasServiceAccount),
+        },
+      },
+    });
+  } catch (err) {
+    console.error('[admin/overview] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to load admin overview.' });
+  }
+});
 
 /**
  * GET /api/admin/metrics
@@ -45,46 +199,48 @@ router.get('/metrics', requireAdmin, async (req, res) => {
 
 /**
  * GET /api/admin/users
- * Paginated user accounts list
+ * Paginated and filterable user accounts directory
  */
 router.get('/users', requireAdmin, async (req, res) => {
-  const page = parseInt(req.query.page || 1, 10);
-  const limit = parseInt(req.query.limit || 50, 10);
+  const page = Math.max(1, parseInt(req.query.page || 1, 10));
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || 25, 10)));
   const offset = (page - 1) * limit;
-  const role = req.query.role || null;
-  const search = req.query.search ? `%${req.query.search.trim().toLowerCase()}%` : null;
 
   try {
-    let sql = `
-      SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.is_suspended, u.created_at,
-             s.student_id, s.enrollment_number, f.employee_id
+    const { whereSql, params, nextParamIndex } = buildAdminUsersWhere(req.query);
+    const fromJoinSql = `
       FROM users u
       LEFT JOIN students s ON s.user_id = u.id
       LEFT JOIN faculty f ON f.user_id = u.id
-      WHERE 1=1
+      LEFT JOIN telegram_accounts ta ON ta.user_id = u.id
+      WHERE ${whereSql}
     `;
-    const params = [];
-    let pIdx = 1;
 
-    if (role) {
-      sql += ` AND u.role = $${pIdx++}`;
-      params.push(role);
-    }
-    if (search) {
-      sql += ` AND (LOWER(u.email) LIKE $${pIdx} OR LOWER(u.full_name) LIKE $${pIdx} OR LOWER(COALESCE(s.student_id, '')) LIKE $${pIdx})`;
-      params.push(search);
-      pIdx++;
-    }
+    const listSql = `
+      SELECT u.id, u.email, u.full_name, u.student_name, u.role, u.is_admin, u.is_active,
+             u.is_suspended, u.email_verified, u.created_at,
+             u.qums_qid, u.qums_session_status, u.active_erp_type,
+             u.new_erp_qid, u.new_erp_student_name, u.new_erp_session_status,
+             u.telegram_chat_id, ta.telegram_username,
+             u.last_reconnect_source, u.last_reconnected_at,
+             u.reconnect_count_telegram, u.reconnect_count_web,
+             u.attendance_last_checked_at, u.assignment_last_checked_at,
+             s.student_id, s.enrollment_number, f.employee_id
+      ${fromJoinSql}
+      ORDER BY u.created_at DESC
+      LIMIT $${nextParamIndex} OFFSET $${nextParamIndex + 1}
+    `;
 
-    sql += ` ORDER BY u.created_at DESC LIMIT $${pIdx++} OFFSET $${pIdx++}`;
-    params.push(limit, offset);
-
-    const result = await db.query(sql, params);
-    const countRes = await db.query('SELECT COUNT(*) FROM users');
+    const [result, filteredCountRes, totalCountRes] = await Promise.all([
+      db.query(listSql, [...params, limit, offset]),
+      db.query(`SELECT COUNT(*)::int AS cnt ${fromJoinSql}`, params),
+      db.query('SELECT COUNT(*)::int AS cnt FROM users'),
+    ]);
 
     res.json({
       success: true,
-      total: parseInt(countRes.rows[0].count, 10),
+      total: totalCountRes.rows[0].cnt,
+      filteredTotal: filteredCountRes.rows[0].cnt,
       page,
       limit,
       users: result.rows,
@@ -92,6 +248,99 @@ router.get('/users', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('[admin/users] Error:', err.message);
     res.status(500).json({ success: false, error: 'Failed to fetch users list.' });
+  }
+});
+
+/**
+ * GET /api/admin/users/export.xlsx
+ * Downloads filtered user accounts list as an Excel workbook
+ */
+router.get('/users/export.xlsx', requireAdmin, async (req, res) => {
+  try {
+    const { whereSql, params } = buildAdminUsersWhere(req.query);
+    const sql = `
+      SELECT u.email, u.full_name, u.student_name, u.role, u.is_suspended,
+             u.qums_qid, u.new_erp_qid, u.active_erp_type,
+             u.qums_session_status, u.new_erp_session_status,
+             u.telegram_chat_id, u.last_reconnect_source, u.last_reconnected_at,
+             u.reconnect_count_telegram, u.reconnect_count_web,
+             u.attendance_last_checked_at, u.assignment_last_checked_at, u.created_at,
+             s.student_id
+      FROM users u
+      LEFT JOIN students s ON s.user_id = u.id
+      LEFT JOIN telegram_accounts ta ON ta.user_id = u.id
+      WHERE ${whereSql}
+      ORDER BY u.created_at DESC
+      LIMIT 1000
+    `;
+    const result = await db.query(sql, params);
+    const exportRows = result.rows.map((u) => ({
+      'Student Name': u.student_name || u.new_erp_student_name || u.full_name || 'User',
+      Email: u.email,
+      Role: u.role,
+      Status: u.is_suspended ? 'SUSPENDED' : 'ACTIVE',
+      QID: u.qums_qid || u.new_erp_qid || u.student_id || '-',
+      'ERP Mode': u.active_erp_type || 'OLD',
+      'QUMS Session': u.qums_session_status || 'disconnected',
+      Telegram: u.telegram_chat_id ? 'LINKED' : 'UNLINKED',
+      'Last Reconnect': u.last_reconnect_source || '-',
+      'Telegram Reconnects': u.reconnect_count_telegram || 0,
+      'Web Reconnects': u.reconnect_count_web || 0,
+      'Attendance Last Checked': u.attendance_last_checked_at || '-',
+      'Assignment Last Checked': u.assignment_last_checked_at || '-',
+      Created: u.created_at || '-',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Users');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="gueattend-users.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    console.error('[admin/export] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to export users workbook.' });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * Explicit administrator user deletion (blocks self-deletion & writes audit log)
+ */
+router.delete('/users/:id', requireAdmin, async (req, res) => {
+  const targetId = req.params.id;
+  if (targetId === req.session.userId) {
+    return res.status(400).json({ success: false, error: 'Cannot delete your own active administrator account.' });
+  }
+
+  try {
+    const existing = await db.getUserById(targetId);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    await db.withTransaction(async (client) => {
+      await client.query('DELETE FROM telegram_accounts WHERE user_id = $1', [targetId]);
+      await client.query('DELETE FROM students WHERE user_id = $1', [targetId]);
+      await client.query('DELETE FROM faculty WHERE user_id = $1', [targetId]);
+      await client.query('DELETE FROM users WHERE id = $1', [targetId]);
+    });
+
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'DELETE_USER',
+      resource: `users:${targetId}`,
+      details: { deletedEmail: existing.email, deletedRole: existing.role },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ success: true, message: 'User account removed.' });
+  } catch (err) {
+    console.error('[admin/delete] Error:', err.message);
+    res.status(500).json({ success: false, error: `Could not delete user: ${err.message}` });
   }
 });
 
