@@ -3,16 +3,16 @@
  * gueattend - Google Firebase Authentication Admin & Multi-Tenant Isolation
  */
 
-const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { getAuth } = require('firebase-admin/auth');
 const {
   getFirebaseApp,
   hasServiceAccountCredential,
-  isAdminEmail,
   setAuthenticatedUserClaim,
 } = require('./config/firebase');
 const db = require('./database/db');
+
+const FIREBASE_PASSWORD_SENTINEL = '!FIREBASE_MANAGED_DO_NOT_USE!';
 
 /**
  * Ensures the Firebase user has custom claim `role = "authenticated"` for Supabase Third-Party Auth,
@@ -76,9 +76,11 @@ function getFirebaseWebConfig() {
 }
 
 /**
- * Establish Express session from Firebase ID Token (Tier 1 Web App Login)
+ * Establish Express session from verified Firebase ID Token (Single Identity Provider).
+ * Never grants access by email alone, never stores Firebase passwords in Supabase,
+ * and never grants admin privileges through public signup.
  */
-async function establishSessionFromIdToken(req, res, idToken, optionalPassword) {
+async function establishSessionFromIdToken(req, res, idToken) {
   const app = getFirebaseApp();
   if (!app) {
     throw new Error('Firebase authentication service is not configured.');
@@ -87,63 +89,101 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
   const decodedToken = await getAuth(app).verifyIdToken(idToken);
   const email = (decodedToken.email || '').toLowerCase().trim();
   if (!email) {
-    throw new Error('Firebase token does not contain a verified email address.');
+    throw new Error('Firebase token does not contain an email address.');
   }
 
-  const isAdminClaim = Boolean(decodedToken.admin) || decodedToken.role === 'admin' || isAdminEmail(email);
-  let user = await db.getUserByEmail(email);
+  // Primary lookup strictly by verified Firebase UID
+  let user = await db.getUserByFirebaseUid(decodedToken.uid);
 
   if (!user) {
+    // Fallback lookup by email ONLY to bind a pre-seeded account that has no firebase_uid yet
+    const byEmail = await db.getUserByEmail(email);
+    if (byEmail) {
+      if (byEmail.firebase_uid && byEmail.firebase_uid !== decodedToken.uid) {
+        await db.recordAuditLog({
+          userId: byEmail.id,
+          action: 'FIREBASE_UID_MISMATCH',
+          resource: 'auth:login',
+          details: {
+            email,
+            existingFirebaseUid: byEmail.firebase_uid,
+            incomingFirebaseUid: decodedToken.uid,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        }).catch(() => {});
+
+        const err = new Error(
+          'This email is already linked to a different authentication identity. Please recover access via your original sign-in method or contact an administrator.'
+        );
+        err.statusCode = 409;
+        throw err;
+      }
+
+      if (!decodedToken.email_verified) {
+        const err = new Error('Please verify your email first before linking this account.');
+        err.statusCode = 403;
+        err.emailNotVerified = true;
+        throw err;
+      }
+
+      // Safely bind Firebase UID while preserving existing DB role (e.g. bootstrapped admin or faculty)
+      await db.query(
+        `UPDATE users
+         SET firebase_uid = $1, email_verified = TRUE, updated_at = NOW()
+         WHERE id = $2`,
+        [decodedToken.uid, byEmail.id]
+      );
+      user = await db.getUserById(byEmail.id);
+
+      await db.recordAuditLog({
+        userId: user.id,
+        action: 'FIREBASE_UID_BOUND',
+        resource: 'auth:login',
+        details: { email, firebaseUid: decodedToken.uid, role: user.role },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch(() => {});
+    }
+  }
+
+  if (!user) {
+    // Public signup (Email or Google): ALWAYS student role; NEVER grant admin via public signup
     const fullName = decodedToken.name || email.split('@')[0];
     const newUserId = `usr_${crypto.randomUUID()}`;
-    const seedSecret = optionalPassword || crypto.randomBytes(24).toString('hex');
-    const passwordHash = await bcrypt.hash(seedSecret, 10);
-    const assignedRole = isAdminClaim ? 'admin' : 'student';
-    const isVerifiedInitial = Boolean(decodedToken.email_verified) || isAdminClaim;
+    const isVerifiedInitial = Boolean(decodedToken.email_verified);
 
     const newUserRes = await db.query(
       `INSERT INTO users (
          id, email, full_name, password_hash, firebase_uid, role, is_admin,
          email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, FALSE, 'disconnected', NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, 'student', FALSE, $6, TRUE, FALSE, 'disconnected', NOW(), NOW())
        RETURNING *`,
-      [newUserId, email, fullName, passwordHash, decodedToken.uid, assignedRole, isAdminClaim, isVerifiedInitial]
+      [newUserId, email, fullName, FIREBASE_PASSWORD_SENTINEL, decodedToken.uid, isVerifiedInitial]
     );
     user = newUserRes.rows[0];
 
-    if (assignedRole === 'student') {
-      await db.ensureStudentProfile(user.id, email).catch(() => {});
-    }
+    await db.ensureStudentProfile(user.id, email).catch(() => {});
+    await db.recordAuditLog({
+      userId: user.id,
+      action: 'USER_REGISTERED',
+      resource: 'auth:firebase-signup',
+      details: { email, firebaseUid: decodedToken.uid, provider: decodedToken.firebase?.sign_in_provider || 'firebase' },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch(() => {});
   } else {
-    const isVerifiedNow = Boolean(decodedToken.email_verified) || Boolean(user.email_verified) || isAdminClaim;
-    const effectiveRole = (user.role === 'admin' || user.is_admin === true || isAdminClaim)
-      ? 'admin'
-      : (user.role || 'student');
-    const isAdminFlag = effectiveRole === 'admin';
-
-    if (optionalPassword) {
-      const syncedHash = await bcrypt.hash(optionalPassword, 10);
+    const isVerifiedNow = Boolean(decodedToken.email_verified) || Boolean(user.email_verified);
+    if (isVerifiedNow !== Boolean(user.email_verified)) {
       await db.query(
-        `UPDATE users
-         SET firebase_uid = $1, email_verified = $2, role = $3, is_admin = $4, password_hash = $5, updated_at = NOW()
-         WHERE id = $6`,
-        [decodedToken.uid, isVerifiedNow, effectiveRole, isAdminFlag, syncedHash, user.id]
+        `UPDATE users SET email_verified = $1, updated_at = NOW() WHERE id = $2`,
+        [isVerifiedNow, user.id]
       ).catch(() => {});
-    } else {
-      await db.query(
-        `UPDATE users
-         SET firebase_uid = $1, email_verified = $2, role = $3, is_admin = $4, updated_at = NOW()
-         WHERE id = $5`,
-        [decodedToken.uid, isVerifiedNow, effectiveRole, isAdminFlag, user.id]
-      ).catch(() => {});
+      user.email_verified = isVerifiedNow;
     }
 
-    user.email_verified = isVerifiedNow;
-    user.role = effectiveRole;
-    user.is_admin = isAdminFlag;
-
-    if (effectiveRole === 'student') {
+    if (user.role === 'student') {
       await db.ensureStudentProfile(user.id, email).catch(() => {});
     }
   }
@@ -155,7 +195,7 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
     throw err;
   }
 
-  // Check email verification status for students
+  // Require verified email for students
   if (user.role === 'student' && !decodedToken.email_verified && !user.email_verified) {
     const err = new Error('Please verify your email before logging in. Check your inbox for the verification link.');
     err.statusCode = 403;
@@ -163,30 +203,35 @@ async function establishSessionFromIdToken(req, res, idToken, optionalPassword) 
     throw err;
   }
 
+  // Admin privileges require BOTH verified Firebase UID mapping AND existing DB admin role
+  const effectiveRole = (user.role === 'admin' && user.is_admin === true && user.firebase_uid === decodedToken.uid)
+    ? 'admin'
+    : (user.role === 'faculty' ? 'faculty' : 'student');
+
   // Ensure Firebase custom claim `role=authenticated` is assigned for Supabase RLS
-  const claimResult = await ensureFirebaseAuthenticatedClaim(decodedToken, user.role || 'student');
+  const claimResult = await ensureFirebaseAuthenticatedClaim(decodedToken, effectiveRole);
 
   // Create Express session
   req.session.userId = user.id;
-  req.session.role = user.role || 'student';
+  req.session.role = effectiveRole;
   req.session.firebaseUid = decodedToken.uid;
 
   // Redirection Logic
   let redirect = '/dashboard';
-  if (user.role === 'admin' || user.is_admin === true) {
+  if (effectiveRole === 'admin') {
     redirect = '/admin';
-  } else if (user.role === 'faculty') {
+  } else if (effectiveRole === 'faculty') {
     redirect = '/faculty';
   } else {
     const creds = require('./credentials');
     const hasCookies = creds.loadSessionCookies(user.id);
-    const isConnected = user.qums_session_status === 'connected' || Boolean(hasCookies);
+    const isConnected = (user.qums_session_status === 'connected' || user.qums_session_status === 'active') || Boolean(hasCookies);
     redirect = isConnected ? '/dashboard' : '/geu-setup';
   }
 
   return {
     ok: true,
-    user,
+    user: { ...user, role: effectiveRole },
     redirect,
     tokenRefreshRequired: Boolean(claimResult.tokenRefreshRequired),
   };
@@ -212,16 +257,32 @@ async function verifyFirebaseTokenMiddleware(req, res, next) {
         appRole: decodedToken.app_role || null,
       };
 
-      const user = await db.getUserByEmail(decodedToken.email);
+      const cleanEmail = (decodedToken.email || '').trim().toLowerCase();
+      let user = await db.getUserByFirebaseUid(decodedToken.uid);
+      if (!user && cleanEmail) {
+        const byEmail = await db.getUserByEmail(cleanEmail);
+        if (byEmail) {
+          if (byEmail.firebase_uid && byEmail.firebase_uid !== decodedToken.uid) {
+            return res.status(409).json({
+              success: false,
+              error: 'Firebase identity does not match existing account record.',
+            });
+          }
+          user = byEmail;
+        }
+      }
       if (user) {
         if (user.is_active === false || user.is_suspended) {
           return res.status(403).json({ success: false, error: 'Account is inactive or suspended.' });
         }
+        const effectiveRole = (user.role === 'admin' && user.is_admin === true && (!user.firebase_uid || user.firebase_uid === decodedToken.uid))
+          ? 'admin'
+          : (user.role === 'admin' ? 'student' : (user.role || 'student'));
         req.session.userId = user.id;
-        req.session.role = (user.role === 'admin' || user.is_admin === true) ? 'admin' : user.role;
+        req.session.role = effectiveRole;
         req.session.firebaseUid = decodedToken.uid;
         req.currentUser = user;
-        req.firebaseClaims.appRole = req.session.role;
+        req.firebaseClaims.appRole = effectiveRole;
       }
       return next();
     } catch (err) {
@@ -238,6 +299,7 @@ async function verifyFirebaseTokenMiddleware(req, res, next) {
 }
 
 module.exports = {
+  FIREBASE_PASSWORD_SENTINEL,
   hasValidFirebaseApiKey,
   getFirebaseWebConfig,
   ensureFirebaseAuthenticatedClaim,

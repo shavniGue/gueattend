@@ -100,3 +100,4 @@ migrateExistingFirebaseUsers().catch((err) => {
   console.error('[firebase-claims] Fatal error:', err.message);
   process.exit(1);
 });
+

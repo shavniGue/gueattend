@@ -45,6 +45,9 @@ router.get('/captcha', requireAuth, async (req, res) => {
 router.post('/start-login', requireAuth, async (req, res) => {
   const { qid, password, isReconnect } = req.body;
   try {
+    if (qid) {
+      await qumsWeb.verifyAuthorizedGueidMapping(req.session.userId, qid);
+    }
     const outcome = await qumsWeb.startQumsLogin({
       userId: req.session.userId,
       qid,
@@ -53,7 +56,7 @@ router.post('/start-login', requireAuth, async (req, res) => {
     });
     res.json(outcome);
   } catch (err) {
-    res.status(400).json({ ok: false, success: false, error: err.message });
+    res.status(err.statusCode || 400).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -65,6 +68,9 @@ router.post('/submit-captcha', requireAuth, async (req, res) => {
   const { qid, password } = req.body;
   const captchaAnswer = req.body.captchaAnswer || req.body.captcha || req.body.captchaText;
   try {
+    if (qid) {
+      await qumsWeb.verifyAuthorizedGueidMapping(req.session.userId, qid);
+    }
     const result = await qumsWeb.submitQumsCaptcha({
       userId: req.session.userId,
       captchaAnswer,
@@ -73,7 +79,7 @@ router.post('/submit-captcha', requireAuth, async (req, res) => {
     });
     res.json(result);
   } catch (err) {
-    res.status(400).json({ ok: false, success: false, error: err.message });
+    res.status(err.statusCode || 400).json({ ok: false, success: false, error: err.message });
   }
 });
 
@@ -90,6 +96,9 @@ router.post('/login', requireAuth, async (req, res) => {
   }
 
   try {
+    if (qid) {
+      await qumsWeb.verifyAuthorizedGueidMapping(req.session.userId, qid);
+    }
     const result = await qumsWeb.submitQumsCaptcha({
       userId: req.session.userId,
       captchaAnswer,
@@ -98,6 +107,9 @@ router.post('/login', requireAuth, async (req, res) => {
     });
     res.json(result);
   } catch (err) {
+    if (err.statusCode === 409 || err.statusCode === 403 || err.statusCode === 400) {
+      return res.status(err.statusCode).json({ ok: false, success: false, error: err.message });
+    }
     // If no active session, attempt start and submit
     if (qid && password) {
       try {
@@ -105,10 +117,10 @@ router.post('/login', requireAuth, async (req, res) => {
         const result = await qumsWeb.submitQumsCaptcha({ userId: req.session.userId, captchaAnswer });
         return res.json(result);
       } catch (innerErr) {
-        return res.status(400).json({ ok: false, success: false, error: innerErr.message });
+        return res.status(innerErr.statusCode || 400).json({ ok: false, success: false, error: innerErr.message });
       }
     }
-    res.status(400).json({ ok: false, success: false, error: err.message });
+    res.status(err.statusCode || 400).json({ ok: false, success: false, error: err.message });
   }
 });
 

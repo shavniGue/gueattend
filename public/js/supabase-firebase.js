@@ -86,3 +86,4 @@ export async function createFirebaseSupabaseClient(firebaseAuth) {
 
   return cachedSupabaseClient;
 }
+

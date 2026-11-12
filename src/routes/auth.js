@@ -69,16 +69,21 @@ router.post('/sync-claims', async (req, res) => {
   }
 
   try {
-    const { verifyFirebaseToken, isAdminEmail } = require('../config/firebase');
+    const { verifyFirebaseToken } = require('../config/firebase');
     const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
 
     const decoded = await verifyFirebaseToken(idToken);
     const cleanEmail = (decoded.email || '').trim().toLowerCase();
-    const existingUser = cleanEmail ? await db.getUserByEmail(cleanEmail) : null;
+    const existingUser =
+      (await db.getUserByFirebaseUid(decoded.uid)) ||
+      (cleanEmail ? await db.getUserByEmail(cleanEmail) : null);
 
+    // Keep application roles separate from Postgres `authenticated` and never elevate to admin via signup/email alone.
     const appRole = existingUser
-      ? (existingUser.role === 'admin' || existingUser.is_admin === true ? 'admin' : existingUser.role || 'student')
-      : (isAdminEmail(cleanEmail) ? 'admin' : 'student');
+      ? ((existingUser.role === 'admin' && existingUser.is_admin === true && existingUser.firebase_uid === decoded.uid)
+          ? 'admin'
+          : (existingUser.role === 'admin' ? 'student' : (existingUser.role || 'student')))
+      : 'student';
 
     const claimOutcome = await ensureFirebaseAuthenticatedClaim(decoded, appRole);
 
@@ -188,18 +193,22 @@ async function ensureSafeStudentRecord(user, cleanEmail) {
  * Case A (No account exists) or Case D3 (Firebase account exists without DB record).
  */
 async function handleNewUserRegistration({ req, res, cleanEmail, fullName, password, decodedToken }) {
-  const { isAdminEmail } = require('../config/firebase');
-  const role = isAdminEmail(cleanEmail) ? 'admin' : 'student';
-  const hash = await bcrypt.hash(password, 10);
-  const name = (fullName || cleanEmail.split('@')[0]).trim();
+  const { FIREBASE_PASSWORD_SENTINEL, ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
+  // Never grant admin access through public signup; admin must be bootstrapped server-side.
+  const role = 'student';
+  // Never store Firebase authentication passwords in Supabase.
+  const hash = decodedToken
+    ? FIREBASE_PASSWORD_SENTINEL
+    : (password ? await bcrypt.hash(password, 10) : FIREBASE_PASSWORD_SENTINEL);
+  const name = (fullName || decodedToken?.name || cleanEmail.split('@')[0]).trim();
   const newUserId = `usr_${crypto.randomUUID()}`;
   const emailVerified = Boolean(decodedToken?.email_verified);
   // Only persist firebase_uid after server-side Firebase ID token verification.
   const verifiedFirebaseUid = decodedToken ? decodedToken.uid : null;
 
   const newUserRes = await db.query(
-    `INSERT INTO users (id, email, full_name, password_hash, firebase_uid, role, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, FALSE, 'disconnected', NOW(), NOW())
+    `INSERT INTO users (id, email, full_name, password_hash, firebase_uid, role, is_admin, email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, TRUE, FALSE, 'disconnected', NOW(), NOW())
      RETURNING *`,
     [newUserId, cleanEmail, name, hash, verifiedFirebaseUid, role, emailVerified]
   );
@@ -209,7 +218,6 @@ async function handleNewUserRegistration({ req, res, cleanEmail, fullName, passw
 
   let claimOutcome = { claimAssigned: false, tokenRefreshRequired: false };
   if (decodedToken) {
-    const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
     claimOutcome = await ensureFirebaseAuthenticatedClaim(decodedToken, role);
   }
 
@@ -250,8 +258,8 @@ async function handleNewUserRegistration({ req, res, cleanEmail, fullName, passw
 async function handleExistingUserRegistration({ req, res, existing, cleanEmail, password, decodedToken }) {
   // Without a verified Firebase ID token, require password ownership before disclosing verification state.
   if (!decodedToken) {
-    const passwordMatches = existing.password_hash
-      ? await bcrypt.compare(password, existing.password_hash)
+    const passwordMatches = password && existing.password_hash && !existing.password_hash.startsWith('!FIREBASE')
+      ? await bcrypt.compare(password, existing.password_hash).catch(() => false)
       : false;
 
     if (!passwordMatches) {
@@ -350,16 +358,13 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
   }
 
   // Cases B, C, and D (no identity conflict): safely resume incomplete state and preserve roles & GUeID.
+  const { FIREBASE_PASSWORD_SENTINEL, ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
   const mergedVerified = Boolean(existing.email_verified || decodedToken.email_verified);
   const needsUidLink = !existing.firebase_uid;
   const needsVerifiedSync = mergedVerified && !existing.email_verified;
-  const canUpdatePasswordHash = !existing.email_verified && !existing.qums_qid && existing.role !== 'admin';
+  const nextPasswordHash = existing.password_hash || FIREBASE_PASSWORD_SENTINEL;
 
-  if (needsUidLink || needsVerifiedSync || canUpdatePasswordHash) {
-    const nextPasswordHash = canUpdatePasswordHash
-      ? await bcrypt.hash(password, 10)
-      : existing.password_hash;
-
+  if (needsUidLink || needsVerifiedSync || !existing.password_hash) {
     await db.query(
       `UPDATE users
        SET firebase_uid = COALESCE(firebase_uid, $1),
@@ -374,8 +379,9 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
   const studentExistedBefore = existing.role === 'student' ? Boolean(await db.getStudentByUserId(existing.id)) : true;
   await ensureSafeStudentRecord(existing, cleanEmail);
 
-  const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
-  const existingAppRole = (existing.role === 'admin' || existing.is_admin === true) ? 'admin' : (existing.role || 'student');
+  const existingAppRole = (existing.role === 'admin' && existing.is_admin === true)
+    ? 'admin'
+    : (existing.role === 'admin' ? 'student' : (existing.role || 'student'));
   const claimOutcome = await ensureFirebaseAuthenticatedClaim(decodedToken, existingAppRole);
 
   const repairedIncompleteState = needsUidLink || needsVerifiedSync || !studentExistedBefore;
@@ -443,16 +449,32 @@ async function handleExistingUserRegistration({ req, res, existing, cleanEmail, 
  */
 router.post('/register', registerLimiter, async (req, res) => {
   const { fullName, email, password, firebaseUid, idToken } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ success: false, ok: false, error: 'Email and password are required.' });
+  const { hasValidFirebaseApiKey } = require('../firebaseAuth');
+
+  if (!email) {
+    return res.status(400).json({ success: false, ok: false, error: 'Email is required.' });
   }
 
   const cleanEmail = String(email).trim().toLowerCase();
   if (!cleanEmail.includes('@')) {
     return res.status(400).json({ success: false, ok: false, error: 'Please enter a valid email address.' });
   }
-  if (String(password).length < 6) {
-    return res.status(400).json({ success: false, ok: false, error: 'Password must be at least 6 characters long.' });
+
+  if (!idToken) {
+    if (hasValidFirebaseApiKey()) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        error: 'Firebase authentication token is required for registration.',
+      });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        error: 'Password must be at least 6 characters long.',
+      });
+    }
   }
 
   let decodedToken = null;
@@ -546,13 +568,17 @@ async function handleUserLogin(req, res) {
   if (idToken) {
     try {
       const { establishSessionFromIdToken } = require('../firebaseAuth');
-      const outcome = await establishSessionFromIdToken(req, res, idToken, password);
+      const outcome = await establishSessionFromIdToken(req, res, idToken);
 
       await db.recordAuditLog({
         userId: outcome.user.id,
         action: 'FIREBASE_TOKEN_LOGIN',
         resource: 'auth:login',
-        details: { email: outcome.user.email, redirect: outcome.redirect },
+        details: {
+          email: outcome.user.email,
+          firebaseUid: outcome.user.firebase_uid || null,
+          redirect: outcome.redirect,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
@@ -567,7 +593,7 @@ async function handleUserLogin(req, res) {
           id: outcome.user.id,
           email: outcome.user.email,
           fullName: outcome.user.full_name,
-          role: outcome.user.role,
+          role: req.session.role || outcome.user.role,
         },
       });
     } catch (fbErr) {
@@ -580,9 +606,19 @@ async function handleUserLogin(req, res) {
           error: fbErr.message,
         });
       }
-      if (!password) {
-        return res.status(401).json({ success: false, ok: false, error: fbErr.message });
+      if (fbErr.statusCode === 409) {
+        return res.status(409).json({
+          success: false,
+          ok: false,
+          code: fbErr.code || 'FIREBASE_UID_MISMATCH',
+          error: fbErr.message,
+        });
       }
+      return res.status(fbErr.statusCode || 401).json({
+        success: false,
+        ok: false,
+        error: fbErr.message,
+      });
     }
   }
 
@@ -633,9 +669,16 @@ async function handleUserLogin(req, res) {
       });
     }
 
-    // Verify Password
-    const { hasValidFirebaseApiKey } = require('../firebaseAuth');
-    const { isAdminEmail } = require('../config/firebase');
+    // Verify Password (Firebase is the single identity provider; Firebase-managed accounts must authenticate with idToken)
+    const { hasValidFirebaseApiKey, FIREBASE_PASSWORD_SENTINEL } = require('../firebaseAuth');
+    if (user.firebase_uid || user.password_hash === FIREBASE_PASSWORD_SENTINEL) {
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        error: 'This account uses Firebase Authentication. Please sign in with Firebase on the Login page.',
+      });
+    }
+
     const match = user.password_hash ? await bcrypt.compare(password, user.password_hash).catch(() => false) : false;
 
     if (!match) {
@@ -648,16 +691,16 @@ async function handleUserLogin(req, res) {
         userAgent: req.headers['user-agent'],
       });
 
-      const needsFirebaseKey = !hasValidFirebaseApiKey() && (Boolean(user.firebase_uid) || isAdminEmail(user.email));
+      const needsFirebaseKey = !hasValidFirebaseApiKey() && Boolean(user.firebase_uid);
       const errMsg = needsFirebaseKey
         ? 'Invalid credentials. (Note: Firebase Auth requires FIREBASE_API_KEY in .env / Render Environment Variables to verify Firebase passwords.)'
         : 'Invalid university credentials.';
       return res.status(401).json({ success: false, ok: false, error: errMsg });
     }
 
-    const effectiveRole = (user.role === 'admin' || user.is_admin === true || isAdminEmail(user.email))
+    const effectiveRole = (user.role === 'admin' && user.is_admin === true)
       ? 'admin'
-      : (user.role || 'student');
+      : (user.role === 'admin' ? 'student' : (user.role || 'student'));
 
     // Check email verification for student
     if (effectiveRole === 'student' && user.email_verified === false) {
@@ -842,6 +885,14 @@ router.post('/reset-password', rateLimit({ maxRequests: 5 }), async (req, res) =
     const user = await db.getUserByEmail(email);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    const { FIREBASE_PASSWORD_SENTINEL } = require('../firebaseAuth');
+    if (user.firebase_uid || user.password_hash === FIREBASE_PASSWORD_SENTINEL) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password resets for Firebase-managed accounts must be completed via the Firebase password reset email link.',
+      });
     }
 
     const hash = await bcrypt.hash(newPassword, 10);

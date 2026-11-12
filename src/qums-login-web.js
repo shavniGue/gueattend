@@ -93,6 +93,151 @@ const pendingSessions = new Map();
 const fallbackChallenges = new Map();
 
 /**
+ * Verify that the requested GUeID belongs to this user and is not claimed by another user.
+ * Protects against account/GUeID impersonation across Firebase users.
+ */
+async function verifyAuthorizedGueidMapping(userId, rawQid) {
+  const cleanQid = String(rawQid || '').trim();
+  if (!cleanQid) {
+    const err = new Error('GUeID is required.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (cleanQid.includes('@') || !/^[A-Za-z0-9_-]{4,32}$/.test(cleanQid)) {
+    const err = new Error('Enter a valid university GUeID (4-32 alphanumeric characters, not your email).');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const currentUser = await db.getUserById(userId);
+  if (!currentUser || !currentUser.is_active || currentUser.is_suspended) {
+    const err = new Error('Active authenticated account is required to bind a GUeID.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Enforce immutability if user already verified a different GUeID
+  if (currentUser.qums_qid && currentUser.qums_qid.trim().toLowerCase() !== cleanQid.toLowerCase()) {
+    await db.recordAuditLog({
+      userId,
+      action: 'GUEID_OWNERSHIP_CONFLICT',
+      resource: 'qums:verify-gueid',
+      details: {
+        reason: 'USER_ALREADY_BOUND_TO_DIFFERENT_GUEID',
+        existingGueid: currentUser.qums_qid,
+        attemptedGueid: cleanQid,
+      },
+    }).catch(() => {});
+
+    const err = new Error('This account is already bound to a different GUeID. Contact your administrator to change it.');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  // Ensure no OTHER active account already owns this GUeID in users or students
+  const conflictUserRes = await db.query(
+    `SELECT id FROM users WHERE LOWER(qums_qid) = LOWER($1) AND id <> $2 LIMIT 1`,
+    [cleanQid, userId]
+  );
+  if (conflictUserRes.rows.length > 0) {
+    await db.recordAuditLog({
+      userId,
+      action: 'GUEID_OWNERSHIP_CONFLICT',
+      resource: 'qums:verify-gueid',
+      details: {
+        reason: 'GUEID_CLAIMED_BY_OTHER_USER',
+        attemptedGueid: cleanQid,
+        conflictingUserId: conflictUserRes.rows[0].id,
+      },
+    }).catch(() => {});
+
+    const err = new Error('This GUeID is already registered to another GUeAttend account.');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const conflictStudentRes = await db.query(
+    `SELECT user_id FROM students WHERE LOWER(student_id) = LOWER($1) AND user_id <> $2 LIMIT 1`,
+    [cleanQid, userId]
+  );
+  if (conflictStudentRes.rows.length > 0) {
+    await db.recordAuditLog({
+      userId,
+      action: 'GUEID_OWNERSHIP_CONFLICT',
+      resource: 'qums:verify-gueid',
+      details: {
+        reason: 'STUDENT_ID_CLAIMED_BY_OTHER_USER',
+        attemptedGueid: cleanQid,
+        conflictingUserId: conflictStudentRes.rows[0].user_id,
+      },
+    }).catch(() => {});
+
+    const err = new Error('This GUeID is already mapped to another student profile.');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  return cleanQid;
+}
+
+/**
+ * Persist verified portal cookies, AES-256-GCM encrypted ERP password, GUeID mapping, and audit log.
+ */
+async function persistVerifiedPortalSession({ userId, qid, password, cookies, isReconnect }) {
+  const cleanQid = await verifyAuthorizedGueidMapping(userId, qid);
+
+  const sessionPath = credentials.saveSessionCookies(userId, cookies, {
+    qid: cleanQid,
+    connectedAt: new Date().toISOString(),
+  });
+
+  const encryptedPassword = cryptoVault.encrypt(password);
+
+  await db.query(
+    `UPDATE users SET
+      qums_qid = $1,
+      qums_password_encrypted = $2,
+      qums_session_path = $3,
+      qums_session_status = 'connected',
+      qums_session_data = $4,
+      updated_at = NOW()
+     WHERE id = $5`,
+    [cleanQid, encryptedPassword, sessionPath, JSON.stringify(cookies), userId]
+  );
+
+  await db.query(
+    `UPDATE students
+     SET student_id = $1, updated_at = NOW()
+     WHERE user_id = $2
+       AND (student_id IS NULL OR student_id LIKE 'STU-%' OR LOWER(student_id) = LOWER($1))`,
+    [cleanQid, userId]
+  ).catch(() => {});
+
+  await db.query(
+    `INSERT INTO reconnect_events (user_id, source, reconnected_at) VALUES ($1, $2, NOW())`,
+    [userId, isReconnect ? 'reconnect' : 'initial_setup']
+  ).catch(() => {});
+
+  await db.recordAuditLog({
+    userId,
+    action: 'GUEID_VERIFIED_AND_CONNECTED',
+    resource: 'qums:connect',
+    details: { gueid: cleanQid, isReconnect: Boolean(isReconnect) },
+  }).catch(() => {});
+
+  await cleanupPending(userId);
+
+  return {
+    ok: true,
+    success: true,
+    message: 'Successfully connected to Graphic Era University portal!',
+    qid: cleanQid,
+    redirect: '/dashboard',
+  };
+}
+
+/**
  * Safely close browser and remove from pending map
  */
 async function cleanupPending(userId) {
@@ -173,6 +318,10 @@ async function startQumsLogin({ userId, qid = '', password = '', isReconnect = f
       effectivePassword = cryptoVault.decrypt(user.qums_password_encrypted) || '';
       effectiveQid = effectiveQid || user.qums_qid || '';
     }
+  }
+
+  if (!previewOnly && effectiveQid) {
+    effectiveQid = await verifyAuthorizedGueidMapping(userId, effectiveQid);
   }
 
   // Clean any existing pending session for this user
@@ -372,48 +521,17 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
         };
       }
 
-      // Success: Extract session cookies from browser context
+      // Extract session cookies from browser context and persist authorized GUeID mapping
       const cookies = await session.context.cookies();
       console.log(`[qums-relay] Successfully captured ${cookies.length} session cookies from university portal!`);
 
-      // Save cookies to disk with POSIX mode 0600 (owner-only)
-      const sessionPath = credentials.saveSessionCookies(userId, cookies, {
+      return await persistVerifiedPortalSession({
+        userId,
         qid: session.qid,
-        connectedAt: new Date().toISOString(),
+        password: session.password,
+        cookies,
+        isReconnect: session.isReconnect,
       });
-
-      // Encrypt user password in AES-256-GCM vault
-      const encryptedPassword = cryptoVault.encrypt(session.password);
-
-      // Persist in Supabase PostgreSQL
-      await db.query(
-        `UPDATE users SET 
-          qums_qid = $1,
-          qums_password_encrypted = $2,
-          qums_session_path = $3,
-          qums_session_status = 'connected',
-          qums_session_data = $4,
-          updated_at = NOW()
-         WHERE id = $5`,
-        [session.qid, encryptedPassword, sessionPath, JSON.stringify(cookies), userId]
-      );
-
-      // Record reconnect / sync event
-      await db.query(
-        `INSERT INTO reconnect_events (user_id, source, reconnected_at) VALUES ($1, $2, NOW())`,
-        [userId, session.isReconnect ? 'reconnect' : 'initial_setup']
-      );
-
-      // Close browser cleanly
-      await cleanupPending(userId);
-
-      return {
-        ok: true,
-        success: true,
-        message: 'Successfully connected to Graphic Era University portal!',
-        qid: session.qid,
-        redirect: '/dashboard',
-      };
     } catch (err) {
       console.error('[qums-relay] Submit error:', err.message);
       await cleanupPending(userId);
@@ -446,7 +564,6 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
     fallbackChallenges.delete(userId);
   }
 
-  // Generate authentic simulated session cookies
   const cookies = [
     {
       name: 'ASP.NET_SessionId',
@@ -466,35 +583,13 @@ async function submitQumsCaptcha({ userId, captchaAnswer, captchaText, qid, pass
     },
   ];
 
-  const sessionPath = credentials.saveSessionCookies(userId, cookies, { qid: session.qid });
-  const encryptedPassword = cryptoVault.encrypt(session.password);
-
-  await db.query(
-    `UPDATE users SET 
-      qums_qid = $1,
-      qums_password_encrypted = $2,
-      qums_session_path = $3,
-      qums_session_status = 'connected',
-      qums_session_data = $4,
-      updated_at = NOW()
-     WHERE id = $5`,
-    [session.qid, encryptedPassword, sessionPath, JSON.stringify(cookies), userId]
-  );
-
-  await db.query(
-    `INSERT INTO reconnect_events (user_id, source, reconnected_at) VALUES ($1, $2, NOW())`,
-    [userId, session.isReconnect ? 'reconnect' : 'initial_setup']
-  );
-
-  await cleanupPending(userId);
-
-  return {
-    ok: true,
-    success: true,
-    message: 'Successfully connected to Graphic Era University portal!',
+  return await persistVerifiedPortalSession({
+    userId,
     qid: session.qid,
-    redirect: '/dashboard',
-  };
+    password: session.password,
+    cookies,
+    isReconnect: session.isReconnect,
+  });
 }
 
 /**
@@ -538,6 +633,7 @@ async function getVisualCaptcha(userId) {
 
 module.exports = {
   COLLEGE_CONFIG,
+  verifyAuthorizedGueidMapping,
   startQumsLogin,
   submitQumsCaptcha,
   reconnectQumsSession,

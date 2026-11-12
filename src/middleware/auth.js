@@ -57,7 +57,7 @@ function requireRole(...allowedRoles) {
         return res.redirect('/login');
       }
 
-      const effectiveRole = (user.role === 'admin' || user.is_admin === true || isAdminEmail(user.email))
+      const effectiveRole = (user.role === 'admin' && user.is_admin === true)
         ? 'admin'
         : user.role;
       user.role = effectiveRole;

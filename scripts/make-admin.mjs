@@ -1,35 +1,85 @@
 /**
  * gueattend - Assign Administrator Role
- * 
- * Configures administrator privileges for shavnikumarigue@gmail.com across:
- * 1. Supabase PostgreSQL (gueattend primary source of truth)
- * 2. Firebase Authentication (Custom User Claims: role: 'admin', admin: true)
+ *
+ * Verifies Firebase UID and authorized account mapping for shavnikumarigue@gmail.com,
+ * assigns Supabase Third-Party Auth claim `role: 'authenticated'` (keeping `app_role: 'admin'` separate),
+ * and updates Supabase PostgreSQL without storing any password hash.
  */
 
 import 'dotenv/config';
-import fs from 'fs';
-import path from 'path';
-import bcrypt from 'bcryptjs';
 import pg from 'pg';
-import { initializeApp, applicationDefault, cert, getApps } from 'firebase-admin/app';
+import crypto from 'crypto';
+import { createRequire } from 'module';
 import { getAuth } from 'firebase-admin/auth';
 
-const TARGET_EMAIL = process.argv[2] || 'shavnikumarigue@gmail.com';
+const require = createRequire(import.meta.url);
+const { getFirebaseApp, isAdminEmail } = require('../src/config/firebase');
+const { FIREBASE_PASSWORD_SENTINEL, setAuthenticatedUserClaim } = (() => {
+  const fb = require('../src/config/firebase');
+  const fba = require('../src/firebaseAuth');
+  return { ...fb, ...fba };
+})();
 
-console.log('====================================================');
-console.log(` gueattend - Administrator Role Setup`);
-console.log(` Target Account: ${TARGET_EMAIL}`);
-console.log('====================================================\n');
+function parseCliArgs(argv) {
+  let email = null;
+  let uid = null;
+  for (const arg of argv) {
+    if (arg.startsWith('--uid=')) uid = arg.slice(6).trim();
+    else if (!arg.startsWith('--') && arg.includes('@') && !email) email = arg.trim().toLowerCase();
+  }
+  return { email: email || 'shavnikumarigue@gmail.com', uid };
+}
 
-/**
- * 1. Synchronize Supabase PostgreSQL ERP Database
- */
-async function syncSupabaseAdmin() {
-  console.log('[1/2] Synchronizing Supabase PostgreSQL ERP Database...');
-  
+async function run() {
+  const { email: TARGET_EMAIL, uid: cliUid } = parseCliArgs(process.argv.slice(2));
+
+  console.log('====================================================');
+  console.log(' gueattend - Server-Side Administrator Bootstrap');
+  console.log(` Target Account: ${TARGET_EMAIL}`);
+  console.log('====================================================\n');
+
+  if (!isAdminEmail(TARGET_EMAIL)) {
+    console.error(`✖ Refusing admin bootstrap: ${TARGET_EMAIL} is not listed in authorized ADMIN_EMAILS.`);
+    process.exit(1);
+  }
+
+  let verifiedUid = cliUid || null;
+  const app = getFirebaseApp();
+
+  if (app) {
+    const auth = getAuth(app);
+    try {
+      const fbUser = verifiedUid
+        ? await auth.getUser(verifiedUid)
+        : await auth.getUserByEmail(TARGET_EMAIL);
+
+      if ((fbUser.email || '').trim().toLowerCase() !== TARGET_EMAIL) {
+        throw new Error(`Firebase UID ${fbUser.uid} belongs to ${fbUser.email}, not ${TARGET_EMAIL}.`);
+      }
+
+      verifiedUid = fbUser.uid;
+      if (!fbUser.emailVerified) {
+        await auth.updateUser(verifiedUid, { emailVerified: true });
+      }
+      await setAuthenticatedUserClaim(verifiedUid, 'admin');
+      console.log('✔ Firebase Admin claims synchronized:');
+      console.log(`  - UID:   ${verifiedUid}`);
+      console.log('  - Claim: role=authenticated, app_role=admin, admin=true\n');
+    } catch (error) {
+      console.error(`✖ Firebase verification error: ${error.message}`);
+      if (!verifiedUid) {
+        console.error('  Sign up once via Firebase Authentication or pass --uid=<firebase_uid>.');
+        process.exit(1);
+      }
+    }
+  } else if (!verifiedUid) {
+    console.error('✖ Firebase Admin SDK credentials not configured and no --uid=<firebase_uid> supplied.');
+    process.exit(1);
+  }
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    console.warn('  ⚠️ DATABASE_URL not set in .env. Skipping Supabase DB sync.');
+    console.warn('⚠️ DATABASE_URL not set. Skipped PostgreSQL update.');
     return;
   }
 
@@ -40,164 +90,52 @@ async function syncSupabaseAdmin() {
   });
 
   try {
-    const passwordHash = await bcrypt.hash('Admin@GEU2025!', 10);
-    const query = `
-      INSERT INTO users (
-        id, email, password_hash, role, is_admin, email_verified, full_name, is_active, created_at, updated_at
-      )
-      VALUES (
-        'usr_admin_shavni', LOWER($1), $2, 'admin', TRUE, TRUE, 'Shavni Kumari (Administrator)', TRUE, NOW(), NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        email = LOWER($1),
-        role = 'admin',
-        is_admin = TRUE,
-        email_verified = TRUE,
-        full_name = 'Shavni Kumari (Administrator)',
-        password_hash = $2,
-        updated_at = NOW()
-      RETURNING id, email, role, is_admin, full_name;
-    `;
+    const existing = await pool.query(
+      `SELECT id, firebase_uid FROM users WHERE firebase_uid = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+      [verifiedUid, TARGET_EMAIL]
+    );
 
-    const res = await pool.query(query, [TARGET_EMAIL, passwordHash]);
-    console.log('  ✔ Supabase PostgreSQL record updated successfully:');
-    console.log(`    - User ID:   ${res.rows[0].id}`);
-    console.log(`    - Email:     ${res.rows[0].email}`);
-    console.log(`    - Role:      ${res.rows[0].role}`);
-    console.log(`    - Is Admin:  ${res.rows[0].is_admin}`);
-    console.log(`    - Full Name: ${res.rows[0].full_name}`);
-    console.log(`    - Initial Temporary Password: Admin@GEU2025!\n`);
-  } catch (err) {
-    console.error('  ✖ Supabase sync error:', err.message);
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0];
+      if (row.firebase_uid && row.firebase_uid !== verifiedUid) {
+        throw new Error(`Database record for ${TARGET_EMAIL} is bound to a different Firebase UID.`);
+      }
+      const res = await pool.query(
+        `UPDATE users
+         SET firebase_uid = $1,
+             email = LOWER($2),
+             password_hash = $3,
+             role = 'admin',
+             is_admin = TRUE,
+             email_verified = TRUE,
+             is_active = TRUE,
+             is_suspended = FALSE,
+             full_name = COALESCE(NULLIF(full_name, ''), 'Shavni Kumari (Administrator)'),
+             updated_at = NOW()
+         WHERE id = $4
+         RETURNING id, email, firebase_uid, role, is_admin, full_name`,
+        [verifiedUid, TARGET_EMAIL, FIREBASE_PASSWORD_SENTINEL, row.id]
+      );
+      console.log('✔ Supabase PostgreSQL administrator record updated:', res.rows[0]);
+    } else {
+      const newId = `usr_${crypto.randomUUID()}`;
+      const res = await pool.query(
+        `INSERT INTO users (
+           id, email, password_hash, firebase_uid, role, is_admin, email_verified,
+           full_name, is_active, is_suspended, qums_session_status, created_at, updated_at
+         )
+         VALUES ($1, LOWER($2), $3, $4, 'admin', TRUE, TRUE, 'Shavni Kumari (Administrator)', TRUE, FALSE, 'disconnected', NOW(), NOW())
+         RETURNING id, email, firebase_uid, role, is_admin, full_name`,
+        [newId, TARGET_EMAIL, FIREBASE_PASSWORD_SENTINEL, verifiedUid]
+      );
+      console.log('✔ Supabase PostgreSQL administrator record created:', res.rows[0]);
+    }
   } finally {
     await pool.end();
   }
 }
 
-/**
- * 2. Assign Custom Claims in Firebase Authentication
- */
-async function syncFirebaseAdmin() {
-  console.log('[2/2] Assigning Firebase Auth Custom User Claims...');
-
-  // Candidate paths for service account key
-  const candidateKeyPaths = [
-    process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
-    path.resolve(process.cwd(), 'service-account.json'),
-    path.resolve(process.cwd(), 'firebase-service-account.json'),
-    path.resolve(process.cwd(), 'config', 'firebase-service-account.json'),
-  ].filter(Boolean);
-
-  let credential;
-  let usedPath = null;
-
-  for (const candidate of candidateKeyPaths) {
-    if (fs.existsSync(candidate)) {
-      try {
-        const raw = fs.readFileSync(candidate, 'utf8');
-        const keyData = JSON.parse(raw);
-        credential = cert(keyData);
-        usedPath = candidate;
-        break;
-      } catch (e) {
-        // continue
-      }
-    }
-  }
-
-  if (!credential) {
-    // Fall back to applicationDefault()
-    credential = applicationDefault();
-  }
-
-  let app;
-  if (getApps().length === 0) {
-    try {
-      app = initializeApp({
-        credential,
-        projectId: process.env.FIREBASE_PROJECT_ID || 'gueattend',
-      });
-    } catch (e) {
-      console.warn('  ⚠️ Firebase initializeApp failed:', e.message);
-    }
-  } else {
-    app = getApps()[0];
-  }
-
-  if (!app) {
-    console.warn('  ⚠️ Could not initialize Firebase Admin SDK.');
-    return;
-  }
-
-  const auth = getAuth(app);
-
-  try {
-    const user = await auth.getUserByEmail(TARGET_EMAIL);
-
-    if (!user.emailVerified) {
-      console.warn(`  ⚠️ Warning: Email ${TARGET_EMAIL} is not marked verified in Firebase.`);
-      console.log('     Proceeding to mark email verified and set claims...');
-      await auth.updateUser(user.uid, { emailVerified: true });
-    }
-
-    const existingClaims = user.customClaims || {};
-
-    await auth.setCustomUserClaims(user.uid, {
-      ...existingClaims,
-      role: 'admin',
-      admin: true,
-    });
-
-    console.log('  ✔ Firebase Admin role assigned successfully!');
-    console.log(`    - Email:     ${TARGET_EMAIL}`);
-    console.log(`    - UID:       ${user.uid}`);
-    console.log('    - Claims:   ', { ...existingClaims, role: 'admin', admin: true });
-  } catch (error) {
-    if (error.code === 'auth/user-not-found') {
-      console.log(`  ℹ User ${TARGET_EMAIL} does not exist yet in Firebase Auth.`);
-      console.log('    Creating admin account in Firebase Auth directly...');
-      try {
-        const newUser = await auth.createUser({
-          email: TARGET_EMAIL,
-          emailVerified: true,
-          password: 'Admin@GEU2025!',
-          displayName: 'Shavni Kumari (Administrator)',
-        });
-        await auth.setCustomUserClaims(newUser.uid, {
-          role: 'admin',
-          admin: true,
-        });
-        console.log('  ✔ Created and assigned admin claims in Firebase Auth!');
-        console.log(`    - UID: ${newUser.uid}`);
-      } catch (createErr) {
-        console.error('  ✖ Could not create Firebase Auth user:', createErr.message);
-      }
-    } else {
-      console.error('  ✖ Firebase Admin setup encountered an error:');
-      console.error(`    ${error.message}\n`);
-      if (error.message.includes('metadata.google.internal') || error.message.includes('credential')) {
-        console.log('  -------------------------------------------------------------');
-        console.log('  ℹ ACTION REQUIRED FOR FIREBASE ADMIN SDK CREDENTIAL:');
-        console.log('  To grant Firebase Admin SDK permission to manage auth claims:');
-        console.log('  1. Open Firebase Console:');
-        console.log('     https://console.firebase.google.com/project/gueattend/settings/serviceaccounts/adminsdk');
-        console.log('  2. Click "Generate new private key" to download service account JSON.');
-        console.log('  3. Save it to project root as: service-account.json');
-        console.log('  4. Re-run: npm run make-admin');
-        console.log('  -------------------------------------------------------------\n');
-      }
-    }
-  }
-}
-
-async function run() {
-  await syncSupabaseAdmin();
-  await syncFirebaseAdmin();
-  console.log('====================================================');
-  console.log(' gueattend Admin Role Setup Complete');
-  console.log('====================================================');
-}
-
-run();
-
+run().catch((err) => {
+  console.error('✖ Fatal:', err.message);
+  process.exit(1);
+});

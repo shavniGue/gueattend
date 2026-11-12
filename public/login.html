@@ -71,6 +71,22 @@
         <span id="btnSpinner" style="display: none;">Signing in...</span>
       </button>
 
+      <div style="display:flex; align-items:center; gap:10px; margin:14px 0; color:var(--text-muted); font-size:12px;">
+        <span style="flex:1; height:1px; background:var(--border);"></span>
+        <span>OR</span>
+        <span style="flex:1; height:1px; background:var(--border);"></span>
+      </div>
+
+      <button type="button" id="googleSignInBtn" class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:11px 14px; font-weight:700; font-size:14px; cursor:pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"/>
+          <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"/>
+        </svg>
+        <span id="googleBtnText">Continue with Google</span>
+      </button>
+
       <div class="auth-footer-stack">
         <div>Don't have an account? <a href="/register">Register</a></div>
         <div><a href="/forgot">Forgot Password?</a></div>
@@ -91,6 +107,8 @@
       configured: false,
       signInWithEmailAndPassword: null,
       sendEmailVerification: null,
+      GoogleAuthProvider: null,
+      signInWithPopup: null,
       isReady: false,
     };
 
@@ -108,11 +126,19 @@
             return firebaseState;
           }
           const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-          const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+          const {
+            getAuth,
+            signInWithEmailAndPassword,
+            sendEmailVerification,
+            GoogleAuthProvider,
+            signInWithPopup,
+          } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
           firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
           firebaseState.sendEmailVerification = sendEmailVerification;
+          firebaseState.GoogleAuthProvider = GoogleAuthProvider;
+          firebaseState.signInWithPopup = signInWithPopup;
           firebaseState.isReady = true;
           console.log('[Tier 1] Firebase Web SDK pre-warmed & ready.');
         }
@@ -183,17 +209,16 @@
         }
       }
 
-      // B. Server-Side Token Verification & Legacy Bcrypt Fallback
+      // B. Server-Side Token Verification (never forward Firebase password when idToken is present)
       try {
+        const loginPayload = idToken
+          ? { identifier: rawId, email: isEmail ? rawId : undefined, idToken }
+          : { identifier: rawId, email: isEmail ? rawId : undefined, password: rawPassword };
+
         const resp = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: rawId,
-            email: isEmail ? rawId : undefined,
-            password: rawPassword,
-            idToken: idToken || undefined,
-          }),
+          body: JSON.stringify(loginPayload),
         });
 
         const data = await resp.json();
@@ -222,6 +247,58 @@
         submitBtn.disabled = false;
       }
     });
+
+    // Google Sign-In via Firebase Popup
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    const googleBtnText = document.getElementById('googleBtnText');
+    if (googleSignInBtn) {
+      googleSignInBtn.addEventListener('click', async () => {
+        alertBox.style.display = 'none';
+        verificationBox.style.display = 'none';
+        googleSignInBtn.disabled = true;
+        if (googleBtnText) googleBtnText.textContent = 'Connecting Google...';
+
+        try {
+          const fb = await loadFirebase();
+          if (!fb || !fb.configured || !fb.auth || !fb.signInWithPopup || !fb.GoogleAuthProvider) {
+            alertBox.textContent = 'Google Sign-In requires Firebase Web config (FIREBASE_API_KEY) on the server.';
+            alertBox.style.display = 'block';
+            return;
+          }
+
+          const provider = new fb.GoogleAuthProvider();
+          const credential = await fb.signInWithPopup(fb.auth, provider);
+          const idToken = await refreshFirebaseTokenWithClaims(credential.user);
+
+          const resp = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          });
+          const data = await resp.json();
+
+          if (data.ok || data.success) {
+            if (data.tokenRefreshRequired && credential.user) {
+              await credential.user.getIdToken(true).catch(() => {});
+            }
+            window.location.href = data.redirect || data.redirectUrl || '/dashboard';
+          } else {
+            alertBox.textContent = data.error || 'Could not complete Google Sign-In.';
+            alertBox.style.display = 'block';
+          }
+        } catch (err) {
+          if (err?.code === 'auth/popup-closed-by-user') {
+            alertBox.textContent = 'Google sign-in popup was closed before completing.';
+          } else {
+            alertBox.textContent = err?.message || 'Google Sign-In failed. Please try again.';
+          }
+          alertBox.style.display = 'block';
+        } finally {
+          googleSignInBtn.disabled = false;
+          if (googleBtnText) googleBtnText.textContent = 'Continue with Google';
+        }
+      });
+    }
 
     // Resend verification link
     resendBtn.addEventListener('click', async () => {

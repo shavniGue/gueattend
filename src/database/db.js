@@ -150,6 +150,12 @@ async function getUserByEmail(email) {
   return res.rows[0] || null;
 }
 
+async function getUserByFirebaseUid(firebaseUid) {
+  if (!firebaseUid) return null;
+  const res = await query('SELECT * FROM users WHERE firebase_uid = $1 LIMIT 1', [String(firebaseUid).trim()]);
+  return res.rows[0] || null;
+}
+
 async function getUserById(id) {
   const res = await query('SELECT * FROM users WHERE id = $1', [id]);
   return res.rows[0] || null;
@@ -921,6 +927,7 @@ module.exports = {
   checkDatabaseHealth,
   // Auth & User
   getUserByEmail,
+  getUserByFirebaseUid,
   getUserById,
   createUser,
   updateUserPassword,

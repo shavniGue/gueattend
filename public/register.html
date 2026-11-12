@@ -81,6 +81,22 @@
         <span id="btnSpinner" style="display: none;">Creating Account...</span>
       </button>
 
+      <div style="display:flex; align-items:center; gap:10px; margin:14px 0; color:var(--text-muted); font-size:12px;">
+        <span style="flex:1; height:1px; background:var(--border);"></span>
+        <span>OR</span>
+        <span style="flex:1; height:1px; background:var(--border);"></span>
+      </div>
+
+      <button type="button" id="googleRegisterBtn" class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:11px 14px; font-weight:700; font-size:14px; cursor:pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"/>
+          <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"/>
+        </svg>
+        <span id="googleRegBtnText">Continue with Google</span>
+      </button>
+
       <div class="auth-footer-stack">
         <div>Already have an account? <a href="/login">Login</a></div>
         <div><a href="/">&#8592; Back to Home</a></div>
@@ -223,6 +239,8 @@
 
   <script src="/js/ads.js"></script>
   <script type="module">
+    import { refreshFirebaseTokenWithClaims } from '/js/supabase-firebase.js';
+
     let firebaseState = {
       app: null,
       auth: null,
@@ -231,6 +249,8 @@
       signInWithEmailAndPassword: null,
       sendEmailVerification: null,
       sendPasswordResetEmail: null,
+      GoogleAuthProvider: null,
+      signInWithPopup: null,
       currentUser: null,
       isReady: false,
     };
@@ -253,6 +273,8 @@
             signInWithEmailAndPassword,
             sendEmailVerification,
             sendPasswordResetEmail,
+            GoogleAuthProvider,
+            signInWithPopup,
           } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
           firebaseState.app = initializeApp(config);
           firebaseState.auth = getAuth(firebaseState.app);
@@ -260,6 +282,8 @@
           firebaseState.signInWithEmailAndPassword = signInWithEmailAndPassword;
           firebaseState.sendEmailVerification = sendEmailVerification;
           firebaseState.sendPasswordResetEmail = sendPasswordResetEmail;
+          firebaseState.GoogleAuthProvider = GoogleAuthProvider;
+          firebaseState.signInWithPopup = signInWithPopup;
           firebaseState.isReady = true;
           console.log('[Register] Firebase Web SDK initialized.');
         }
@@ -535,14 +559,13 @@
           }
         }
 
-        // 2. Complete or resume registration in Supabase using verified Firebase ID Token
-        const idToken = await cred.user.getIdToken(true);
+        // 2. Complete or resume registration in Supabase using verified Firebase ID Token (never transmit Firebase password)
+        const idToken = await refreshFirebaseTokenWithClaims(cred.user);
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email,
-            password,
             firebaseUid: cred.user.uid,
             idToken,
           }),
@@ -574,6 +597,59 @@
         submitBtn.disabled = false;
       }
     });
+
+    // Google Sign-In registration/login via Firebase Popup
+    const googleRegisterBtn = document.getElementById('googleRegisterBtn');
+    const googleRegBtnText = document.getElementById('googleRegBtnText');
+    if (googleRegisterBtn) {
+      googleRegisterBtn.addEventListener('click', async () => {
+        alertBox.style.display = 'none';
+        googleRegisterBtn.disabled = true;
+        if (googleRegBtnText) googleRegBtnText.textContent = 'Connecting Google...';
+
+        try {
+          const fb = await initFirebase();
+          if (!fb.configured || !fb.auth || !fb.signInWithPopup || !fb.GoogleAuthProvider) {
+            alertBox.textContent = 'Google Sign-In requires Firebase Web config (FIREBASE_API_KEY) on the server.';
+            alertBox.style.display = 'block';
+            return;
+          }
+
+          const provider = new fb.GoogleAuthProvider();
+          const cred = await fb.signInWithPopup(fb.auth, provider);
+          const idToken = await refreshFirebaseTokenWithClaims(cred.user);
+
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          });
+          const data = await res.json();
+
+          if (data.ok || data.success) {
+            if (data.tokenRefreshRequired && cred?.user) {
+              await cred.user.getIdToken(true).catch(() => {});
+            }
+            window.location.href = data.redirect || data.redirectUrl || '/geu-setup';
+          } else if (data.code === 'FIREBASE_UID_MISMATCH') {
+            showConflictRecoveryCard(cred.user?.email || '');
+          } else {
+            alertBox.textContent = data.error || 'Could not complete Google Sign-In.';
+            alertBox.style.display = 'block';
+          }
+        } catch (err) {
+          if (err?.code === 'auth/popup-closed-by-user') {
+            alertBox.textContent = 'Google sign-in popup was closed before completing.';
+          } else {
+            alertBox.textContent = err?.message || 'Google Sign-In failed. Please try again.';
+          }
+          alertBox.style.display = 'block';
+        } finally {
+          googleRegisterBtn.disabled = false;
+          if (googleRegBtnText) googleRegBtnText.textContent = 'Continue with Google';
+        }
+      });
+    }
   </script>
 </body>
 </html>

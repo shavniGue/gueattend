@@ -46,37 +46,73 @@
     </form>
   </div>
 
-  <script>
+  <script type="module">
     const form = document.getElementById('forgotForm');
     const alertBox = document.getElementById('alertBox');
     const emailInput = document.getElementById('email');
+    const submitBtn = document.getElementById('submitBtn');
+
+    let firebaseResetState = { isReady: false, configured: false, auth: null, sendPasswordResetEmail: null };
+
+    async function loadFirebaseReset() {
+      if (firebaseResetState.isReady) return firebaseResetState;
+      const res = await fetch('/api/auth/firebase-config');
+      if (res.ok) {
+        const config = await res.json();
+        firebaseResetState.configured = Boolean(config.configured && config.apiKey);
+        if (firebaseResetState.configured) {
+          const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+          const { getAuth, sendPasswordResetEmail } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
+          const app = initializeApp(config);
+          firebaseResetState.auth = getAuth(app);
+          firebaseResetState.sendPasswordResetEmail = sendPasswordResetEmail;
+          firebaseResetState.isReady = true;
+        }
+      }
+      return firebaseResetState;
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       alertBox.style.display = 'none';
+      const email = emailInput.value.trim().toLowerCase();
+      if (!email) {
+        alertBox.className = 'alert-box alert-danger';
+        alertBox.textContent = 'Please enter your email address.';
+        alertBox.style.display = 'block';
+        return;
+      }
 
+      submitBtn.disabled = true;
       try {
-        const resp = await fetch('/api/auth/forgot-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailInput.value.trim() }),
-        });
-        const data = await resp.json();
-
-        if (data.success) {
-          alertBox.className = 'alert-box alert-success';
-          alertBox.textContent = data.message || 'Password reset link sent to your registered address.';
+        const fb = await loadFirebaseReset();
+        if (!fb.configured || !fb.auth || !fb.sendPasswordResetEmail) {
+          alertBox.className = 'alert-box alert-danger';
+          alertBox.textContent = 'Firebase Password Reset requires FIREBASE_API_KEY configured on the server.';
           alertBox.style.display = 'block';
+          return;
+        }
+
+        await fb.sendPasswordResetEmail(fb.auth, email);
+        alertBox.className = 'alert-box alert-success';
+        alertBox.textContent = 'If an account exists for this email, Firebase has sent a password reset link to your inbox.';
+        alertBox.style.display = 'block';
+        form.reset();
+      } catch (err) {
+        const code = err?.code || '';
+        if (code === 'auth/user-not-found') {
+          alertBox.className = 'alert-box alert-success';
+          alertBox.textContent = 'If an account exists for this email, Firebase has sent a password reset link to your inbox.';
           form.reset();
         } else {
           alertBox.className = 'alert-box alert-danger';
-          alertBox.textContent = data.error || 'Failed to request reset.';
-          alertBox.style.display = 'block';
+          alertBox.textContent = code === 'auth/invalid-email'
+            ? 'Please enter a valid email address.'
+            : (err?.message || 'Unable to dispatch Firebase password reset email.');
         }
-      } catch (err) {
-        alertBox.className = 'alert-box alert-danger';
-        alertBox.textContent = 'Connection error. Please try again.';
         alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
       }
     });
   </script>

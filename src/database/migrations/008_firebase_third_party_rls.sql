@@ -434,3 +434,4 @@ DROP POLICY IF EXISTS "Users read own reconnect events" ON public.reconnect_even
 CREATE POLICY "Users read own reconnect events"
   ON public.reconnect_events FOR SELECT TO authenticated
   USING (user_id = public.current_app_user_id() OR public.is_admin());
+

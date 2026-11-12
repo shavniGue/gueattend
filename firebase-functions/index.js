@@ -31,3 +31,4 @@ exports.assignAuthenticatedRoleOnSignup = functions.auth.user().onCreate(async (
 
   return { uid: user.uid, role: 'authenticated' };
 });
+
