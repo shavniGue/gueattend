@@ -90,15 +90,15 @@ body {
 }
 
 .dash-navbar .brand-icon {
-  width: 28px;
-  height: 28px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 30px;
+  height: 30px;
+  background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  flex-shrink: 0;
 }
 
 .dash-navbar .brand-title {
@@ -166,15 +166,15 @@ body {
 }
 
 .landing-navbar .brand-icon {
-  width: 28px;
-  height: 28px;
-  background: #2563eb;
+  width: 30px;
+  height: 30px;
+  background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  flex-shrink: 0;
 }
 
 .landing-navbar .brand-title {
@@ -246,13 +246,22 @@ body {
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  border: none;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22);
 }
 
 .brand-title {
@@ -1213,14 +1222,14 @@ body {
 }
 
 .auth-brand-icon {
-  width: 26px;
-  height: 26px;
-  background: #1d4ed8;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  flex-shrink: 0;
 }
 
 .auth-brand-name {
