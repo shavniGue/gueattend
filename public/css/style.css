@@ -207,10 +207,17 @@ body {
 .landing-navbar .nav-link-login {
   color: #ffffff;
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 6px 14px;
-  margin-right: 6px;
+  padding: 7px 16px;
+  margin-right: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.landing-navbar .nav-link-login:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .landing-navbar .btn-register-nav {
@@ -1168,7 +1175,7 @@ body {
 }
 
 /* ====================================================================
-   LOGIN & AUTH PAGES
+   LOGIN & AUTH PAGES (Exact Image 1 Light Clean Spec)
    ==================================================================== */
 
 .login-wrapper {
@@ -1177,52 +1184,83 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  background: radial-gradient(circle at 80% 20%, #1e40af 0%, #0f172a 60%, #0a101d 100%);
-  padding: 28px 16px;
+  gap: 18px;
+  background: #f5f7fb;
+  padding: 32px 16px;
 }
 
 .login-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
-  max-width: 440px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  max-width: 400px;
   width: 100%;
-  padding: 36px 32px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 36px 32px 32px;
+  border: 1px solid #e2e8f0;
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
-.login-header-logo {
-  width: 56px;
-  height: 56px;
-  background: var(--primary-subtle);
-  border: 2px solid var(--primary);
-  color: var(--primary-dark);
-  font-weight: 800;
-  font-size: 20px;
-  border-radius: 14px;
+.auth-brand-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.auth-brand-icon {
+  width: 26px;
+  height: 26px;
+  background: #1d4ed8;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 14px;
+  color: #ffffff;
+}
+
+.auth-brand-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+}
+
+.auth-tagline {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #2563eb;
+  margin-top: 6px;
 }
 
 .login-header h1 {
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #0f172a;
+  margin-top: 18px;
 }
 
 .login-header p {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: #64748b;
   margin-top: 4px;
+}
+
+.login-card .form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #2563eb;
+  margin-bottom: 6px;
 }
 
 .alert-box {
@@ -1239,6 +1277,12 @@ body {
   border: 1px solid #fecaca;
 }
 
+.alert-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid #bbf7d0;
+}
+
 .input-with-icon {
   position: relative;
   display: flex;
@@ -1247,26 +1291,42 @@ body {
 
 .input-with-icon input {
   width: 100%;
-  padding: 11px 40px 11px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
   font-size: 13.5px;
+  color: #0f172a;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input-with-icon input.has-toggle {
+  padding-right: 40px;
 }
 
 .input-with-icon input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-subtle);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .input-icon-btn {
   position: absolute;
-  right: 12px;
+  right: 10px;
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: 16px;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.input-icon-btn:hover {
+  color: #0f172a;
 }
 
 .captcha-box {
@@ -1292,20 +1352,41 @@ body {
 
 .login-btn {
   width: 100%;
-  background: var(--primary);
+  background: #2563eb;
   color: #ffffff;
   border: none;
-  padding: 12px;
-  border-radius: var(--radius-sm);
+  padding: 11px;
+  border-radius: 7px;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 10px;
-  transition: all 0.2s;
+  margin-top: 6px;
+  transition: background 0.15s ease;
 }
 
 .login-btn:hover {
-  background: var(--primary-dark);
+  background: #1d4ed8;
+}
+
+.auth-footer-stack {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #64748b;
+  text-align: center;
+}
+
+.auth-footer-stack a {
+  color: #2563eb;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.auth-footer-stack a:hover {
+  color: #1d4ed8;
 }
 
 .login-footer-links {
@@ -1341,7 +1422,7 @@ body {
 }
 
 .ads-auth-wrap {
-  max-width: 480px;
+  max-width: 400px;
   width: 100%;
 }
 
@@ -1354,8 +1435,8 @@ body {
 }
 
 .ads-auth-wrap .ads-card {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .ads-label {

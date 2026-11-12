@@ -11,21 +11,26 @@
 
   <div class="login-card">
     <div class="login-header">
-      <div class="login-header-logo">
-        <span>GEU</span>
-      </div>
+      <a href="/" class="auth-brand-row">
+        <span class="auth-brand-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </span>
+        <span class="auth-brand-name">gueattend</span>
+      </a>
+      <div class="auth-tagline">TRACK. ALERT. STAY UPDATED.</div>
       <h1>Password Recovery</h1>
-      <p>Enter your university email to reset your account password</p>
+      <p>Enter your university email to reset your password.</p>
     </div>
 
     <div id="alertBox" class="alert-box"></div>
 
     <form id="forgotForm">
       <div class="form-group">
-        <label class="form-label" for="email">University Registered Email</label>
+        <label class="form-label" for="email">Email</label>
         <div class="input-with-icon">
-          <input type="email" id="email" placeholder="student@geu.ac.in" required autofocus>
-          <span class="input-icon-btn">✉️</span>
+          <input type="email" id="email" placeholder="you@example.com" required autofocus>
         </div>
       </div>
 
@@ -33,8 +38,9 @@
         <span>Request Password Reset</span>
       </button>
 
-      <div class="login-footer-links" style="justify-content: center; margin-top: 24px;">
-        <a href="/login">← Return to Login</a>
+      <div class="auth-footer-stack">
+        <div><a href="/login">&#8592; Return to Login</a></div>
+        <div><a href="/">&#8592; Back to Home</a></div>
       </div>
     </form>
   </div>
