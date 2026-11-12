@@ -118,6 +118,31 @@ app.get('/faculty', requireFaculty, sendPage('faculty.html'));
 app.get('/admin', requireAdmin, sendPage('admin.html'));
 
 // ====================================================================
+// ADSENSE CONFIG & ADS.TXT
+// ====================================================================
+app.get('/ads.txt', (req, res) => {
+  const pubId = (process.env.ADSENSE_CLIENT_ID || '').replace(/^ca-/, '').trim();
+  if (pubId) {
+    return res.type('text/plain').send(`google.com, ${pubId}, DIRECT, f08c47fec0942fa0\n`);
+  }
+  return res.type('text/plain').send('# Set ADSENSE_CLIENT_ID (ca-pub-...) in environment variables to publish ads.txt\n');
+});
+
+app.get('/api/ads/config', (req, res) => {
+  const disabled = ['false', 'off', '0'].includes(String(process.env.ADS_ENABLED || 'true').toLowerCase());
+  res.json({
+    enabled: !disabled,
+    clientId: (process.env.ADSENSE_CLIENT_ID || '').trim(),
+    slots: {
+      landing: (process.env.ADSENSE_SLOT_LANDING || '').trim(),
+      dashboard: (process.env.ADSENSE_SLOT_DASHBOARD || '').trim(),
+      guide: (process.env.ADSENSE_SLOT_GUIDE || '').trim(),
+      auth: (process.env.ADSENSE_SLOT_AUTH || '').trim(),
+    },
+  });
+});
+
+// ====================================================================
 // REST API ROUTES
 // ====================================================================
 app.post('/api/login', authRoutes.handleUserLogin);

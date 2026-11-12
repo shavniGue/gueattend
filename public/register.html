@@ -25,17 +25,9 @@
     <!-- State 1: Registration Form -->
     <form id="registerForm" autocomplete="on">
       <div class="form-group">
-        <label class="form-label" for="regFullName">Full Name</label>
-        <div class="input-with-icon">
-          <input type="text" id="regFullName" placeholder="e.g. Karan Kumar" required autofocus>
-          <span class="input-icon-btn">👤</span>
-        </div>
-      </div>
-
-      <div class="form-group">
         <label class="form-label" for="regEmail">University Email Address</label>
         <div class="input-with-icon">
-          <input type="email" id="regEmail" placeholder="e.g. student@geu.ac.in" required>
+          <input type="email" id="regEmail" placeholder="e.g. student@geu.ac.in" required autofocus>
           <span class="input-icon-btn">📧</span>
         </div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">A verification link will be sent to this email.</div>
@@ -100,6 +92,15 @@
 
   </div>
 
+  <!-- Advertisement / Sponsored Section -->
+  <section class="ads-auth-wrap" data-ad-placement="auth" aria-label="Advertisement">
+    <div class="ads-card">
+      <div class="ads-label">ADVERTISEMENT</div>
+      <div class="ads-slot-body"></div>
+    </div>
+  </section>
+
+  <script src="/js/ads.js"></script>
   <script type="module">
     let firebaseState = {
       app: null,
@@ -137,7 +138,6 @@
 
     // UI elements
     const form = document.getElementById('registerForm');
-    const fullNameInput = document.getElementById('regFullName');
     const emailInput = document.getElementById('regEmail');
     const passwordInput = document.getElementById('regPassword');
     const confirmPasswordInput = document.getElementById('regConfirmPassword');
@@ -161,7 +161,6 @@
       e.preventDefault();
       alertBox.style.display = 'none';
 
-      const fullName = fullNameInput.value.trim();
       const email = emailInput.value.trim().toLowerCase();
       const password = passwordInput.value;
       const confirmPassword = confirmPasswordInput.value;
@@ -208,7 +207,6 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fullName,
             email,
             password,
             firebaseUid,

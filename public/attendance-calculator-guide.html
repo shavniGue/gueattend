@@ -219,26 +219,18 @@
       </div>
     </div>
 
+    <!-- Advertisement Section -->
+    <section class="ads-dash-wrap" data-ad-placement="guide" aria-label="Advertisement">
+      <div class="ads-card">
+        <div class="ads-label">ADVERTISEMENT</div>
+        <div class="ads-slot-body"></div>
+      </div>
+    </section>
+
   </main>
 
+  <script src="/js/ads.js"></script>
   <script>
-    // Theme Switcher Logic
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const themes = ['emerald', 'indigo', 'cyan'];
-    let currentThemeIdx = 0;
-    const savedTheme = localStorage.getItem('gueattend_theme') || 'emerald';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    currentThemeIdx = themes.indexOf(savedTheme) >= 0 ? themes.indexOf(savedTheme) : 0;
-
-    if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', () => {
-        currentThemeIdx = (currentThemeIdx + 1) % themes.length;
-        const nextTheme = themes[currentThemeIdx];
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('gueattend_theme', nextTheme);
-      });
-    }
-
     // Live Calculator Logic
     function recalculate() {
       const A = Math.max(0, parseInt(document.getElementById('calcAttended').value) || 0);
