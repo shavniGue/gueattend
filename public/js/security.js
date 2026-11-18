@@ -62,3 +62,4 @@
     return origFetch(input, init);
   };
 })();
+

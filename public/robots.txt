@@ -12,3 +12,4 @@ Disallow: /telegram-setup
 Disallow: /api/
 
 Sitemap: https://gueattend.onrender.com/sitemap.xml
+

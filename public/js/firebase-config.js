@@ -5,6 +5,7 @@
  */
 
 export const firebaseConfig = {
+  apiKey: "AIzaSyAInddZsCOQ4QRlGH9jEkRUwAh5ZFEGQTI",
   authDomain: "gueattend.firebaseapp.com",
   projectId: "gueattend",
   storageBucket: "gueattend.firebasestorage.app",
