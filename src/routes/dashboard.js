@@ -64,7 +64,7 @@ router.get('/student', requireAuth, async (req, res) => {
         },
         student: {
           userId: req.session.userId,
-          name: userRow?.full_name || userRow?.student_name || 'Student',
+          name: userRow?.student_name || userRow?.full_name || 'Student',
           email: userRow?.email || '',
           studentId: userRow?.qums_qid || '',
         },
@@ -125,9 +125,23 @@ router.get('/student', requireAuth, async (req, res) => {
 
     // 4. Today's Attendance & 5. Summary & 6. Month Register
     const todayAttendance = isPortalConnected ? await db.getTodayAttendance(student.id, todayStr) : [];
-    const attendanceSummary = isPortalConnected
+    let attendanceSummary = isPortalConnected
       ? await db.getAttendanceSummary(student.id)
       : { overallPercentage: null, below75Count: 0, totalSubjects: 0, okCount: 0, subjects: [] };
+
+    // If portal is connected but database summary is empty, invoke live Graphic Era scraper
+    if (isPortalConnected && (!attendanceSummary.subjects || attendanceSummary.subjects.length === 0)) {
+      try {
+        const scraper = require('../scraper');
+        const scraped = await scraper.scrapeSubjectWiseAttendance(req.session.userId);
+        if (scraped && scraped.subjects && scraped.subjects.length > 0) {
+          attendanceSummary = scraped;
+        }
+      } catch (err) {
+        console.warn('[dashboard] Scraper invocation note:', err.message);
+      }
+    }
+
     const monthlyAttendance = isPortalConnected
       ? await db.getMonthlyAttendance(student.id, currentMonth, currentYear)
       : [];

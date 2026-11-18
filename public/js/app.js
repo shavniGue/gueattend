@@ -77,11 +77,26 @@ async function loadDashboardData() {
     const summary = data.widgets?.attendanceSummary || {};
     const subjects = summary.subjects || [];
 
-    const fullNameUpper = (currentStudent.name || currentUser.fullName || 'STUDENT').toUpperCase();
+    function formatStudentGreetingName(rawName) {
+      if (!rawName) return 'Student';
+      const clean = String(rawName).trim();
+      if (clean.includes('@')) {
+        return clean.split('@')[0].replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+      return clean
+        .toLowerCase()
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+
+    const rawStudentName = currentStudent.studentName || currentStudent.name || currentUser.studentName || currentUser.fullName || '';
+    const displayStudentName = formatStudentGreetingName(rawStudentName);
+
     const navName = document.getElementById('navUserNameDisplay');
-    if (navName) navName.textContent = fullNameUpper;
+    if (navName) navName.textContent = displayStudentName.toUpperCase();
     const greeting = document.getElementById('greetingUser');
-    if (greeting) greeting.textContent = `Hello, ${fullNameUpper} 👋`;
+    if (greeting) greeting.textContent = `Hello, ${displayStudentName} 👋`;
 
     const qidEl = document.getElementById('modalStudentQid');
     if (qidEl) qidEl.textContent = currentStudent.studentId || '';

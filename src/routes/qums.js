@@ -209,6 +209,7 @@ router.get('/status', requireAuth, async (req, res) => {
       success: true,
       sessionState,
       studentQid: user?.qums_qid || '',
+      studentName: user?.student_name || user?.full_name || student?.name || '',
       status: sessionState === 'connected' ? 'active' : sessionState,
       hasVaultedPassword: Boolean(user && user.qums_password_encrypted),
       lastSynced: user?.updated_at || new Date().toISOString(),

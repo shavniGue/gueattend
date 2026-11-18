@@ -1,7 +1,7 @@
 /**
  * gueattend - Server-Side Administrator Bootstrap
  *
- * Configures administrator privileges for shavnikumarigue@gmail.com across:
+ * Configures administrator privileges for authorized administrator account across:
  * 1. Firebase Authentication (verifies Firebase UID + sets role='authenticated', app_role='admin', admin=true)
  * 2. Supabase PostgreSQL (stores Firebase UID mapping + role='admin', is_admin=TRUE; NEVER stores passwords)
  * 3. Audit Logs (ADMIN_BOOTSTRAPPED)
@@ -20,6 +20,14 @@ const {
   ensureFirebaseAuthenticatedClaim,
 } = require('../src/firebaseAuth');
 
+function getDefaultAdminEmail() {
+  const list = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list[0] || '';
+}
+
 function parseArgs(argv) {
   let email = null;
   let uid = null;
@@ -33,12 +41,12 @@ function parseArgs(argv) {
     }
   }
   return {
-    email: email || 'shavnikumarigue@gmail.com',
+    email: email || getDefaultAdminEmail(),
     uid,
   };
 }
 
-async function bootstrapAdmin({ email = 'shavnikumarigue@gmail.com', uid = null } = {}) {
+async function bootstrapAdmin({ email = getDefaultAdminEmail(), uid = null } = {}) {
   const cleanEmail = String(email).trim().toLowerCase();
   if (!isAdminEmail(cleanEmail)) {
     throw new Error(`Email "${cleanEmail}" is not in authorized ADMIN_EMAILS.`);

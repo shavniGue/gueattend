@@ -1,7 +1,7 @@
 /**
  * gueattend - Assign Administrator Role
  *
- * Verifies Firebase UID and authorized account mapping for shavnikumarigue@gmail.com,
+ * Verifies Firebase UID and authorized account mapping for administrator account,
  * assigns Supabase Third-Party Auth claim `role: 'authenticated'` (keeping `app_role: 'admin'` separate),
  * and updates Supabase PostgreSQL without storing any password hash.
  */
@@ -17,6 +17,14 @@ const { getFirebaseApp, isAdminEmail, setAuthenticatedUserClaim } = require('../
 const { FIREBASE_PASSWORD_SENTINEL } = require('../src/firebaseAuth');
 const { assertDatabaseIsolation, resolvePgSslConfig } = require('../src/database/identity');
 
+function getDefaultAdminEmail() {
+  const list = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list[0] || '';
+}
+
 function parseCliArgs(argv) {
   let email = null;
   let uid = null;
@@ -24,7 +32,7 @@ function parseCliArgs(argv) {
     if (arg.startsWith('--uid=')) uid = arg.slice(6).trim();
     else if (!arg.startsWith('--') && arg.includes('@') && !email) email = arg.trim().toLowerCase();
   }
-  return { email: email || 'shavnikumarigue@gmail.com', uid };
+  return { email: email || getDefaultAdminEmail(), uid };
 }
 
 async function run() {

@@ -147,33 +147,48 @@ async function establishSessionFromIdToken(req, res, idToken) {
     }
   }
 
+  const isConfiguredAdmin = isAdminEmail(email);
+
   if (!user) {
-    // Public signup (Email or Google): ALWAYS student role; NEVER grant admin via public signup
     const fullName = decodedToken.name || email.split('@')[0];
     const newUserId = `usr_${crypto.randomUUID()}`;
     const isVerifiedInitial = Boolean(decodedToken.email_verified);
+    const initialRole = isConfiguredAdmin ? 'admin' : 'student';
+    const initialIsAdmin = Boolean(isConfiguredAdmin);
 
     const newUserRes = await db.query(
       `INSERT INTO users (
          id, email, full_name, password_hash, firebase_uid, role, is_admin,
          email_verified, is_active, is_suspended, qums_session_status, created_at, updated_at
        )
-       VALUES ($1, $2, $3, $4, $5, 'student', FALSE, $6, TRUE, FALSE, 'disconnected', NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, FALSE, 'disconnected', NOW(), NOW())
        RETURNING *`,
-      [newUserId, email, fullName, FIREBASE_PASSWORD_SENTINEL, decodedToken.uid, isVerifiedInitial]
+      [newUserId, email, fullName, FIREBASE_PASSWORD_SENTINEL, decodedToken.uid, initialRole, initialIsAdmin, isVerifiedInitial]
     );
     user = newUserRes.rows[0];
 
-    await db.ensureStudentProfile(user.id, email).catch(() => {});
+    if (user.role === 'student') {
+      await db.ensureStudentProfile(user.id, email).catch(() => {});
+    }
     await db.recordAuditLog({
       userId: user.id,
-      action: 'USER_REGISTERED',
+      action: isConfiguredAdmin ? 'ADMIN_REGISTERED' : 'USER_REGISTERED',
       resource: 'auth:firebase-signup',
       details: { email, firebaseUid: decodedToken.uid, provider: decodedToken.firebase?.sign_in_provider || 'firebase' },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     }).catch(() => {});
   } else {
+    // If user is listed in ADMIN_EMAILS, auto-promote to admin role
+    if (isConfiguredAdmin && (!user.is_admin || user.role !== 'admin')) {
+      await db.query(
+        `UPDATE users SET role = 'admin', is_admin = TRUE, updated_at = NOW() WHERE id = $1`,
+        [user.id]
+      ).catch(() => {});
+      user.role = 'admin';
+      user.is_admin = true;
+    }
+
     const isVerifiedNow = Boolean(decodedToken.email_verified) || Boolean(user.email_verified);
     if (isVerifiedNow !== Boolean(user.email_verified)) {
       await db.query(

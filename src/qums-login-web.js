@@ -229,6 +229,14 @@ async function persistVerifiedPortalSession({ userId, qid, password, cookies, is
     details: { gueid: cleanQid, isReconnect: Boolean(isReconnect) },
   }).catch(() => {});
 
+  // Trigger initial attendance & student name sync asynchronously
+  try {
+    const scraper = require('./scraper');
+    scraper.scrapeSubjectWiseAttendance(userId).catch((err) => {
+      console.warn('[qums-relay] Initial attendance sync note:', err.message);
+    });
+  } catch (err) {}
+
   await cleanupPending(userId);
 
   return {

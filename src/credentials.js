@@ -21,9 +21,11 @@ function getSessionFilePath(userId) {
  */
 function saveSessionCookies(userId, cookies, metadata = {}) {
   const filePath = getSessionFilePath(userId);
+  const cookieList = Array.isArray(cookies) ? cookies : (cookies?.cookies || []);
   const data = {
+    cookies: cookieList,
+    origins: [],
     userId,
-    cookies,
     metadata,
     updatedAt: new Date().toISOString(),
   };
@@ -51,7 +53,8 @@ function loadSessionCookies(userId) {
   }
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return parsed.cookies || parsed;
   } catch (err) {
     console.error(`[credentials] Failed to read session for ${userId}:`, err.message);
     return null;
