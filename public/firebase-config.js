@@ -1,16 +1,12 @@
-// Single canonical Firebase Web SDK configuration for QAttend
-// Note: The Firebase Browser API key is a public client identifier, restricted
-// in Google Cloud Console to authorized web domains:
-// - https://qattend.onrender.com
-// - https://qums-forgot-password-test.firebaseapp.com
+// Single canonical Firebase Web SDK configuration for GUEAttend
 export const firebaseConfig = {
-  apiKey: "AIzaSyBdSmUAtwvEkeHOPRF-mSFpYJOPruVVPtU",
-  authDomain: "qums-forgot-password-test.firebaseapp.com",
-  projectId: "qums-forgot-password-test",
-  storageBucket: "qums-forgot-password-test.firebasestorage.app",
-  messagingSenderId: "823963861077",
-  appId: "1:823963861077:web:2e9d124cb105b7dda114dc",
-  measurementId: "G-17L8V2XLE7"
+  apiKey: "AIzaSyAInddZsCOQ4QRlGH9jEkRUwAh5ZFEGQTI",
+  authDomain: "gueattend.firebaseapp.com",
+  projectId: "gueattend",
+  storageBucket: "gueattend.firebasestorage.app",
+  messagingSenderId: "366802350784",
+  appId: "1:366802350784:web:d1222169119b1f56967325",
+  measurementId: "G-EFR2J8WCH0"
 };
 
 export default firebaseConfig;

@@ -31,7 +31,9 @@ const {
 } = require('./login');
 
 const LOGIN_URL =
-  process.env.QUMS_LOGIN_URL || 'https://qums.quantumuniversity.edu.in/';
+  process.env.GEU_LOGIN_URL ||
+  process.env.QUMS_LOGIN_URL ||
+  'https://student.geu.ac.in/N0j5Ha0';
 const PENDING_TTL_MS = 3 * 60 * 1000; // 3 min to solve the captcha
 const MAX_CONCURRENT_PENDING = parseInt(process.env.MAX_CONCURRENT_PENDING, 10) || 15; // Allow multiple concurrent users
 const MAX_CONCURRENT_LAUNCHES = parseInt(process.env.MAX_CONCURRENT_LAUNCHES, 10) || 6;
@@ -118,36 +120,35 @@ const LOGIN_FORM_WAIT_MS = 20000; // form may render late / inside an iframe
 async function gotoLoginPage(page) {
   try {
     await page.goto(LOGIN_URL, {
-      waitUntil: 'commit', // resolve at response start — don't wait for full DOM
+      waitUntil: 'domcontentloaded',
       timeout: LOGIN_NAV_TIMEOUT_MS,
     });
   } catch (err) {
     const e = new Error(
-      `QUMS portal tak navigation fail hua (${String(err.message || '').split('\n')[0]}).`
+      `GEU portal navigation failed (${String(err.message || '').split('\n')[0]}).`
     );
     e.name = 'ScrapeError'; // server maps this to HTTP 502 + shows the hint
     e.hint = 'Portal down hai ya network se reachable nahi — thodi der baad retry karo.';
     throw e;
   }
 
-  // Bounded poll: findLoginForm needs text+password inputs in SOME frame
-  // (the portal may render the form inside an iframe that loads a bit later).
+  // Bounded poll: findLoginForm needs UserID+password inputs in SOME frame
   const deadline = Date.now() + LOGIN_FORM_WAIT_MS;
   while (Date.now() < deadline) {
     const frame = await findLoginForm(page);
     try {
-      const [textCount, passCount] = await Promise.all([
-        frame.locator('input[type="text"]').count(),
-        frame.locator('input[type="password"]').count(),
+      const [userCount, passCount] = await Promise.all([
+        frame.locator('input[formcontrolname="UserID" i], input[type="text"], input[placeholder*="User ID" i]').count(),
+        frame.locator('input[formcontrolname="Password" i], input[type="password"]').count(),
       ]);
-      if (textCount > 0 && passCount > 0) return frame;
+      if (userCount > 0 && passCount > 0) return frame;
     } catch {
       /* frame detached mid-check — retry */
     }
     await page.waitForTimeout(500);
   }
 
-  const e = new Error('QUMS login form load nahi hua (page khula par form nahi mila).');
+  const e = new Error('GEU ERP login form load nahi hua (page khula par form nahi mila).');
   e.name = 'ScrapeError';
   e.hint = 'Portal slow hai ya markup badal gaya hai — thodi der baad retry karo.';
   throw e;

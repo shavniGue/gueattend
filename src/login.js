@@ -28,11 +28,11 @@ function isLoginLikeUrl(urlString) {
 async function findLoginForm(page) {
   for (const frame of page.frames()) {
     try {
-      const [textCount, passCount] = await Promise.all([
-        frame.locator('input[type="text"]').count(),
-        frame.locator('input[type="password"]').count(),
+      const [userCount, passCount] = await Promise.all([
+        frame.locator('input[formcontrolname="UserID" i], input[type="text"], input[placeholder*="User ID" i]').count(),
+        frame.locator('input[formcontrolname="Password" i], input[type="password"]').count(),
       ]);
-      if (textCount > 0 && passCount > 0) return frame;
+      if (userCount > 0 && passCount > 0) return frame;
     } catch {
       /* frame detached mid-check — skip */
     }
@@ -41,71 +41,86 @@ async function findLoginForm(page) {
 }
 
 /**
- * Fill QID + password, leaving the captcha input untouched for the user.
- * The QID field is picked by name/id/placeholder hints when possible,
- * otherwise it falls back to the first visible text input (known QUMS layout:
- * QID text input, then password, then captcha text input).
+ * Fill User ID + password, leaving the captcha input untouched for the user.
+ * The User ID field is picked by formcontrolname/name/id/placeholder hints,
+ * skipping hidden honeypot fields.
  * NOTE: no credential value is ever printed to the console.
  */
 async function autofillCredentials(frame, qid, password) {
-  const textInputs = frame.locator('input[type="text"]');
-  const textCount = await textInputs.count();
-  if (textCount === 0) {
-    throw new Error('No text inputs found on the login form — portal markup may have changed.');
-  }
-
   let qidInput = null;
-  const fastQid = frame.locator('input#UserName, input[name="UserName" i]');
+  const fastQid = frame.locator('input[formcontrolname="UserID" i], input#UserName, input[name="UserName" i], input[placeholder*="User ID" i]');
   if ((await fastQid.count().catch(() => 0)) > 0) {
     qidInput = fastQid.first();
   }
+
   if (!qidInput) {
+    const textInputs = frame.locator('input[type="text"], input:not([type])');
+    const textCount = await textInputs.count();
     for (let i = 0; i < textCount; i++) {
-    const el = textInputs.nth(i);
-    const attrs = [
-      await el.getAttribute('name'),
-      await el.getAttribute('id'),
-      await el.getAttribute('placeholder'),
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    if (/qid|user|loginid|login_id|regd|roll|empid/.test(attrs)) {
-      qidInput = el;
-      break;
+      const el = textInputs.nth(i);
+      const isVisible = await el.isVisible().catch(() => false);
+      if (!isVisible) continue;
+      const attrs = [
+        await el.getAttribute('name'),
+        await el.getAttribute('id'),
+        await el.getAttribute('placeholder'),
+        await el.getAttribute('formcontrolname'),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (/website|honeypot/.test(attrs)) continue;
+      if (/qid|user|loginid|login_id|regd|roll|empid/.test(attrs)) {
+        qidInput = el;
+        break;
+      }
     }
+    if (!qidInput && textCount > 0) {
+      for (let i = 0; i < textCount; i++) {
+        const el = textInputs.nth(i);
+        if (await el.isVisible().catch(() => false)) {
+          const fc = (await el.getAttribute('formcontrolname') || '').toLowerCase();
+          if (fc !== 'website') {
+            qidInput = el;
+            break;
+          }
+        }
+      }
     }
   }
-  if (!qidInput) qidInput = textInputs.first();
 
-  const passwordInput = frame.locator('input[type="password"]').first();
+  if (!qidInput) {
+    throw new Error('No User ID input found on the login form — portal markup may have changed.');
+  }
+
+  const passwordInput = frame.locator('input[formcontrolname="Password" i], input[type="password"]').first();
 
   await qidInput.waitFor({ state: 'visible', timeout: 15000 });
   await qidInput.fill(qid);
   await passwordInput.fill(password);
 
-  console.log('[+] QID + password auto-filled. Captcha field left empty for you.');
-  console.log('    (Agar QID kisi galat box me gaya ho to window me khud theek kar lena.)');
+  console.log('[+] User ID + password auto-filled. Captcha field left empty for you.');
 }
 
 /**
- * Locate the captcha text input: prefer name/id/placeholder matching /captcha/i,
- * else fall back to the LAST text input in the frame (known QUMS layout puts it
- * after the password field).
+ * Locate the captcha text input: prefer formcontrolname/name/id/placeholder matching /captcha/i.
  */
 async function locateCaptchaInput(frame) {
-  const fastCaptcha = frame.locator('input#captcha, input[name="captcha" i], input.captcha');
+  const fastCaptcha = frame.locator('input[formcontrolname="CaptchaText" i], input#captcha, input[name="captcha" i], input[placeholder*="text shown above" i], input.captcha');
   if ((await fastCaptcha.count().catch(() => 0)) > 0) {
     return fastCaptcha.first();
   }
-  const textInputs = frame.locator('input[type="text"]');
+  const textInputs = frame.locator('input[type="text"], input:not([type])');
   const count = await textInputs.count();
   for (let i = 0; i < count; i++) {
     const el = textInputs.nth(i);
+    const isVis = await el.isVisible().catch(() => false);
+    if (!isVis) continue;
     const attrs = [
       await el.getAttribute('name'),
       await el.getAttribute('id'),
       await el.getAttribute('placeholder'),
+      await el.getAttribute('formcontrolname'),
     ]
       .filter(Boolean)
       .join(' ')
@@ -121,10 +136,10 @@ async function locateCaptchaInput(frame) {
  */
 async function clickLoginButton(frame) {
   const candidates = [
-    frame.locator('button.btnSubmit').first(),
     frame.locator('button[type="submit"]').first(),
-    frame.locator('input[type="submit"]').first(),
     frame.getByRole('button', { name: /login|sign in/i }).first(),
+    frame.locator('button.btnSubmit').first(),
+    frame.locator('input[type="submit"]').first(),
     frame.locator('a', { hasText: /login|sign in/i }).first(),
   ];
   for (const c of candidates) {
@@ -142,17 +157,16 @@ async function clickLoginButton(frame) {
 
 /**
  * Screenshot the captcha image element -> base64 data URL (web login flow me
- * user ko dikhane ke liye). Detection: img with captcha-ish src/id/alt/name,
- * else the last <img> inside the form.
+ * user ko dikhane ke liye).
  */
 async function captureCaptchaImage(page, frame) {
+  await frame.waitForSelector('img[alt*="CAPTCHA" i], img[src^="data:image"], img#imgPhoto, img[src*="captcha" i]', { timeout: 15000 }).catch(() => {});
   const imgs = frame.locator('img');
   const n = await imgs.count();
   if (n === 0) throw new Error('No <img> found for the captcha on the login form.');
 
   let chosen = null;
-  // Fast path: QUMS portal uses img#imgPhoto
-  const fastImg = frame.locator('img#imgPhoto, img[src*="captcha" i], img[id*="captcha" i]');
+  const fastImg = frame.locator('img[alt*="CAPTCHA" i], img[src^="data:image/"], img#imgPhoto, img[src*="captcha" i], img[id*="captcha" i]');
   const fastCount = await fastImg.count().catch(() => 0);
   if (fastCount > 0) {
     chosen = fastImg.first();

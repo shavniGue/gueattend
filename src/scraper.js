@@ -7,12 +7,19 @@ const { request: playwrightRequest, chromium } = require('playwright');
 
 const SESSION_FILE = path.join(__dirname, '..', 'session_state.json');
 const DASHBOARD_URL =
+  process.env.GEU_DASHBOARD_URL ||
   process.env.QUMS_DASHBOARD_URL ||
-  'https://qums.quantumuniversity.edu.in/Web_StudentAcademic/Cyborg_S_Dashboard';
+  'https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6';
 const TIMETABLE_URL =
+  process.env.GEU_TIMETABLE_URL ||
   process.env.QUMS_TIMETABLE_URL ||
-  'https://qums.quantumuniversity.edu.in/Web_StudentAcademic/Cyborg_StudentTimeTable?id=Time%20Table';
+  'https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAt3MCzUmDOUv7';
 const ATTENDANCE_API = '/Web_StudentAcademic/GetYearSemWiseAttendance';
+const GEU_ATTENDANCE_API = '/api/Student/StudentAttendanceAcademic_Fill';
+const GEU_TODAY_API = '/api/Student/Dashboard_GetTodayAttendance';
+const GEU_TIMETABLE_API = '/api/Student/StudentTimeTable_Fill';
+const GEU_MONTH_API = '/api/Student/Dashboard_GetMonthRegister';
+const GEU_PROFILE_API = '/api/Student/Dashboard_GetProfile';
 // QUMS student-detail API (live-probed): POST { RegID } ->
 // { state: "[{ RegID, StudentID, EnrollmentNo, StudentName, ... }]" }
 const STUDENT_DETAIL_API = '/Web_StudentAcademic/GetStudentDetailOnRegID';
@@ -24,8 +31,9 @@ const STUDENT_DETAIL_API = '/Web_StudentAcademic/GetStudentDetailOnRegID';
 //          state2: "[...study-material/assignment-detail rows: AssignmentDetailID,
 //                   Subject (title), ASSIGNMENTSUBJECT, CLASSSUBJECT, EMPLOYEENAME...]" }
 const ASSIGNMENT_PAGE_URL =
+  process.env.GEU_ASSIGNMENT_URL ||
   process.env.QUMS_ASSIGNMENT_URL ||
-  'https://qums.quantumuniversity.edu.in/Web_StudentAcademic/Cyborg_StudentAssignment?id=Assignment';
+  'https://student.geu.ac.in/dashboard/cyborg-studentassignment';
 const ASSIGNMENT_API = '/Web_StudentAcademic/GetStudentAssignment';
 
 class ScrapeError extends Error {
@@ -37,20 +45,20 @@ class ScrapeError extends Error {
 }
 class SessionExpiredError extends Error {
   constructor() {
-    super('QUMS session expired — the portal returned the login page.');
+    super('GEU ERP session expired — the portal returned the login page.');
     this.name = 'SessionExpiredError';
-    this.hint = 'Dashboard → QUMS Setup → "Reconnect QUMS" — you only need to solve the captcha.';
+    this.hint = 'Dashboard → GEU Setup → "Reconnect GEU ERP" — you only need to solve the captcha.';
   }
 }
 /**
- * QUMS could not be reached (DNS/socket/timeout/5xx/portal maintenance).
+ * GEU ERP could not be reached (DNS/socket/timeout/5xx/portal maintenance).
  * IMPORTANT: this is NOT a session expiry. Watchers must not mark the session
  * expired or spam the user with a reconnect alert for a temporary outage —
  * they retry on the next cycle instead.
  */
 class QumsUnreachableError extends Error {
   constructor(message, cause) {
-    super(message || 'QUMS portal is unreachable right now.');
+    super(message || 'GEU ERP portal is unreachable right now.');
     this.name = 'QumsUnreachableError';
     this.cause = cause || null;
     this.hint = 'Portal down ya network issue — thodi der baad agla cycle retry karega.';
@@ -58,9 +66,9 @@ class QumsUnreachableError extends Error {
 }
 class NoSessionError extends Error {
   constructor() {
-    super('No saved QUMS session found (session_state.json missing).');
+    super('No saved GEU ERP session found (session_state.json missing).');
     this.name = 'NoSessionError';
-    this.hint = 'Dashboard → QUMS Setup → run the one-time QID/password + captcha login.';
+    this.hint = 'Dashboard → GEU Setup → run the one-time GEU ID/password + captcha login.';
   }
 }
 
@@ -334,15 +342,29 @@ function mapAttendanceRow(raw) {
 /** Shared API context: session cookies + AJAX-ish headers, no browser needed. */
 async function newApiContext(sessionPath = SESSION_FILE) {
   try {
+    const extraHTTPHeaders = {
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: DASHBOARD_URL,
+    };
+    try {
+      if (fs.existsSync(sessionPath)) {
+        const raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
+        const cookies = Array.isArray(raw.cookies) ? raw.cookies : [];
+        const xsrf = cookies.find((c) => c && (c.name === 'XSRF-TOKEN' || c.name === 'cyborg.xsrf.v1'));
+        if (xsrf && xsrf.value) {
+          extraHTTPHeaders['X-XSRF-TOKEN'] = xsrf.value;
+        }
+      }
+    } catch {}
     return await playwrightRequest.newContext({
       storageState: sessionPath,
       baseURL: new URL(DASHBOARD_URL).origin,
-      extraHTTPHeaders: { 'X-Requested-With': 'XMLHttpRequest', Referer: DASHBOARD_URL },
+      extraHTTPHeaders,
     });
   } catch (err) {
     // Corrupt/unreadable session file or a network-level context failure is NOT
     // proof that the authenticated session expired.
-    throw new QumsUnreachableError(`QUMS request context failed: ${err.message}`, err);
+    throw new QumsUnreachableError(`GEU request context failed: ${err.message}`, err);
   }
 }
 

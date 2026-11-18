@@ -34,7 +34,7 @@ if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
   TEST_CERT = certMatch ? certMatch[0] : '';
 }
 const TEST_KID = 'test-kid-1';
-const PROJECT_ID = 'qums-forgot-password-test';
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'gueattend';
 
 let failures = 0;
 function check(label, actual, expected) {

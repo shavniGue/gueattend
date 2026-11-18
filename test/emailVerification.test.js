@@ -35,7 +35,7 @@ const TEST_CERT_PATH = path.join(__dirname, 'fixtures', 'firebase-test-cert.pem'
 const TEST_PRIVATE_KEY = fs.readFileSync(TEST_KEY_PATH, 'utf8');
 const TEST_CERT = fs.readFileSync(TEST_CERT_PATH, 'utf8');
 const TEST_KID = 'test-kid-1';
-const PROJECT_ID = 'qums-forgot-password-test';
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'gueattend';
 
 const firebaseAuth = require('../src/firebaseAuth');
 const db = require('../src/db');

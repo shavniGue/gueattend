@@ -28,13 +28,13 @@ const TelegramBot = require('node-telegram-bot-api');
 const db = require('./db');
 const { decryptSecret } = require('./crypto');
 
-const BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME || 'qums_attendance_bot').replace(/^@/, '');
+const BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME || 'gue_attendance_bot').replace(/^@/, '');
 const DEEP_LINK_BASE = `https://t.me/${BOT_USERNAME}`;
 
 // ---- exact user-facing copy (English only — single source of truth) ----
 const MSG = {
   WELCOME:
-    '👋 Welcome to the QUMS Attendance Bot!\nOpen the web dashboard and press "Connect Telegram" to connect your account.',
+    '👋 Welcome to the GUE Attendance Bot!\nOpen the web dashboard and press "Connect Telegram" to connect your account.',
   LINK_INVALID:
     '❌ This connection link is invalid or expired.\nPlease open the dashboard and press "Connect Telegram" again.',
   LINK_USAGE: 'Usage: /link <code> — the code is in the "Connect Telegram" section of the dashboard.',
@@ -1479,15 +1479,15 @@ async function handleStatus(chatId, log = console) {
 
 async function handleHelp(chatId, log = console) {
   const text = [
-    'Welcome to the *QAttend Bot*!',
+    'Welcome to the *GUEAttend Bot*!',
     '',
     'Available commands:',
     '📊 /attendance — Full attendance summary (auto-deletes in 1 minute)',
     '📅 /today — Today\'s attendance status: Present/Absent breakdown (auto-deletes in 1 minute)',
     '📅 /DD/MM/YY — Full attendance for any specific date, e.g. /12/10/26 (auto-deletes in 1 minute)',
     '📚 /assignments — View pending assignments & deadlines',
-    'ℹ️ /status — Check your QUMS & Telegram account status',
-    '🔄 /reconnect — Reconnect your QUMS session via Telegram (CAPTCHA)',
+    'ℹ️ /status — Check your GEU ERP & Telegram account status',
+    '🔄 /reconnect — Reconnect your GEU ERP session via Telegram (CAPTCHA)',
     '❓ /help — Show this help message',
     '',
     '💡 *Automatic Notifications:*',
@@ -1500,11 +1500,7 @@ async function handleHelp(chatId, log = console) {
 }
 
 function isUserNewErp(user) {
-  if (!user) return false;
-  return (
-    String(user.activeErpType || '').toUpperCase() === 'NEW' ||
-    Boolean(user.newErpSessionPath || user.newErpSessionData || user.newErpEmail)
-  );
+  return false;
 }
 
 async function handleAttendance(chatId, log = console) {

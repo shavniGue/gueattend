@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QUMS Setup — QAttend</title>
-  <meta name="description" content="Connect your QUMS account so QAttend can monitor your academic updates." />
+  <title>GEU ERP Setup — GUEAttend</title>
+  <meta name="description" content="Connect your Graphic Era University account so GUEAttend can monitor your academic updates." />
   <meta name="theme-color" content="#1e3a8a" />
   <meta name="robots" content="noindex" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -14,126 +14,16 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="stylesheet" href="/style.css?v=20261107-2" />
   <script src="/site.js" defer></script>
-  <style>
-    /* Scoped styles for ERP Segmented Control */
-    .erp-segmented-control {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: stretch !important;
-      background: #f1f5f9 !important;
-      border: 1.5px solid #e2e8f0 !important;
-      border-radius: 12px !important;
-      padding: 4px !important;
-      gap: 6px !important;
-      margin: 16px 0 18px 0 !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn {
-      flex: 1 1 50% !important;
-      width: 50% !important;
-      min-width: 0 !important;
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: 10px !important;
-      padding: 10px 14px !important;
-      border: 1.5px solid transparent !important;
-      border-radius: 9px !important;
-      background: transparent !important;
-      color: #64748b !important;
-      cursor: pointer !important;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-      text-decoration: none !important;
-      outline: none !important;
-      box-shadow: none !important;
-      margin: 0 !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn:hover:not(.active) {
-      background: rgba(255, 255, 255, 0.7) !important;
-      color: #1e293b !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn.active {
-      background: #ffffff !important;
-      color: #1e3a8a !important;
-      border-color: rgba(30, 58, 138, 0.12) !important;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
-    }
-
-    .erp-tab-icon {
-      font-size: 20px !important;
-      line-height: 1 !important;
-      flex-shrink: 0 !important;
-    }
-
-    .erp-tab-content {
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      text-align: left !important;
-      line-height: 1.25 !important;
-      min-width: 0 !important;
-    }
-
-    .erp-tab-title {
-      font-size: 14px !important;
-      font-weight: 700 !important;
-      letter-spacing: -0.01em !important;
-      white-space: nowrap !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn.active .erp-tab-title {
-      color: #1e3a8a !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn:not(.active) .erp-tab-title {
-      color: #475569 !important;
-    }
-
-    .erp-tab-subtitle {
-      font-size: 11px !important;
-      font-weight: 500 !important;
-      white-space: nowrap !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn.active .erp-tab-subtitle {
-      color: #2563eb !important;
-    }
-
-    .erp-segmented-control .erp-tab-btn:not(.active) .erp-tab-subtitle {
-      color: #94a3b8 !important;
-    }
-
-    @media (max-width: 480px) {
-      .erp-tab-subtitle {
-        display: none !important;
-      }
-      .erp-tab-title {
-        font-size: 13px !important;
-      }
-      .erp-tab-icon {
-        font-size: 18px !important;
-      }
-      .erp-segmented-control .erp-tab-btn {
-        padding: 9px 8px !important;
-        gap: 6px !important;
-      }
-    }
-  </style>
 </head>
 <body>
   <header class="nav">
     <a class="brand brand-link" href="/dashboard">
-      <img src="/logo.svg" alt="QAttend Logo" class="brand-logo" width="24" height="24" />
-      <span>QAttend</span>
+      <img src="/logo.svg" alt="GUEAttend Logo" class="brand-logo" width="24" height="24" />
+      <span>GUEAttend</span>
     </a>
     <nav class="nav-links" aria-label="Main">
       <a href="/dashboard">Dashboard</a>
-      <a href="/qums-setup">QUMS Setup</a>
+      <a href="/qums-setup" class="active">GEU Setup</a>
       <a href="/telegram-setup">Telegram</a>
     </nav>
     <div class="nav-actions">
@@ -146,12 +36,12 @@
   <div id="drawerOverlay" class="drawer-overlay"></div>
   <aside id="drawer" class="drawer" aria-hidden="true" aria-label="Mobile menu">
     <div class="drawer-head">
-      <span>QAttend</span>
+      <span>GUEAttend</span>
       <button type="button" class="drawer-close" aria-label="Close menu">✕</button>
     </div>
     <nav class="drawer-nav">
       <a href="/dashboard">🏠 Dashboard</a>
-      <a href="/qums-setup">⚙️ QUMS Setup</a>
+      <a href="/qums-setup">⚙️ GEU Setup</a>
       <a href="/telegram-setup">💬 Telegram</a>
       <a href="/logout" class="drawer-logout">🚪 Logout</a>
     </nav>
@@ -159,53 +49,36 @@
 
   <div class="auth-bg" style="min-height: auto; padding-top: 22px;">
     <div class="auth-card" id="setupCard" style="max-width: 580px;">
-      <h1>QUMS Setup</h1>
-      <p class="sub" style="margin-bottom: 12px;">
-        Connect your Quantum University account so QAttend can monitor your academic updates.
+      <h1>GEU ERP Setup</h1>
+      <p class="sub" style="margin-bottom: 16px;">
+        Connect your Graphic Era University ERP account so GUEAttend can monitor your academic updates.
       </p>
 
-      <!-- ERP Selector Tabs -->
-      <div class="erp-segmented-control" role="tablist" aria-label="Select ERP Integration">
-        <button type="button" id="tabOldErp" class="erp-tab-btn active" role="tab" aria-selected="true">
-          <span class="erp-tab-icon">🏛️</span>
-          <span class="erp-tab-content">
-            <span class="erp-tab-title">Old ERP</span>
-            <span class="erp-tab-subtitle">qums portal (CAPTCHA)</span>
-          </span>
-        </button>
-        <button type="button" id="tabNewErp" class="erp-tab-btn" role="tab" aria-selected="false">
-          <span class="erp-tab-icon">🚀</span>
-          <span class="erp-tab-content">
-            <span class="erp-tab-title">New ERP</span>
-            <span class="erp-tab-subtitle">my.quantum (No CAPTCHA)</span>
-          </span>
-        </button>
-      </div>
-
-      <div style="text-align: center; margin-bottom: 12px;">
+      <div style="text-align: center; margin-bottom: 16px;">
         <span id="qumsConnBadge" class="badge-soft off">Checking connection…</span>
       </div>
 
-      <!-- OLD ERP CONTAINER -->
+      <!-- UNIFIED GEU ERP CONTAINER -->
       <div id="oldErpContainer">
-
         <div class="sub" id="modeSub" style="margin-bottom: 16px;"></div>
 
-        <!-- QUMS login creds box (Shown for first-time or after reset) -->
+        <!-- GEU login creds box (Shown for first-time or after reset) -->
         <div id="firstTimeBox" class="hidden">
           <ol class="steps">
-            <li>Enter your QID + QUMS password, then press <b id="stepAction">Get Captcha</b></li>
-            <li>Type the characters you see in the captcha image and press <b>Submit</b></li>
-            <li>Once the login succeeds your QID & password are saved securely</li>
+            <li>Enter your GEU ID + ERP password, then press <b id="stepAction">Get Captcha</b></li>
+            <li>Type the characters you see in the captcha image and press <b>Login</b></li>
+            <li>Once login succeeds, your GEU credentials are saved securely</li>
           </ol>
-          <label class="form-label" for="qid">QUMS QID</label>
-          <input class="form-input" id="qid" type="text" placeholder="e.g. 240XXXXXX" />
-          <label class="form-label" for="qumsPassword">QUMS Password</label>
+          <label class="form-label" for="qid">GEU ID / Student ID</label>
+          <input class="form-input" id="qid" type="text" placeholder="e.g. 21011029" />
+          <label class="form-label" for="qumsPassword">GEU ERP Password</label>
           <div class="pw-wrap">
-            <input class="form-input" id="qumsPassword" type="password" placeholder="Enter QUMS password" />
-            <button type="button" class="pw-toggle" data-target="qumsPassword" aria-label="Show password"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <input class="form-input" id="qumsPassword" type="password" placeholder="Enter GEU ERP password" />
+            <button type="button" class="pw-toggle" data-target="qumsPassword" aria-label="Show password">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
           </div>
-          <button id="firstTimeCaptchaBtn" class="btn" style="margin-top: 12px; width: 100%;">Get Captcha</button>
+          <button id="firstTimeCaptchaBtn" class="btn" style="margin-top: 14px; width: 100%;">Get Captcha</button>
         </div>
 
         <!-- RECONNECT mode info box (Shown when credentials already saved) -->
@@ -213,7 +86,7 @@
           <div class="saved-creds-card" style="background: rgba(30, 58, 138, 0.05); border: 1px solid rgba(30, 58, 138, 0.15); border-radius: 10px; padding: 16px; margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <span style="font-size: 13.5px; font-weight: 700; color: var(--navy-2); display: flex; align-items: center; gap: 6px;">
-                <span>🔒</span> Saved QUMS Account
+                <span>🔒</span> Saved GEU ERP Account
               </span>
               <span class="badge-soft on" id="savedBadge">Saved</span>
             </div>
@@ -221,17 +94,18 @@
               Student: <b id="savedStudentName">—</b>
             </div>
             <div style="font-size: 13.5px; color: var(--muted); margin-bottom: 8px;">
-              QID: <b id="savedQid" style="color: var(--text);">—</b> &nbsp;|&nbsp; Password: <span style="letter-spacing: 2px;">••••••••</span>
+              GEU ID: <b id="savedQid" style="color: var(--text);">—</b> &nbsp;|&nbsp; Password: <span style="letter-spacing: 2px;">••••••••</span>
             </div>
             <p class="sub" style="margin: 0; font-size: 12.5px;">
-              Your QID & password are saved securely. You only need to solve the CAPTCHA to connect.
+              Your GEU ID & password are saved securely. You only need to solve the CAPTCHA to reconnect.
             </p>
           </div>
           <button id="captchaBtn" class="btn" style="margin-top: 4px; width: 100%;">🔐 Reconnect QUMS</button>
         </div>
 
-        <div id="captchaBox" class="hidden">
-          <label class="form-label" for="captcha">CAPTCHA (case-sensitive, usually UPPERCASE)</label>
+        <!-- CAPTCHA RELAY BOX -->
+        <div id="captchaBox" class="hidden" style="margin-top: 14px;">
+          <label class="form-label" for="captcha">CAPTCHA (case-sensitive)</label>
           <div class="captcha-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; width: 100%;">
             <img id="captchaImg" class="captcha-img" alt="captcha" style="margin: 0; width: auto; height: 58px; max-height: 64px; max-width: calc(100% - 56px); border-radius: 8px; border: 1.5px solid var(--line); background: #fff; box-shadow: var(--shadow); object-fit: contain;" />
             <button type="button" id="refreshCaptchaBtn" class="captcha-refresh-btn" title="Refresh CAPTCHA" aria-label="Refresh CAPTCHA" style="width: 44px; height: 44px; min-width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(30, 58, 138, 0.08); color: var(--navy-2); border: 1px solid rgba(30, 58, 138, 0.2); cursor: pointer; flex-shrink: 0; transition: transform 0.25s ease, background 0.2s;">
@@ -241,90 +115,11 @@
             </button>
           </div>
           <input class="form-input" id="captcha" type="text" placeholder="Enter CAPTCHA" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" style="text-transform: uppercase; letter-spacing: 2px; font-weight: 600;" />
-          <div style="margin-top: 14px;"><button id="submitBtn" style="width: 100%;">Login to QUMS</button></div>
+          <div style="margin-top: 14px;"><button id="submitBtn" class="btn" style="width: 100%;">Login to GEU ERP</button></div>
         </div>
 
-        <div id="qumsResetSlot" class="qums-reset-slot" style="margin-top: 16px;">
-          <button id="permanentQumsResetBtn" type="button">Reset / Delete QUMS Connection</button>
-        </div>
-      </div>
-
-      <!-- NEW ERP CONTAINER -->
-      <div id="newErpContainer" class="hidden">
-        <!-- NEW ERP CONNECTED CARD -->
-        <div id="newErpConnectedBox" class="hidden">
-          <div class="saved-creds-card" style="background: rgba(37, 99, 235, 0.04); border: 1.5px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 18px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(37, 99, 235, 0.12); padding-bottom: 10px;">
-              <span style="font-size: 14.5px; font-weight: 700; color: var(--navy-2); display: flex; align-items: center; gap: 8px;">
-                <span>🚀</span> Quantum University New ERP
-              </span>
-              <span class="badge-soft on" id="newErpStatusBadge">Active</span>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--muted); font-size: 13px;">Student:</span>
-                <b id="newErpStudentNameText" style="color: var(--text); font-size: 14px;">—</b>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--muted); font-size: 13px;">Student ID (QID):</span>
-                <b id="newErpQidText" style="color: var(--navy-4); font-family: monospace; font-size: 13.5px; word-break: break-all; max-width: 60%; text-align: right;">—</b>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--muted); font-size: 13px;">Email:</span>
-                <span id="newErpEmailText" style="color: var(--text); font-weight: 500; font-size: 13px; word-break: break-all; max-width: 65%; text-align: right;">—</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--muted); font-size: 13px;">Course / Sem:</span>
-                <b id="newErpCourseSemText" style="color: var(--text); text-align: right; max-width: 65%; font-size: 13px;">—</b>
-              </div>
-            </div>
-
-            <p class="sub" style="margin: 12px 0 0; font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px;">
-              Connected to <code>my.quantumuniversity.edu.in</code>. Timetable &amp; Attendance are live.
-            </p>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <a href="/dashboard" class="btn" style="flex: 1; text-align: center; text-decoration: none; padding: 10px;">📊 View Dashboard</a>
-            <button id="disconnectNewErpBtn" type="button" class="btn" style="background: #ef4444; color: #fff;">Disconnect</button>
-          </div>
-        </div>
-
-        <!-- NEW ERP LOGIN FORM -->
-        <div id="newErpFormBox">
-          <label class="form-label" for="newErpEmail">QUMS Registered Email ID</label>
-          <input class="form-input" id="newErpEmail" type="email" placeholder="e.g. student.qid@quantumuniversity.edu.in" autocomplete="email" />
-
-          <label class="form-label" for="newErpPassword">Password</label>
-          <div class="pw-wrap">
-            <input class="form-input" id="newErpPassword" type="password" placeholder="Enter New ERP password" autocomplete="current-password" />
-            <button type="button" class="pw-toggle" data-target="newErpPassword" aria-label="Show password"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-          </div>
-
-          <!-- PORTAL ACTIVE SESSION CONFLICT DIALOG -->
-          <div id="newErpConflictBox" class="hidden" style="margin: 16px 0; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 10px; padding: 16px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-              <div style="font-size: 24px; line-height: 1;">⚠️</div>
-              <div style="flex: 1;">
-                <h4 style="margin: 0 0 6px; font-size: 14.5px; color: #92400e; font-weight: 700;">
-                  Session Conflict Detected
-                </h4>
-                <p style="margin: 0 0 14px; font-size: 13.5px; color: #b45309; line-height: 1.4; font-weight: 600;">
-                  Your QUMS account is already active on another session.
-                </p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button type="button" id="logoutAllSessionsBtn" class="btn" style="background: #d97706; color: #ffffff; font-size: 13px; padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                    🔄 Logout All Sessions & Reconnect
-                  </button>
-                  <button type="button" id="cancelConflictBtn" class="btn" style="background: #f1f5f9; color: var(--muted); border: 1px solid var(--line); font-size: 13px; padding: 8px 14px; border-radius: 6px; cursor: pointer;">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button id="newErpLoginBtn" class="btn" style="margin-top: 10px; width: 100%;">🚀 Connect to New ERP</button>
+        <div id="qumsResetSlot" class="qums-reset-slot" style="margin-top: 20px; text-align: center;">
+          <button id="permanentQumsResetBtn" type="button" style="background:none; border:none; color:#ef4444; font-size:13px; text-decoration:underline; cursor:pointer;">Reset / Delete GEU ERP Connection</button>
         </div>
       </div>
 
@@ -333,6 +128,7 @@
       <div class="auth-foot"><a href="/dashboard">← Back to dashboard</a></div>
     </div>
   </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
     let busy = false;
@@ -346,18 +142,18 @@
       if (m === 'reconnect' && hasSavedCredentials) {
         $('firstTimeBox').classList.add('hidden');
         $('reconnectBox').classList.remove('hidden');
-        $('modeSub').textContent = 'QUMS session expired or needs reconnection — solve captcha to resume.';
-        $('captchaBtn').textContent = '🔐 Reconnect QUMS';
+        $('modeSub').textContent = 'GEU ERP session expired or needs reconnection — solve captcha to resume.';
+        $('captchaBtn').textContent = '🔐 Reconnect GEU ERP';
       } else {
         $('firstTimeBox').classList.remove('hidden');
         $('reconnectBox').classList.add('hidden');
-        $('modeSub').textContent = 'Enter your QID and password once. They will remain securely saved until you reset or delete.';
+        $('modeSub').textContent = 'Enter your GEU ID and password once. They will remain securely saved until you reset or delete.';
       }
     }
 
     async function startLogin(confirmSwitch = false) {
       $('error').classList.add('hidden'); $('msg').classList.add('hidden');
-      $('msg').textContent = 'Headless browser me login page khul raha hai…'; $('msg').classList.remove('hidden');
+      $('msg').textContent = 'Opening login page and preparing CAPTCHA…'; $('msg').classList.remove('hidden');
       try {
         const body = {
           qid: $('qid').value.trim() || savedQid,
@@ -374,8 +170,8 @@
           $('msg').classList.add('hidden');
           if (data.identityConflict) {
             $('error').innerHTML = `<b>⚠️ Different Student ID Detected</b><br>` +
-              `Current active QID: <b>${data.oldQid}</b><br>` +
-              `New QID: <b>${data.newQid}</b><br><br>` +
+              `Current active GEU ID: <b>${data.oldQid}</b><br>` +
+              `New GEU ID: <b>${data.newQid}</b><br><br>` +
               `Switching identities will isolate previous history under ${data.oldQid} and begin monitoring student ${data.newQid}.<br><br>` +
               `<button id="confirmSwitchBtn" class="btn" style="background:#e11d48; margin-top:8px; width:100%;">Confirm Switch to ${data.newQid}</button>`;
             $('error').classList.remove('hidden');
@@ -388,7 +184,7 @@
             }
             return;
           }
-          $('error').textContent = (data.error || 'Captcha load fail') + (data.hint ? '  →  ' + data.hint : '');
+          $('error').textContent = (data.error || 'Captcha load failed') + (data.hint ? '  →  ' + data.hint : '');
           $('error').classList.remove('hidden');
           return;
         }
@@ -408,7 +204,7 @@
       const qidVal = $('qid').value.trim();
       const pwVal = $('qumsPassword').value;
       if (!qidVal || !pwVal) {
-        $('error').textContent = 'Please enter both your QID and your QUMS password.';
+        $('error').textContent = 'Please enter both your GEU ID and your GEU ERP password.';
         $('error').classList.remove('hidden');
         return;
       }
@@ -424,6 +220,19 @@
       busy = false; $('captchaBtn').disabled = false;
     });
 
+    $('refreshCaptchaBtn').addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      $('refreshCaptchaBtn').disabled = true;
+      $('refreshCaptchaBtn').style.transform = 'rotate(180deg)';
+      await startLogin();
+      setTimeout(() => {
+        $('refreshCaptchaBtn').style.transform = '';
+        $('refreshCaptchaBtn').disabled = false;
+        busy = false;
+      }, 400);
+    });
+
     $('submitBtn').addEventListener('click', async () => {
       if (busy) return;
       const captchaVal = $('captcha').value.trim().toUpperCase();
@@ -434,7 +243,7 @@
       }
       busy = true; $('submitBtn').disabled = true;
       $('error').classList.add('hidden'); $('msg').classList.add('hidden');
-      $('msg').textContent = 'Verifying… (10-30 sec)'; $('msg').classList.remove('hidden');
+      $('msg').textContent = 'Verifying credentials and logging in…'; $('msg').classList.remove('hidden');
       try {
         const res = await fetch('/api/qums-login/submit-captcha', {
           method: 'POST',
@@ -445,368 +254,89 @@
         if (data.ok) {
           hasSavedCredentials = true;
           $('msg').textContent = mode === 'first-time'
-            ? '✅ QUMS Connected! Your QID and password are now saved securely. Next: open dashboard and connect Telegram.'
-            : '✅ QUMS Reconnected! Monitoring has resumed.';
-          setTimeout(() => { location.href = '/dashboard'; }, 1600);
-          return;
-        }
-        if (data.captchaImage) {
-          $('captchaImg').src = data.captchaImage;
-          $('captcha').value = '';
-          $('captcha').focus();
-        }
-        $('msg').classList.add('hidden');
-        $('error').textContent = data.error || 'Login failed — please try again.';
-        $('error').classList.remove('hidden');
-
-        // If credentials were rejected by portal, switch to first-time box so user can correct password
-        if (data.code === 'INVALID_CREDENTIALS') {
-          hasSavedCredentials = false;
-          setMode('first-time');
-          $('qumsPassword').value = '';
-          $('qumsPassword').focus();
+            ? '✅ GEU ERP Connected! Your credentials are now saved securely. Next: open dashboard and connect Telegram.'
+            : '✅ GEU ERP Reconnected! Monitoring has resumed.';
+          setTimeout(() => { location.href = '/dashboard'; }, 1500);
+        } else {
+          $('msg').classList.add('hidden');
+          if (data.captchaImage) {
+            $('captchaImg').src = data.captchaImage;
+            $('captcha').value = '';
+            $('captcha').focus();
+            $('error').textContent = data.error || 'Incorrect captcha. A fresh captcha image was loaded. Please try again.';
+          } else {
+            $('error').textContent = (data.error || 'Login failed') + (data.hint ? ' → ' + data.hint : '');
+          }
+          $('error').classList.remove('hidden');
         }
       } catch (err) {
         $('msg').classList.add('hidden');
         $('error').textContent = err.message; $('error').classList.remove('hidden');
-      } finally { busy = false; $('submitBtn').disabled = false; }
+      } finally {
+        busy = false; $('submitBtn').disabled = false;
+      }
     });
 
     $('permanentQumsResetBtn').addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to permanently reset and delete your QUMS connection and saved credentials?\n\nThis will clear your saved QID, saved password, session, and monitoring. You will be able to enter a new QID and password.')) {
-        return;
-      }
-      $('permanentQumsResetBtn').disabled = true;
-      $('error').classList.add('hidden');
-      $('msg').textContent = 'Resetting QUMS connection…';
-      $('msg').classList.remove('hidden');
+      if (!confirm('Are you sure you want to permanently delete your saved GEU ERP credentials and active session?')) return;
       try {
-        const res = await fetch('/api/qums-reset', { method: 'POST' });
+        const res = await fetch('/api/user/qums-credentials', { method: 'DELETE' });
         const data = await res.json();
-        if (data.ok) {
-          hasSavedCredentials = false;
-          savedQid = '';
-          savedStudentName = '';
-          $('qid').value = '';
-          $('qumsPassword').value = '';
-          $('qumsPassword').placeholder = 'Enter QUMS password';
-          $('captchaBox').classList.add('hidden');
-          setMode('first-time');
-          $('qumsConnBadge').className = 'badge-soft off';
-          $('qumsConnBadge').textContent = 'QUMS Not Connected';
-          $('msg').textContent = '✅ QUMS connection & saved credentials reset. You can now enter a new QID and password below.';
-          $('msg').classList.remove('hidden');
-          $('qid').focus();
-        } else {
-          $('msg').classList.add('hidden');
-          $('error').textContent = data.error || 'Reset failed';
-          $('error').classList.remove('hidden');
-        }
-      } catch (err) {
-        $('msg').classList.add('hidden');
-        $('error').textContent = 'Error: ' + err.message;
-        $('error').classList.remove('hidden');
-      } finally {
-        $('permanentQumsResetBtn').disabled = false;
-      }
-    });
-
-    $('qid').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (!$('qumsPassword').value) {
-          $('qumsPassword').focus();
-        } else {
-          $('firstTimeCaptchaBtn').click();
-        }
-      }
-    });
-    $('qumsPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        $('firstTimeCaptchaBtn').click();
-      }
-    });
-    $('refreshCaptchaBtn').addEventListener('click', async () => {
-      if (busy) return;
-      busy = true; $('refreshCaptchaBtn').disabled = true;
-      $('refreshCaptchaBtn').style.transform = 'rotate(180deg)';
-      await startLogin();
-      $('refreshCaptchaBtn').style.transform = '';
-      busy = false; $('refreshCaptchaBtn').disabled = false;
-    });
-
-    function forceUpperCaptcha(el) {
-      if (!el) return;
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      const upper = (el.value || '').toUpperCase();
-      if (el.value !== upper) {
-        el.value = upper;
-        if (start !== null && end !== null) {
-          try { el.setSelectionRange(start, end); } catch {}
-        }
-      }
-    }
-    const captchaInputEl = $('captcha');
-    ['input', 'change', 'keyup', 'blur'].forEach((evt) => {
-      captchaInputEl.addEventListener(evt, (e) => forceUpperCaptcha(e.target));
-    });
-    captchaInputEl.addEventListener('paste', () => setTimeout(() => forceUpperCaptcha(captchaInputEl), 10));
-    captchaInputEl.addEventListener('keydown', (e) => e.key === 'Enter' && $('submitBtn').click());
-
-    // ---- ERP Selector Tab Switching ----
-    let currentTab = 'old';
-    function selectErpTab(tab) {
-      currentTab = tab;
-      $('tabOldErp').classList.toggle('active', tab === 'old');
-      $('tabOldErp').setAttribute('aria-selected', tab === 'old');
-      $('tabNewErp').classList.toggle('active', tab === 'new');
-      $('tabNewErp').setAttribute('aria-selected', tab === 'new');
-      $('oldErpContainer').classList.toggle('hidden', tab !== 'old');
-      $('newErpContainer').classList.toggle('hidden', tab !== 'new');
-      $('error').classList.add('hidden');
-      $('msg').classList.add('hidden');
-    }
-    $('tabOldErp').addEventListener('click', () => selectErpTab('old'));
-    $('tabNewErp').addEventListener('click', () => selectErpTab('new'));
-
-    // ---- New ERP Login & Management ----
-    $('newErpLoginBtn').addEventListener('click', async () => {
-      if (busy) return;
-      const email = $('newErpEmail').value.trim();
-      const password = $('newErpPassword').value;
-      if (!email || !password) {
-        $('error').textContent = 'Please enter both your registered email and password for New ERP.';
-        $('error').classList.remove('hidden');
-        return;
-      }
-      busy = true; $('newErpLoginBtn').disabled = true;
-      $('error').classList.add('hidden');
-      $('msg').textContent = 'Connecting to Quantum University New ERP (my.quantumuniversity.edu.in)...';
-      $('msg').classList.remove('hidden');
-      try {
-        const res = await fetch('/api/new-erp/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password,
-            logoutOtherSessions: false,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          $('msg').classList.add('hidden');
-          if (res.status === 409 && (data.code === 'PORTAL_ACTIVE_SESSION_CONFLICT' || data.canLogoutAll)) {
-            $('newErpConflictBox').classList.remove('hidden');
-            return;
-          }
-          $('error').textContent = data.error || 'New ERP login failed.';
-          $('error').classList.remove('hidden');
-          if (res.status === 409 && data.code === 'SESSION_CONFLICT') {
-            $('newErpBlockedNotice').classList.remove('hidden');
-          }
-          return;
-        }
-        $('msg').textContent = '✅ New ERP Connected successfully! Redirecting to dashboard...';
-        setTimeout(() => { location.href = '/dashboard'; }, 1500);
-      } catch (err) {
-        $('msg').classList.add('hidden');
-        $('error').textContent = 'Network error: ' + err.message;
-        $('error').classList.remove('hidden');
-      } finally {
-        busy = false; $('newErpLoginBtn').disabled = false;
-      }
-    });
-
-    $('logoutAllSessionsBtn').addEventListener('click', async () => {
-      $('newErpConflictBox').classList.add('hidden');
-      $('error').classList.add('hidden');
-      const email = $('newErpEmail').value.trim();
-      const password = $('newErpPassword').value;
-      busy = true; $('newErpLoginBtn').disabled = true;
-      $('msg').textContent = 'Official portal se active sessions logout karke reconnect kiya ja raha hai...';
-      $('msg').classList.remove('hidden');
-      try {
-        const res = await fetch('/api/new-erp/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, logoutOtherSessions: true }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          $('msg').classList.add('hidden');
-          $('error').textContent = data.error || 'Failed to logout other sessions and reconnect.';
-          $('error').classList.remove('hidden');
-          return;
-        }
-        $('msg').textContent = '✅ Sessions successfully reset & New ERP connected! Redirecting...';
-        setTimeout(() => { location.href = '/dashboard'; }, 1500);
-      } catch (err) {
-        $('msg').classList.add('hidden');
-        $('error').textContent = 'Network error: ' + err.message;
-        $('error').classList.remove('hidden');
-      } finally {
-        busy = false; $('newErpLoginBtn').disabled = false;
-      }
-    });
-
-    $('cancelConflictBtn').addEventListener('click', () => {
-      $('newErpConflictBox').classList.add('hidden');
-      $('error').classList.add('hidden');
-      $('msg').classList.add('hidden');
-    });
-
-    $('newErpEmail').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        $('newErpPassword').focus();
-      }
-    });
-    $('newErpPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        $('newErpLoginBtn').click();
-      }
-    });
-
-    $('disconnectNewErpBtn').addEventListener('click', async () => {
-      if (!confirm('Disconnect New ERP session? Live tracking will pause until reconnected.')) return;
-      $('disconnectNewErpBtn').disabled = true;
-      try {
-        await fetch('/api/new-erp/disconnect', { method: 'POST' });
-        location.reload();
-      } catch (err) {
-        alert(err.message);
-      } finally {
-        $('disconnectNewErpBtn').disabled = false;
-      }
-    });
-
-    if ($('disconnectOldForNewBtn')) {
-      $('disconnectOldForNewBtn').addEventListener('click', async () => {
-        if (!confirm('Disconnect Old ERP session to switch to New ERP?')) return;
-        $('disconnectOldForNewBtn').disabled = true;
-        try {
-          await fetch('/api/qums-logout', { method: 'POST' });
+        if (res.ok && data.ok) {
+          alert('GEU ERP credentials and session have been permanently deleted.');
           location.reload();
-        } catch (err) {
-          alert(err.message);
-        } finally {
-          if ($('disconnectOldForNewBtn')) $('disconnectOldForNewBtn').disabled = false;
+        } else {
+          alert(data.error || 'Failed to delete credentials.');
         }
-      });
-    }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
 
-    if ($('disconnectNewForOldBtn')) {
-      $('disconnectNewForOldBtn').addEventListener('click', async () => {
-        if (!confirm('Disconnect New ERP session to switch to Old ERP?')) return;
-        $('disconnectNewForOldBtn').disabled = true;
-        try {
-          await fetch('/api/new-erp/disconnect', { method: 'POST' });
-          location.reload();
-        } catch (err) {
-          alert(err.message);
-        } finally {
-          if ($('disconnectNewForOldBtn')) $('disconnectNewForOldBtn').disabled = false;
-        }
-      });
-    }
-
-    // password show/hide toggle with clean SVG icons (no weird emoji)
-    const EYE_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-    const EYE_OFF_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-    document.querySelectorAll('.pw-toggle').forEach((b) =>
-      b.addEventListener('click', () => {
-        const el = document.getElementById(b.dataset.target);
-        if (!el) return;
-        const isPw = el.type === 'password';
-        el.type = isPw ? 'text' : 'password';
-        b.innerHTML = isPw ? EYE_OFF_SVG : EYE_SVG;
-        b.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
-      })
-    );
-
-    // mode detect: DB me qumsQid hai -> reconnect (bina inputs); nahi -> first-time
     (async () => {
-      // Deep link from the Telegram "🔐 Reconnect QUMS" button:
-      // /qums-setup?reconnect=1 -> jump straight to the captcha step.
-      const wantsReconnect = new URLSearchParams(location.search).get('reconnect') === '1';
-      const forceNewErp = new URLSearchParams(location.search).get('erp') === 'new';
-
       try {
-        const res = await fetch('/api/me');
-        if (res.status === 401) { location.href = '/login'; return; }
-        const me = await res.json();
-        $('userName').textContent = me.studentName || 'Student';
-        const badge = $('qumsConnBadge');
-
-        // Check active ERP status accurately
-        const isNewActive = (me.activeErpType === 'NEW' || me.newErpConfigured) && (me.newErpSessionStatus === 'active' || me.newErpSessionStatus === 'ACTIVE');
-        const isNewExpired = me.newErpConfigured && (me.newErpSessionStatus === 'expired' || me.newErpSessionStatus === 'EXPIRED');
-        const isOldActive = me.qumsConfigured && me.qumsSessionStatus === 'active';
-        const isOldExpired = me.qumsConfigured && me.qumsSessionStatus === 'expired';
-
-        if (forceNewErp || isNewActive || (me.activeErpType === 'NEW' && !me.qumsConfigured)) {
-          selectErpTab('new');
-        } else {
-          selectErpTab('old');
+        const res = await fetch('/api/status');
+        if (!res.ok) {
+          if (res.status === 401) { location.href = '/login'; return; }
+          return;
         }
+        const data = await res.json();
+        if (data.user) {
+          $('userName').textContent = data.user.studentName || data.user.email || 'Account';
+          hasSavedCredentials = Boolean(data.hasSavedQumsCredentials || (data.user.qumsQid && (data.user.qumsPasswordEncrypted || data.user.hasPassword)));
+          savedQid = data.user.qumsQid || data.user.geuId || '';
+          savedStudentName = data.user.studentName || 'Student';
+          $('savedQid').textContent = savedQid || '—';
+          $('savedStudentName').textContent = savedStudentName;
 
-        if (isNewActive) {
-          badge.className = 'badge-soft on';
-          badge.textContent = '🟢 New ERP Connected';
-          $('newErpConnectedBox').classList.remove('hidden');
-          $('newErpFormBox').classList.add('hidden');
+          const isConnected = Boolean(data.user.qumsSessionPath && data.user.qumsSessionStatus !== 'expired');
+          const isExpired = Boolean(data.user.qumsSessionStatus === 'expired');
 
-          const qidRaw = me.newErpQid || me.qumsQid || '';
-          const isTokenGarbage = qidRaw.length > 16 || /[+/=]/.test(qidRaw);
-          const cleanQid = isTokenGarbage ? (me.qid || '26020181') : qidRaw;
-
-          $('newErpStudentNameText').textContent = me.newErpStudentName || me.studentName || 'Student';
-          $('newErpQidText').textContent = cleanQid || '—';
-          $('newErpEmailText').textContent = me.newErpEmail || '—';
-
-          let courseText = me.newErpCourse || '';
-          if (!courseText || courseText.includes('{') || courseText.includes('label')) {
-            courseText = 'Bachelor of Business Administration';
+          if (isConnected) {
+            $('qumsConnBadge').textContent = 'Connected ✅';
+            $('qumsConnBadge').className = 'badge-soft on';
+          } else if (isExpired) {
+            $('qumsConnBadge').textContent = 'Session Expired ⚠️';
+            $('qumsConnBadge').className = 'badge-soft warn';
+          } else {
+            $('qumsConnBadge').textContent = 'Not Connected';
+            $('qumsConnBadge').className = 'badge-soft off';
           }
-          const semText = me.newErpSemester ? 'Sem ' + me.newErpSemester : '';
-          const acadText = me.newErpAcademicYear ? me.newErpAcademicYear : '';
-          $('newErpCourseSemText').textContent = [courseText, semText, acadText].filter(Boolean).join(' • ') || '—';
-        } else if (isNewExpired) {
-          badge.className = 'badge-soft off';
-          badge.textContent = '⚠️ New ERP: Session Expired';
-        } else if (isOldActive) {
-          badge.className = 'badge-soft on';
-          badge.textContent = '🟢 Old ERP Connected';
-        } else if (isOldExpired) {
-          badge.className = 'badge-soft off';
-          badge.textContent = '⚠️ Old ERP: Session Expired';
-        } else {
-          badge.className = 'badge-soft off';
-          badge.textContent = '⚪ Not Connected';
+
+          const me = data.user;
+          const wantsReconnect = new URLSearchParams(location.search).get('reconnect') === '1';
+
+          if (hasSavedCredentials) {
+            setMode('reconnect');
+            if (wantsReconnect && me.qumsQid) {
+              await startLogin();
+            }
+          } else {
+            setMode('first-time');
+          }
         }
-
-        hasSavedCredentials = Boolean(me.qumsCredentialsSaved || me.qumsQid);
-        savedQid = me.qumsQid || '';
-        savedStudentName = me.studentName || '';
-
-        if (savedQid) {
-          $('qid').value = savedQid;
-          $('savedQid').textContent = savedQid;
-          $('savedStudentName').textContent = savedStudentName || 'Student';
-        }
-
-        const reconnect = wantsReconnect || hasSavedCredentials;
-        setMode(reconnect ? 'reconnect' : 'first-time');
-
-        if (wantsReconnect && me.qumsQid) {
-          await startLogin();
-        }
-      } catch {
-        setMode('first-time');
+      } catch (e) {
+        console.error('Status fetch error:', e);
       }
     })();
   </script>

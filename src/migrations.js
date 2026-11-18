@@ -185,6 +185,7 @@ const MIGRATIONS = [
          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
          UNIQUE(user_id, external_assignment_id)
        )`,
+      `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS qid TEXT DEFAULT ''`,
       `CREATE INDEX IF NOT EXISTS idx_assignments_user_qid ON assignments(user_id, qid)`,
       `CREATE TABLE IF NOT EXISTS notification_log (
          id BIGSERIAL PRIMARY KEY,

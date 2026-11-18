@@ -35,7 +35,7 @@ const CERT_URL =
 
 /** Public project identifier (safe to hardcode — it is not a credential). */
 const FIREBASE_PROJECT_ID =
-  String(process.env.FIREBASE_PROJECT_ID || 'qums-forgot-password-test').trim();
+  String(process.env.FIREBASE_PROJECT_ID || 'gueattend').trim();
 
 /** Allow small clock drift between our server and Firebase tokens. */
 const CLOCK_SKEW_SECONDS = 300;

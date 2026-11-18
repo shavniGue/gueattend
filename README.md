@@ -1,320 +1,83 @@
-# QAttend --- QUMS Attendance & Assignment Tracker
+# GUEAttend — Graphic Era University (GEU) Attendance & Assignment Tracker
 
 > **Never miss an attendance update or assignment deadline again.**
 
-QAttend is a full-stack student utility that connects with **Quantum
-University Management System (QUMS)** to monitor attendance and
-assignments, store student data securely, and send timely updates
-through **Telegram**.
+GUEAttend is a full-stack student utility that connects with **Graphic Era University ERP (`student.geu.ac.in`)** to monitor attendance and assignments, store student data securely, and send timely updates through **Telegram (@gue_attendance_bot)**.
 
-## Screenshots
+## 🔗 Official GEU ERP Portal Links
 
-> Note: Personal student and faculty details have been redacted from these screenshots.
+1. **GEU ERP Login:** [https://student.geu.ac.in/N0j5Ha0](https://student.geu.ac.in/N0j5Ha0)
+2. **GEU ERP Timetable:** [https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAt3MCzUmDOUv7](https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAt3MCzUmDOUv7)
+3. **GEU ERP Dashboard:** [https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6](https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6)
 
-### QAttend Main Dashboard
+## 🤖 Telegram Bot Details
 
-Displays overall attendance percentage, QUMS and Telegram connection status, today's classes section, and the subject-wise attendance table.
+- **Bot Name:** GUE Attendance Bot
+- **Bot Username:** [@gue_attendance_bot](https://t.me/gue_attendance_bot)
+- **Commands:** `/start`, `/attendance`, `/today`, `/DD/MM/YY`, `/assignments`, `/status`, `/reconnect`, `/help`
 
-![QAttend Main Dashboard](docs/screenshots/dashboard.png)
+## ✨ Key Features
 
-### Old ERP and New ERP Connection Setup
+### 🎓 Graphic Era University ERP Integration
+- **Single Unified ERP:** Simplified and purpose-built for Graphic Era University students (no dual ERP clutter).
+- **Secure Authentication:** Captcha relay and session management with AES-256-GCM encryption.
+- **Identity Auto-Detection:** Automatically extracts student name, GEU Student ID, semester, and course.
+- **Session Recovery:** Seamless 1-Click reconnection when the portal session expires.
 
-Displays the Old ERP and New ERP selection interface along with the QUMS connection and reconnect controls.
+### 📊 Automated Attendance Monitoring
+- **Real-time Live Polling:** Detects class attendance marked by professors (`N → P`, `N → A`, `P → A`, `A → P`).
+- **Original Date Preservation:** Alerts always display the actual lecture date rather than the detection timestamp.
+- **75% Attendance Calculator:** Mathematical calculation of exact attendance percentages, bunk buffer, and classes needed to reach 75%.
+- **Daily Timetable:** Automatic 8:30 AM IST schedule alert with classroom, subject code, and faculty details.
 
-![Old ERP and New ERP Connection Setup](docs/screenshots/qums-setup.png)
-
-### Telegram Attendance Notifications
-
-Displays daily class schedule messages and attendance update alerts sent by the Telegram bot.
-
-![Telegram Attendance Notifications](docs/screenshots/telegram-notifications.png)
-
-## ✨ Features
-
-### 🎓 QUMS Integration
-
--   Secure QUMS login flow with manual CAPTCHA support.
--   Old ERP and New ERP selection with connection and reconnect controls (see [Old ERP and New ERP Connection Setup](#old-erp-and-new-erp-connection-setup)).
--   Fetches the student's actual **name, QID/RegID and Year/Semester**
-    from QUMS.
--   QUMS is the source of truth for academic identity.
--   Reconnect flow for expired QUMS sessions.
--   QUMS password is not permanently stored.
-
-### 📊 Automatic Attendance Monitoring
-
--   Web dashboard displaying overall attendance percentage, connection status, today's classes, and subject-wise attendance breakdown (see [QAttend Main Dashboard](#qattend-main-dashboard)).
--   Automatic attendance monitoring during configured college hours.
--   Detects meaningful attendance transitions such as `N → P`, `N → A`,
-    `P → A`, and `A → P`.
--   Handles delayed/backdated teacher updates.
--   Telegram notifications show the **actual class date**, not the
-    detection date (see [Telegram Attendance Notifications](#telegram-attendance-notifications)).
--   Attendance before a user's monitoring start date never generates a
-    new notification.
--   Persistent PostgreSQL deduplication prevents duplicate alerts.
--   Reconnect/session-expiry recovery compares saved state with fresh
-    QUMS data.
-
-### ⏰ Scheduled Jobs
-
--   **8:30 AM IST:** Morning attendance/class notification.
--   **Every 5 minutes:** Attendance watcher.
--   **Every 10 minutes:** Month-register synchronization.
--   **Every 30 minutes:** Assignment checking.
--   **7:00 PM IST:** Assignment deadline reminder when the real deadline
-    is today.
--   The old 9 PM attendance summary has been removed.
-
-### 📚 Assignment Tracking
-
--   Detects genuinely new assignments from QUMS.
--   Sends subject, assignment title, last date and QUMS link.
--   Sends one deadline reminder for an assignment due that day.
--   Persistent deduplication prevents repeated notifications.
-
-### 🤖 Telegram Bot
-
-Provides daily class schedule messages, attendance updates, assignment
-notifications, deadline reminders, QUMS session-expiry alerts and
-reconnect notifications (see [Telegram Attendance Notifications](#telegram-attendance-notifications)).
-
-### 👥 Multi-User Architecture
-
--   Multiple students supported.
--   Firebase authentication.
--   Individual QUMS identities.
--   Individual Telegram connections.
--   Per-user attendance and assignment history.
--   Per-user notification deduplication.
-
-## 🏗️ Architecture
-
-``` text
-Student → QAttend (Node.js/Express) → Supabase PostgreSQL
-                    │
-                    ├──────────────→ QUMS
-                    │
-                    └──────────────→ Telegram Bot
-```
-
-## 🛠️ Tech Stack
-
--   **Frontend:** HTML, CSS, JavaScript
--   **Backend:** Node.js, Express.js
--   **Database:** PostgreSQL / Supabase
--   **Authentication:** Firebase Authentication
--   **Automation:** Playwright
--   **Notifications:** Telegram Bot API
--   **Deployment:** GitHub + Render + Supabase
-
-## 📁 Project Structure
-
-``` text
-qattend/
-├── src/
-│   ├── server.js
-│   ├── db.js
-│   └── ...
-├── public/
-│   └── ...
-├── package.json
-├── package-lock.json
-├── .gitignore
-└── README.md
-```
-
-## 🔐 Environment Variables
-
-Configure secrets through `.env` locally or Render Environment
-Variables.
-
-``` env
-APP_BASE_URL=https://qattend.onrender.com
-DATABASE_URL=postgresql://...
-NODE_ENV=production
-
-SESSION_SECRET=...
-ENCRYPTION_KEY=...
-
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_BOT_USERNAME=...
-
-QUMS_LOGIN_URL=https://qums.quantumuniversity.edu.in/
-QUMS_DASHBOARD_URL=https://qums.quantumuniversity.edu.in/Web_StudentAcademic/Cyborg_S_Dashboard
-QUMS_TIMETABLE_URL=https://qums.quantumuniversity.edu.in/Web_StudentAcademic/Cyborg_StudentTimeTable?id=Time%20Table
-
-WATCH_INTERVAL_MINUTES=5
-MONTH_REGISTER_INTERVAL_MINUTES=10
-```
-
-**Never commit passwords, bot tokens, session secrets, encryption keys,
-or database credentials to GitHub.**
-
-## 🚀 Local Development
-
-``` bash
-git clone https://github.com/karansin003/qattend.git
-cd qattend
-npm install
-npx playwright install chromium
-npm start
-```
-
-## 🌐 Production
-
-**QAttend:** https://qattend.onrender.com
-
-Production flow:
-
-``` text
-User → Render → QAttend → Supabase PostgreSQL
-                         ├→ QUMS
-                         └→ Telegram
-```
-
-## 🗄️ Database
-
-Main persistent data categories:
-
-``` text
-users
-attendance
-assignments
-notification_log
-```
-
--   **users:** Firebase identity, QID/RegID, QUMS student name,
-    Year/Semester, Telegram connection and monitoring state.
--   **attendance:** class-level attendance state and history.
--   **assignments:** QUMS assignment information and synchronization
-    state.
--   **notification_log:** notification history and deduplication data.
-
-## 🔄 Attendance Logic
-
-QAttend uses the monitoring start date as an eligibility boundary:
-
-``` text
-Monitoring Start Date
-        │
-        ├── Class Date BEFORE start date → Never notify
-        │
-        └── Class Date ON/AFTER start date → Eligible
-```
-
-Example:
-
-``` text
-Monitoring starts: 1 Oct 2026
-
-30 Sep: P → A
-→ No notification
-
-1 Oct: P → A
-→ Notification sent
-```
-
-Delayed update example:
-
-``` text
-Class Date:       1 Oct
-Teacher marks:    2 Oct
-Detection Date:   2 Oct
-
-Telegram:
-Class Date: 1 October 2026
-```
-
-## 🔔 Notification Flow
-
-``` text
-QUMS
+### 🔔 Notification Pipeline
+```text
+GEU ERP (student.geu.ac.in)
   ↓
 Attendance / Assignment Change
   ↓
-QAttend Watcher
+GUEAttend Watcher
   ↓
 Validate User + Date + State
   ↓
-Persistent Deduplication
+Persistent PostgreSQL Deduplication
   ↓
-Telegram Bot
+Telegram Bot (@gue_attendance_bot)
   ↓
-Student Notification
+Student Telegram Chat
 ```
 
-## 🔥 Firebase Authentication
+## 🛠️ Tech Stack & Services
 
-Firebase provides registration, login, forgot-password and
-password-reset flows.
+- **Backend:** Node.js, Express, Playwright, node-telegram-bot-api, pg
+- **Database:** Supabase PostgreSQL
+- **Authentication:** Firebase Auth (`gueattend`)
+- **Email:** Resend API
+- **Admin Email:** `shavnikumarigue@gmail.com`
 
-The Firebase display name is **not** the source of truth for academic
-identity. Student name and academic information come from QUMS.
+## 🚀 Environment Setup
 
-## 🛡️ Security
+Copy `.env.example` to `.env` and configure:
 
--   QUMS passwords are not permanently stored.
--   Secrets are kept in environment variables.
--   Database credentials are never committed to Git.
--   Telegram credentials are protected.
--   Firebase private credentials are never exposed to the client.
--   User records are isolated by internal user identity.
--   Notification deduplication is persisted in PostgreSQL.
-
-## 📌 Production Notes
-
-Render background monitoring depends on the hosting environment
-remaining active. Free hosting instances may sleep when inactive, which
-can affect background timers and browser sessions.
-
-Only one production Telegram polling process should consume updates for
-the bot token.
-
-## 🧪 Health Check
-
-``` text
-https://qattend.onrender.com/health
+```ini
+PORT=3000
+DATABASE_URL=postgresql://postgres.cnpullmxupyqdndxzbih:...@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres
+GEU_LOGIN_URL=https://student.geu.ac.in/N0j5Ha0
+GEU_TIMETABLE_URL=https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAt3MCzUmDOUv7
+GEU_DASHBOARD_URL=https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6
+TELEGRAM_BOT_TOKEN=9295459826:AAFMEClgvi12x1HKHyTFG-E412s5101c7SY
+TELEGRAM_BOT_USERNAME=gue_attendance_bot
+ADMIN_EMAILS=shavnikumarigue@gmail.com
+FIREBASE_PROJECT_ID=gueattend
 ```
 
-## 📈 Future Improvements
+## 🧪 Testing
 
--   Admin dashboard
--   System health dashboard
--   Attendance analytics
--   Subject-wise attendance trends
--   Low-attendance alerts
--   Better monitoring observability
--   Background job queue
--   Persistent browser/session storage
--   Automated database cleanup/archiving
+Run test suite:
+```bash
+npm test
+```
 
-## 👨‍💻 Author
+## 📌 Repository
 
-**Karan Kumar**
-
-B.Tech Computer Science & Engineering\
-Specialization: Artificial Intelligence & Machine Learning
-
-## ⭐ Project Goal
-
-> **Students should not have to repeatedly check QUMS just to know
-> whether their attendance or assignments changed.**
-
-QAttend automates that workflow by connecting QUMS, PostgreSQL,
-Firebase, and Telegram into one student-focused platform.
-
-## License & Copyright
-
-Copyright © 2026 Karan Kumar.
-
-QAttend is proprietary software. All rights
-reserved.
-
-Unauthorized reproduction, redistribution,
-modification, or commercial use of original
-QAttend materials is prohibited without prior
-written authorization.
-
-Original Repository:
-https://github.com/karansin003/qattend
+Repository: [https://github.com/shavniGue/gueattend.git](https://github.com/shavniGue/gueattend.git)

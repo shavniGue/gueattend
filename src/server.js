@@ -140,7 +140,7 @@ async function requireAuth(req, res, next) {
   }
 }
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'shavnikumarigue@gmail.com')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
