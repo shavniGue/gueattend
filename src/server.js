@@ -263,6 +263,10 @@ app.use('/api/campus', campusRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use(['/api/qums', '/api/geu'], qumsRoutes);
+app.post(['/api/qums-reset', '/api/geu-reset'], requireAuth, (req, res, next) => {
+  req.url = '/reset';
+  qumsRoutes(req, res, next);
+});
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/admin', adminRoutes);
 

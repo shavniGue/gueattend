@@ -173,8 +173,56 @@ router.post('/disconnect', requireAuth, async (req, res) => {
       [req.session.userId]
     ).catch(() => {});
 
-    res.json({ ok: true, success: true, message: 'QUMS session disconnected.' });
+    res.json({ ok: true, success: true, message: 'GEU session disconnected.' });
   } catch (err) {
+    res.status(500).json({ ok: false, success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/qums/reset and POST /api/qums/delete-connection
+ * Permanently clears saved GUeID, AES password, session cookies, and monitoring state
+ */
+router.post(['/reset', '/delete-connection'], requireAuth, async (req, res) => {
+  try {
+    const creds = require('../credentials');
+    creds.clearSessionCookies(req.session.userId);
+    await qumsWeb.cleanupPending(req.session.userId);
+
+    await db.query(
+      `UPDATE users SET
+         qums_qid = '',
+         qums_password_encrypted = NULL,
+         qums_session_path = '',
+         qums_session_data = '',
+         qums_session_status = 'disconnected',
+         student_name = '',
+         last_error = '',
+         updated_at = NOW()
+       WHERE id = $1`,
+      [req.session.userId]
+    );
+
+    await db.query(
+      `DELETE FROM session_expiry_state WHERE user_id = $1`,
+      [req.session.userId]
+    ).catch(() => {});
+
+    await db.recordAuditLog({
+      userId: req.session.userId,
+      action: 'GUEID_CONNECTION_RESET',
+      resource: 'qums:reset',
+      details: { resetBy: req.session.userId },
+    }).catch(() => {});
+
+    res.json({
+      ok: true,
+      success: true,
+      redirect: '/geu-setup',
+      message: 'GUeID connection & saved credentials reset. You can now enter a new GUeID and password.',
+    });
+  } catch (err) {
+    console.error('[qums/reset] Error:', err.message);
     res.status(500).json({ ok: false, success: false, error: err.message });
   }
 });

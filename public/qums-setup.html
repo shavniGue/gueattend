@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GEU ID Login — gueattend</title>
+  <title>GEU ID Login &amp; Connection — gueattend</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -34,86 +34,102 @@
     </div>
   </header>
 
-  <!-- Centered Clean GEU ID Login Container -->
-  <main class="dashboard-container" style="max-width: 520px;">
-    <div class="dash-header-row" style="margin-bottom: 18px;">
-      <div>
-        <h1 class="greeting-title" style="font-size: 21px;">GEU ID Portal Login</h1>
-        <p class="greeting-subtitle">Connect using your GUeID, password, and live CAPTCHA from student.geu.ac.in</p>
-      </div>
-      <div>
-        <a href="/dashboard" class="btn-secondary" style="text-decoration: none; display: inline-block;">← Dashboard</a>
-      </div>
-    </div>
+  <!-- Centered Content Container -->
+  <main class="dashboard-container" style="max-width: 480px; margin: 30px auto; padding: 0 16px;">
 
-    <!-- Alert / Status Banner -->
-    <div id="statusBanner" style="display: none; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px; font-weight: 600;"></div>
-    <div id="setupAlertBox" style="display: none; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px;"></div>
+    <!-- Global Alert / Message Box -->
+    <div id="setupAlertBox" style="display: none; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 20px; font-size: 13.5px; line-height: 1.4;"></div>
 
-    <!-- Card 1: 1-Click Reconnect (shown when credentials are saved or session expired) -->
-    <div id="reconnectCard" class="dash-table-card" style="display: none; margin-bottom: 18px; border-left: 4px solid var(--primary);">
-      <div style="padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
-        <h2 style="font-size: 15px; font-weight: 700; color: #1e3a8a;">Graphic Era ERP Connection</h2>
-        <span class="status-tag active" id="reconnectStatusBadge" style="background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px;">Saved</span>
+    <!-- ================================================================ -->
+    <!-- VIEW A: SAVED ACCOUNT & RECONNECT / RESET VIEW                   -->
+    <!-- (Shown when credentials are vaulted in database)                 -->
+    <!-- ================================================================ -->
+    <div id="reconnectCard" style="display: none;">
+
+      <!-- Centered Status Header (Matches Screenshot) -->
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div id="erpStatusPill" style="display: inline-flex; align-items: center; gap: 7px; background: #dcfce7; color: #15803d; font-size: 13.5px; font-weight: 600; padding: 5px 16px; border-radius: 9999px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+          <span id="erpStatusDot" style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #22c55e;"></span>
+          <span id="erpStatusText">Old ERP Connected</span>
+        </div>
+        <div id="erpSubtitleText" style="font-size: 14px; color: #64748b; margin-top: 10px; line-height: 1.4;">
+          GUeID session expired or needs reconnection — solve captcha to resume.
+        </div>
       </div>
 
-      <div style="padding: 20px;">
-        <!-- Saved GUeID Account Box (Matches Image 1) -->
-        <div class="saved-creds-card" style="background: rgba(30, 58, 138, 0.05); border: 1px solid rgba(30, 58, 138, 0.15); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 13.5px; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 6px;">
-              <span>🔒</span> Saved GUeID Account
-            </span>
-            <span class="badge-soft on" style="background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px;">Saved</span>
+      <!-- Saved Account Card (Matches Image Exact Layout) -->
+      <div class="saved-account-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div style="font-size: 15px; font-weight: 700; color: #2563eb; display: flex; align-items: center; gap: 7px;">
+            <span>🔒</span>
+            <span>Saved GUeID Account</span>
           </div>
-          <div style="font-size: 14px; margin-bottom: 4px; color: var(--text);">
-            Student: <b id="savedStudentName">—</b>
-          </div>
-          <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 8px;">
-            GUeID: <b id="savedQid" style="color: var(--text);">—</b> &nbsp;|&nbsp; Password: <span style="letter-spacing: 2px;">••••••••</span>
-          </div>
-          <p style="margin: 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">
-            Your GUeID & password are saved securely. You only need to solve the CAPTCHA to connect.
-          </p>
+          <span style="background: #e6f9ed; color: #16a34a; font-size: 12.5px; font-weight: 700; padding: 3px 12px; border-radius: 9999px;">Saved</span>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
-          <div id="reconnectCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; display: inline-flex; align-items: center; min-width: 160px; min-height: 52px; justify-content: center;">
-            <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
-          </div>
-          <button type="button" id="refreshReconnectCaptchaBtn" class="btn-secondary">Refresh</button>
+        <div style="font-size: 14.5px; color: #475569; margin-bottom: 6px;">
+          Student: <strong id="savedStudentName" style="color: #0f172a; font-weight: 700;">—</strong>
         </div>
 
-        <form id="reconnectForm">
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label class="form-label" for="reconnectCaptchaInput">CAPTCHA (case-sensitive)</label>
-            <input type="text" id="reconnectCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 15px;">
-          </div>
-          <button type="submit" id="reconnectSubmitBtn" class="btn-primary" style="width: 100%; padding: 11px; font-weight: 700;">🔐 Reconnect GUeID</button>
-        </form>
+        <div style="font-size: 14px; color: #64748b; margin-bottom: 14px;">
+          GUeID: <strong id="savedQid" style="color: #0f172a; font-weight: 700;">—</strong> &nbsp;|&nbsp; Password: <span style="letter-spacing: 2px; color: #475569;">••••••••</span>
+        </div>
 
+        <div style="font-size: 13px; color: #64748b; line-height: 1.5;">
+          Your GUeID &amp; password are saved securely. You only need to solve the CAPTCHA to connect.
+        </div>
+      </div>
+
+      <!-- Action Buttons below card (Matches Image Exact Layout) -->
+      <div style="margin-top: 20px;">
+        <!-- 1. Primary Reconnect Button (Solid Blue) -->
+        <button type="button" id="reconnectActionBtn" style="width: 100%; background: #2563eb; color: #ffffff; border: none; border-radius: 10px; padding: 14px 20px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); transition: background 0.15s ease;">
+          <span>🔐</span> Reconnect GUeID
+        </button>
+
+        <!-- 2. Reset / Delete Connection Button (Red Outline) -->
+        <button type="button" id="deleteConnectionBtn" style="width: 100%; background: #ffffff; color: #dc2626; border: 1.5px solid #ef4444; border-radius: 10px; padding: 13px 20px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: all 0.15s ease;">
+          Reset / Delete GUeID Connection
+        </button>
+
+        <!-- 3. Back to dashboard Link (Centered Blue) -->
+        <div style="margin-top: 18px; text-align: center;">
+          <a href="/dashboard" style="color: #2563eb; font-size: 15px; font-weight: 500; text-decoration: underline;">
+            ← Back to dashboard
+          </a>
+        </div>
+
+        <!-- 4. Subtle Manual Switch Option -->
         <div style="margin-top: 14px; text-align: center;">
-          <button type="button" id="toggleCredentialsFormBtn" style="background: none; border: none; color: var(--primary); font-size: 12.5px; cursor: pointer; text-decoration: underline;">
-            Update GUeID or Password
+          <button type="button" id="toggleCredentialsFormBtn" style="background: none; border: none; color: #64748b; font-size: 12.5px; cursor: pointer; text-decoration: underline;">
+            Update GUeID or Password manually
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Card 2: GEU ID Login Form (GUeID + Password + Live CAPTCHA only) -->
-    <div class="dash-table-card" id="fullSetupCard">
-      <div style="padding: 22px;">
+    <!-- ================================================================ -->
+    <!-- VIEW B: FULL GEU ID LOGIN FORM                                   -->
+    <!-- (Shown when no credentials are saved or when toggled)            -->
+    <!-- ================================================================ -->
+    <div class="dash-table-card" id="fullSetupCard" style="display: none; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+      <div style="padding: 24px;">
+        <div style="margin-bottom: 20px;">
+          <h1 class="greeting-title" style="font-size: 20px; margin-bottom: 6px;">GEU ID Portal Login</h1>
+          <p class="greeting-subtitle" style="font-size: 13.5px; color: #64748b; margin: 0;">Connect using your GUeID, password, and live CAPTCHA from student.geu.ac.in</p>
+        </div>
+
         <form id="qumsSetupForm">
           <div class="form-group" style="margin-bottom: 16px;">
-            <label class="form-label" for="setupQidInput">GUeID</label>
-            <input type="text" id="setupQidInput" class="form-input" placeholder="Enter your GUeID" required autocomplete="username">
+            <label class="form-label" for="setupQidInput" style="font-size: 13.5px; font-weight: 600; color: #334155;">GUeID (Student ID)</label>
+            <input type="text" id="setupQidInput" class="form-input" placeholder="e.g. 24030110" required autocomplete="username" style="font-size: 14.5px; padding: 10px 12px;">
           </div>
 
           <div class="form-group" style="margin-bottom: 16px;">
-            <label class="form-label" for="setupPasswordInput">Password</label>
-            <div class="input-with-icon">
-              <input type="password" id="setupPasswordInput" class="has-toggle" placeholder="Enter your portal password" required autocomplete="current-password">
-              <button type="button" id="toggleSetupPasswordBtn" class="input-icon-btn" aria-label="Show password" title="Show password">
+            <label class="form-label" for="setupPasswordInput" style="font-size: 13.5px; font-weight: 600; color: #334155;">Password</label>
+            <div class="input-with-icon" style="position: relative;">
+              <input type="password" id="setupPasswordInput" class="form-input has-toggle" placeholder="Enter your ERP portal password" required autocomplete="current-password" style="font-size: 14.5px; padding: 10px 12px; width: 100%;">
+              <button type="button" id="toggleSetupPasswordBtn" class="input-icon-btn" aria-label="Show password" title="Show password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #64748b;">
                 <svg id="setupEyeOffIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
                   <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
@@ -127,25 +143,103 @@
             </div>
           </div>
 
-          <div class="form-group" style="margin-bottom: 18px;">
-            <label class="form-label" for="setupCaptchaInput">CAPTCHA</label>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="setupCaptchaInput" style="font-size: 13.5px; font-weight: 600; color: #334155;">CAPTCHA</label>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-              <div id="setupCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; display: inline-flex; align-items: center; min-width: 170px; min-height: 52px; justify-content: center;">
+              <div id="setupCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; display: inline-flex; align-items: center; min-width: 170px; min-height: 52px; justify-content: center;">
                 <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
               </div>
-              <button type="button" id="refreshSetupCaptchaBtn" class="btn-secondary">Refresh CAPTCHA</button>
+              <button type="button" id="refreshSetupCaptchaBtn" class="btn-secondary" style="padding: 8px 14px; font-size: 13px;">Refresh CAPTCHA</button>
             </div>
-            <input type="text" id="setupCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 15px;">
+            <input type="text" id="setupCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 15px; padding: 10px 12px;">
           </div>
 
-          <button type="submit" id="setupSubmitBtn" class="btn-primary" style="width: 100%; padding: 11px;">
+          <button type="submit" id="setupSubmitBtn" class="btn-primary" style="width: 100%; padding: 13px; font-size: 15.5px; font-weight: 700;">
             <span id="setupBtnLabel">Connect GEU ID</span>
           </button>
-          <div id="setupSpinner" style="display: none; font-size: 12.5px; color: var(--text-muted); text-align: center; margin-top: 8px;">Connecting to student.geu.ac.in...</div>
+          <div id="setupSpinner" style="display: none; font-size: 12.5px; color: var(--text-muted); text-align: center; margin-top: 10px;">Connecting to student.geu.ac.in...</div>
         </form>
+
+        <div style="margin-top: 18px; text-align: center;">
+          <a href="/dashboard" style="color: #2563eb; font-size: 14.5px; font-weight: 500; text-decoration: underline;">
+            ← Back to dashboard
+          </a>
+        </div>
+
+        <div style="margin-top: 20px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; color: #64748b; line-height: 1.4;">
+          💡 <strong>Tip:</strong> Graphic Era ERP permits one active session at a time. If you ever see "Session expired" on student.geu.ac.in, simply refresh that page to re-authenticate there.
+        </div>
       </div>
     </div>
   </main>
+
+  <!-- ================================================================ -->
+  <!-- MODAL 1: 1-CLICK RECONNECT MODAL                                 -->
+  <!-- ================================================================ -->
+  <div class="modal-backdrop" id="reconnectModal">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <div class="modal-title">🔐 Reconnect GUeID</div>
+        <button type="button" class="modal-close-btn" id="closeReconnectModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13.5px; color: #64748b; margin-bottom: 16px; line-height: 1.4;">
+          Solve the live CAPTCHA from <strong>student.geu.ac.in</strong> to resume your session with your securely saved credentials.
+        </p>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <div id="reconnectCaptchaContainer" style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; display: inline-flex; align-items: center; min-width: 160px; min-height: 52px; justify-content: center;">
+            <span style="font-size: 12px; color: var(--text-muted);">Loading CAPTCHA...</span>
+          </div>
+          <button type="button" id="refreshReconnectCaptchaBtn" class="btn-secondary" style="padding: 8px 14px; font-size: 13px;">Refresh</button>
+        </div>
+
+        <form id="reconnectForm">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="reconnectCaptchaInput" style="font-size: 13px; font-weight: 600; color: #334155;">CAPTCHA (case-sensitive)</label>
+            <input type="text" id="reconnectCaptchaInput" class="form-input" placeholder="Enter CAPTCHA code" required autocomplete="off" style="font-family: monospace; letter-spacing: 2px; font-size: 16px; padding: 10px 12px;">
+          </div>
+          <button type="submit" id="reconnectSubmitBtn" class="btn-primary" style="width: 100%; padding: 12px; font-weight: 700; font-size: 15px;">
+            Verify &amp; Reconnect
+          </button>
+          <div id="reconnectSpinner" style="display: none; font-size: 12.5px; color: #64748b; text-align: center; margin-top: 10px;">
+            Connecting to student.geu.ac.in...
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL 2: RESET / DELETE CONNECTION CONFIRMATION MODAL            -->
+  <!-- ================================================================ -->
+  <div class="modal-backdrop" id="deleteConfirmModal">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <div class="modal-title" style="color: #dc2626;">⚠️ Reset / Delete GUeID Connection</div>
+        <button type="button" class="modal-close-btn" id="closeDeleteModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 14px; color: #1e293b; line-height: 1.5; margin-bottom: 14px;">
+          Are you sure you want to permanently delete your saved GUeID connection and credentials?
+        </p>
+        <ul style="font-size: 13px; color: #64748b; margin-bottom: 20px; padding-left: 20px; line-height: 1.6;">
+          <li>Your saved GUeID binding will be removed.</li>
+          <li>Your vaulted password will be erased from encrypted storage.</li>
+          <li>Active portal session cookies will be purged.</li>
+          <li>You can enter a fresh GUeID and password anytime.</li>
+        </ul>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" id="confirmDeleteBtn" style="flex: 1; background: #dc2626; color: #ffffff; border: none; border-radius: 8px; padding: 11px 16px; font-weight: 700; font-size: 14.5px; cursor: pointer; transition: background 0.15s ease;">
+            Yes, Delete Connection
+          </button>
+          <button type="button" id="cancelDeleteBtn" class="btn-secondary" style="flex: 1; padding: 11px 16px; font-size: 14.5px;">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     function showSetupMessage(text, isError = true) {
@@ -156,6 +250,7 @@
       box.style.background = isError ? '#fef2f2' : '#dcfce7';
       box.style.border = isError ? '1px solid #fecaca' : '1px solid #bbf7d0';
       box.style.color = isError ? '#b91c1c' : '#15803d';
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     // Password eye toggle
@@ -208,50 +303,58 @@
       }
     }
 
+    // Modal Helpers
+    function openModal(id) {
+      document.getElementById(id)?.classList.add('open');
+    }
+    function closeModal(id) {
+      document.getElementById(id)?.classList.remove('open');
+    }
+
     // Check Status on Load
     async function checkStatus() {
       try {
         const res = await fetch('/api/geu/status');
         const data = await res.json();
-        const banner = document.getElementById('statusBanner');
+
         const reconnectCard = document.getElementById('reconnectCard');
         const fullSetupCard = document.getElementById('fullSetupCard');
-        const reconnectStatusBadge = document.getElementById('reconnectStatusBadge');
         const savedStudentName = document.getElementById('savedStudentName');
         const savedQid = document.getElementById('savedQid');
+        const erpStatusPill = document.getElementById('erpStatusPill');
+        const erpStatusDot = document.getElementById('erpStatusDot');
+        const erpStatusText = document.getElementById('erpStatusText');
+        const erpSubtitleText = document.getElementById('erpSubtitleText');
 
         if (data.hasVaultedPassword && data.studentQid) {
           reconnectCard.style.display = 'block';
+          fullSetupCard.style.display = 'none';
+
           if (savedStudentName) savedStudentName.textContent = data.studentName || 'Student';
           if (savedQid) savedQid.textContent = data.studentQid;
-          if (fullSetupCard) fullSetupCard.style.display = 'none';
-          loadCaptcha('reconnectCaptchaContainer');
 
           if (data.sessionState === 'expired') {
-            banner.style.display = 'block';
-            banner.style.background = 'var(--warning-bg)';
-            banner.style.color = 'var(--warning-text)';
-            banner.textContent = 'GUeID session expired or needs reconnection — solve captcha to resume.';
-            if (reconnectStatusBadge) {
-              reconnectStatusBadge.textContent = 'Session Expired';
-              reconnectStatusBadge.style.background = '#fef3c7';
-              reconnectStatusBadge.style.color = '#b45309';
-            }
+            erpStatusPill.style.background = '#dcfce7';
+            erpStatusPill.style.color = '#15803d';
+            erpStatusDot.style.background = '#22c55e';
+            erpStatusText.textContent = 'Old ERP Connected';
+            erpSubtitleText.textContent = 'GUeID session expired or needs reconnection — solve captcha to resume.';
           } else if (data.sessionState === 'connected' || data.sessionState === 'active') {
-            banner.style.display = 'block';
-            banner.style.background = 'var(--success-bg)';
-            banner.style.color = 'var(--success-text)';
-            const esc = window.GueSecurity ? window.GueSecurity.escapeHtml : (v) => String(v || '');
-            banner.innerHTML = `🟢 Graphic Era ERP Connected for GUeID: <strong>${esc(data.studentQid || '')}</strong>`;
-            if (reconnectStatusBadge) {
-              reconnectStatusBadge.textContent = 'Active';
-              reconnectStatusBadge.style.background = '#dcfce7';
-              reconnectStatusBadge.style.color = '#15803d';
-            }
+            erpStatusPill.style.background = '#dcfce7';
+            erpStatusPill.style.color = '#15803d';
+            erpStatusDot.style.background = '#22c55e';
+            erpStatusText.textContent = 'Graphic Era ERP Connected';
+            erpSubtitleText.textContent = `Live attendance synchronization is active for GUeID ${data.studentQid}.`;
+          } else {
+            erpStatusPill.style.background = '#fef3c7';
+            erpStatusPill.style.color = '#b45309';
+            erpStatusDot.style.background = '#f59e0b';
+            erpStatusText.textContent = 'Reconnection Required';
+            erpSubtitleText.textContent = 'Solve live CAPTCHA to resume portal synchronization.';
           }
         } else {
-          if (reconnectCard) reconnectCard.style.display = 'none';
-          if (fullSetupCard) fullSetupCard.style.display = 'block';
+          reconnectCard.style.display = 'none';
+          fullSetupCard.style.display = 'block';
           loadCaptcha('setupCaptchaContainer');
         }
 
@@ -259,9 +362,13 @@
           const qidInput = document.getElementById('setupQidInput');
           if (qidInput) qidInput.value = data.studentQid;
         }
-      } catch (err) {}
+      } catch (err) {
+        document.getElementById('fullSetupCard').style.display = 'block';
+        loadCaptcha('setupCaptchaContainer');
+      }
     }
 
+    // Toggle full credentials form
     document.getElementById('toggleCredentialsFormBtn')?.addEventListener('click', () => {
       const fullSetupCard = document.getElementById('fullSetupCard');
       if (fullSetupCard) {
@@ -274,13 +381,117 @@
       }
     });
 
-    document.getElementById('refreshSetupCaptchaBtn')?.addEventListener('click', () => loadCaptcha('setupCaptchaContainer'));
-    document.getElementById('refreshReconnectCaptchaBtn')?.addEventListener('click', () => loadCaptcha('reconnectCaptchaContainer'));
+    // Reconnect Modal Handlers
+    document.getElementById('reconnectActionBtn')?.addEventListener('click', () => {
+      openModal('reconnectModal');
+      loadCaptcha('reconnectCaptchaContainer');
+      setTimeout(() => {
+        document.getElementById('reconnectCaptchaInput')?.focus();
+      }, 100);
+    });
 
-    // Handle GEU ID Login Submit
+    document.getElementById('closeReconnectModalBtn')?.addEventListener('click', () => {
+      closeModal('reconnectModal');
+    });
+
+    document.getElementById('refreshReconnectCaptchaBtn')?.addEventListener('click', () => {
+      loadCaptcha('reconnectCaptchaContainer');
+    });
+
+    // Reconnect Form Submit
+    document.getElementById('reconnectForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const captcha = document.getElementById('reconnectCaptchaInput').value.trim();
+      const btn = document.getElementById('reconnectSubmitBtn');
+      const spinner = document.getElementById('reconnectSpinner');
+
+      btn.disabled = true;
+      spinner.style.display = 'block';
+
+      try {
+        const res = await fetch('/api/geu/reconnect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ captcha }),
+        });
+        const data = await res.json();
+        if (data.success || data.ok) {
+          closeModal('reconnectModal');
+          showSetupMessage('Reconnected successfully! Redirecting to dashboard...', false);
+          window.location.href = data.redirect || '/dashboard';
+        } else {
+          showSetupMessage(data.error || 'Invalid CAPTCHA code.');
+          if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
+            renderCaptchaImage(document.getElementById('reconnectCaptchaContainer'), data.captcha || data.captchaImage);
+          } else {
+            loadCaptcha('reconnectCaptchaContainer');
+          }
+          const capInput = document.getElementById('reconnectCaptchaInput');
+          if (capInput) {
+            capInput.value = '';
+            capInput.focus();
+          }
+        }
+      } catch (err) {
+        showSetupMessage('Network error while reconnecting.');
+      } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+      }
+    });
+
+    // Delete / Reset Connection Modal Handlers
+    document.getElementById('deleteConnectionBtn')?.addEventListener('click', () => {
+      openModal('deleteConfirmModal');
+    });
+
+    document.getElementById('closeDeleteModalBtn')?.addEventListener('click', () => {
+      closeModal('deleteConfirmModal');
+    });
+
+    document.getElementById('cancelDeleteBtn')?.addEventListener('click', () => {
+      closeModal('deleteConfirmModal');
+    });
+
+    document.getElementById('confirmDeleteBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('confirmDeleteBtn');
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const res = await fetch('/api/geu/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (data.success || data.ok) {
+          closeModal('deleteConfirmModal');
+          showSetupMessage('GUeID connection and saved credentials successfully deleted. You can now connect a new account.', false);
+          document.getElementById('reconnectCard').style.display = 'none';
+          document.getElementById('fullSetupCard').style.display = 'block';
+          loadCaptcha('setupCaptchaContainer');
+          const qidInput = document.getElementById('setupQidInput');
+          if (qidInput) qidInput.value = '';
+          const passInput = document.getElementById('setupPasswordInput');
+          if (passInput) passInput.value = '';
+          const capInput = document.getElementById('setupCaptchaInput');
+          if (capInput) capInput.value = '';
+        } else {
+          showSetupMessage(data.error || 'Failed to reset GUeID connection.');
+        }
+      } catch (err) {
+        showSetupMessage('Network error while resetting connection.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Yes, Delete Connection';
+      }
+    });
+
+    // Handle GEU ID Login Submit (Full Form)
+    document.getElementById('refreshSetupCaptchaBtn')?.addEventListener('click', () => loadCaptcha('setupCaptchaContainer'));
+
     document.getElementById('qumsSetupForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      document.getElementById('setupAlertBox').style.display = 'none';
       const qid = document.getElementById('setupQidInput').value.trim();
       const password = document.getElementById('setupPasswordInput').value;
       const captcha = document.getElementById('setupCaptchaInput').value.trim();
@@ -307,7 +518,11 @@
           } else {
             loadCaptcha('setupCaptchaContainer');
           }
-          document.getElementById('setupCaptchaInput').value = '';
+          const capInput = document.getElementById('setupCaptchaInput');
+          if (capInput) {
+            capInput.value = '';
+            capInput.focus();
+          }
         }
       } catch (err) {
         showSetupMessage('Network error while connecting to student.geu.ac.in.');
@@ -317,39 +532,10 @@
       }
     });
 
-    // Handle Reconnect Submit
-    document.getElementById('reconnectForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      document.getElementById('setupAlertBox').style.display = 'none';
-      const captcha = document.getElementById('reconnectCaptchaInput').value.trim();
-      const btn = document.getElementById('reconnectSubmitBtn');
-
-      btn.disabled = true;
-      btn.textContent = 'Reconnecting...';
-
-      try {
-        const res = await fetch('/api/geu/reconnect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ captcha }),
-        });
-        const data = await res.json();
-        if (data.success || data.ok) {
-          window.location.href = data.redirect || '/dashboard';
-        } else {
-          showSetupMessage(data.error || 'Invalid CAPTCHA code.');
-          if (data.refreshCaptcha && (data.captcha || data.captchaImage)) {
-            renderCaptchaImage(document.getElementById('reconnectCaptchaContainer'), data.captcha || data.captchaImage);
-          } else {
-            loadCaptcha('reconnectCaptchaContainer');
-          }
-          document.getElementById('reconnectCaptchaInput').value = '';
-        }
-      } catch (err) {
-        showSetupMessage('Network error while reconnecting.');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Reconnect';
+    // Close modals on clicking backdrop
+    window.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-backdrop')) {
+        e.target.classList.remove('open');
       }
     });
 
@@ -359,7 +545,7 @@
       window.location.href = '/login';
     });
 
-    loadCaptcha('setupCaptchaContainer');
+    // Initial check
     checkStatus();
   </script>
 </body>

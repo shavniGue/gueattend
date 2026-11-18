@@ -33,8 +33,9 @@ async function scrapeSubjectWiseAttendance(userId) {
 
   // 1. If live session cookies exist, query Graphic Era University Cyborg ERP
   if (sessionExists) {
+    let apiContext = null;
     try {
-      const apiContext = await playwrightRequest.newContext({
+      apiContext = await playwrightRequest.newContext({
         storageState: sessionPath,
         baseURL: COLLEGE_BASE_URL,
         extraHTTPHeaders: {
@@ -148,6 +149,10 @@ async function scrapeSubjectWiseAttendance(userId) {
       }
     } catch (scrapeErr) {
       console.warn('[scraper] Live ERP scrape note:', scrapeErr.message);
+    } finally {
+      if (apiContext) {
+        await apiContext.dispose().catch(() => {});
+      }
     }
   }
 
