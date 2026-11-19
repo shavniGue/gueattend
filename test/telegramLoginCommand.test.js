@@ -112,7 +112,7 @@ function ok(label, cond) {
   // TEST 4: CAPTCHA photo sent to user
   const photo = sentPhotos.find(p => p.chatId === '99887766');
   ok('4. CAPTCHA photo delivered directly to Telegram', Boolean(photo));
-  ok('4. CAPTCHA photo contains helpful prompt caption', photo && photo.caption.includes('GEU ERP'));
+  ok('4. CAPTCHA photo sent clean without caption (matching Image 2)', photo && (!photo.caption || photo.caption === ''));
   ok('4. CAPTCHA photo has inline buttons', photo && photo.opts && photo.opts.reply_markup && photo.opts.reply_markup.inline_keyboard.length > 0);
 
   // TEST 5: User submits CAPTCHA in lowercase 'yap5s' -> succeeds

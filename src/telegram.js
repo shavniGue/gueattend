@@ -718,7 +718,7 @@ async function startTelegramCaptchaReconnect(userId, log = console, opts = {}) {
     }
   }
 
-  if (!alertMsgId && !opts.skipAlertText) {
+  if ((!alertMsgId || opts.alwaysSendAlertText) && !opts.skipAlertText) {
     const alertOpts = {};
     await sendMessage(userId, TELEGRAM_SESSION_EXPIRED_TEXT, log, alertOpts);
     alertMsgId = alertOpts.messageId || null;
@@ -731,9 +731,8 @@ async function startTelegramCaptchaReconnect(userId, log = console, opts = {}) {
       throw new Error('No captcha image returned from QUMS login');
     }
 
-    const photoCaption = '🔐 *GEU ERP Reconnect CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
     const photoOpts = { replyMarkup: captchaKeyboard() };
-    await sendPhoto(userId, res.captchaImage, photoCaption, log, photoOpts);
+    await sendPhoto(userId, res.captchaImage, '', log, photoOpts);
     const captchaMsgId = photoOpts.messageId || null;
     if (captchaMsgId && user.telegramChatId) {
       scheduleAutoDelete(user.telegramChatId, captchaMsgId, AUTO_DELETE_DELAY_MS, log);
@@ -955,9 +954,8 @@ async function handleUserMessage(msg, log = console) {
 
     // Provide the new captcha image
     if (result && result.captchaImage) {
-      const photoCaption = '🔐 *Fresh GEU ERP CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
       const photoOpts = { replyMarkup: captchaKeyboard() };
-      await sendPhoto(user.id, result.captchaImage, photoCaption, log, photoOpts);
+      await sendPhoto(user.id, result.captchaImage, '', log, photoOpts);
       rState.captchaMessageId = photoOpts.messageId || null;
       if (rState.captchaMessageId && chatId) {
         scheduleAutoDelete(chatId, rState.captchaMessageId, AUTO_DELETE_DELAY_MS, log);
@@ -1247,9 +1245,8 @@ async function handleCallbackQuery(query, log = console) {
         await deleteMessage(user.id, oldCaptchaMsgId, log).catch(() => {});
       }
 
-      const photoCaption = '🔐 *Regenerated GEU ERP CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
       const photoOpts = { replyMarkup: captchaKeyboard() };
-      await sendPhoto(user.id, res.captchaImage, photoCaption, log, photoOpts);
+      await sendPhoto(user.id, res.captchaImage, '', log, photoOpts);
       if (photoOpts.messageId && chatId) {
         scheduleAutoDelete(chatId, photoOpts.messageId, AUTO_DELETE_DELAY_MS, log);
       }
@@ -2546,7 +2543,7 @@ async function handleReconnectCommand(chatId, log = console) {
   }
   reconnectingChats.add(chatKey);
   try {
-    const started = await startTelegramCaptchaReconnect(user.id, log);
+    const started = await startTelegramCaptchaReconnect(user.id, log, { alwaysSendAlertText: true });
     if (!started || !started.ok) {
       if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
         await reply(chatId, '⏳ Another reconnect is currently in progress. Please wait a moment and send /reconnect again.', log);
@@ -2629,7 +2626,7 @@ async function handleTelegramLoginCommand(chatId, qid, password, msg, log = cons
   const waitMsg = await reply(chatId, '⏳ GEU ERP credentials saved! Launching portal and fetching CAPTCHA...', log);
 
   try {
-    const started = await startTelegramCaptchaReconnect(user.id, log, { skipAlertText: true });
+    const started = await startTelegramCaptchaReconnect(user.id, log, { alwaysSendAlertText: true });
     if (waitMsg && waitMsg.message_id) {
       await deleteMessage(user.id, waitMsg.message_id, log).catch(() => {});
     }

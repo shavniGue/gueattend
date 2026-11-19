@@ -170,6 +170,13 @@
         const data = await res.json();
         if (!res.ok) {
           $('msg').classList.add('hidden');
+          if (data.code === 'QumsCredsRequired' || (data.error && data.error.toLowerCase().includes('password'))) {
+            setMode('first-time');
+            $('error').textContent = 'Please enter your GEU ERP password. It will be saved securely for all future reconnects.';
+            $('error').classList.remove('hidden');
+            $('qumsPassword').focus();
+            return;
+          }
           if (data.identityConflict) {
             $('error').innerHTML = `<b>⚠️ Different Student ID Detected</b><br>` +
               `Current active GEU ID: <b>${data.oldQid}</b><br>` +
@@ -360,12 +367,15 @@
             data.hasSavedQumsCredentials ||
             data.hasSavedGeuCredentials ||
             me.qumsCredentialsSaved ||
-            (me.qumsQid && (me.qumsPasswordEncrypted || me.hasPassword))
+            me.qumsQid
           );
           savedQid = me.qumsQid || me.geuId || '';
           savedStudentName = me.studentName || 'Student';
           $('savedQid').textContent = savedQid || '—';
           $('savedStudentName').textContent = savedStudentName;
+          if (savedQid) {
+            $('qid').value = savedQid;
+          }
 
           const isConnected = Boolean(me.qumsSessionPath || me.qumsConfigured) && me.qumsSessionStatus !== 'expired';
           const isExpired = Boolean(me.qumsSessionStatus === 'expired');
