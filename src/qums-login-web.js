@@ -191,27 +191,16 @@ async function openLoginFormPage() {
     ],
   };
 
+  const { launchChromiumSafe } = require('./playwright-helper');
   let browser;
   try {
-    browser = await chromium.launch(launchOptions);
+    browser = await launchChromiumSafe(chromium, launchOptions);
   } catch (launchErr) {
-    const errMsg = String(launchErr && launchErr.message ? launchErr.message : '');
-    if (errMsg.includes("Executable doesn't exist") || errMsg.includes('playwright install')) {
-      console.warn('[Playwright] Chromium browser executable not found. Running auto-install (npx playwright install chromium)...');
-      try {
-        const { execSync } = require('child_process');
-        execSync('PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium', { stdio: 'inherit', timeout: 180000 });
-        browser = await chromium.launch(launchOptions);
-      } catch (retryErr) {
-        console.error('[Playwright] Auto-install failed:', retryErr.message);
-        const userErr = new Error('Browser engine download ho raha hai. Please 1 minute baad dobara Get Captcha click karein.');
-        userErr.name = 'BrowserMissingError';
-        userErr.hint = 'Server is installing Chromium dependencies. Please wait 60 seconds and retry.';
-        throw userErr;
-      }
-    } else {
-      throw launchErr;
-    }
+    console.error('[Playwright] Chromium launch error:', launchErr.message);
+    const userErr = new Error('Browser engine download ho raha hai. Please 1 minute baad dobara Get Captcha click karein.');
+    userErr.name = 'BrowserMissingError';
+    userErr.hint = 'Server is installing Chromium dependencies. Please wait 60 seconds and retry.';
+    throw userErr;
   }
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },

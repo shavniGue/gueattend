@@ -1067,22 +1067,8 @@ function getTodaySubjects(timetable, now = new Date()) {
 
 
 async function createSessionContext(sessionPath = SESSION_FILE) {
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: true });
-  } catch (err) {
-    if (err && String(err.message).includes("Executable doesn't exist")) {
-      try {
-        const { execSync } = require('child_process');
-        execSync('npx playwright install chromium', { stdio: 'inherit', timeout: 180000 });
-        browser = await chromium.launch({ headless: true });
-      } catch (retryErr) {
-        throw err;
-      }
-    } else {
-      throw err;
-    }
-  }
+  const { launchChromiumSafe } = require('./playwright-helper');
+  const browser = await launchChromiumSafe(chromium, { headless: true });
   const context = await browser.newContext({
     storageState: sessionPath,
     viewport: { width: 1366, height: 900 },
