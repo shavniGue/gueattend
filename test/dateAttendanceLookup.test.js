@@ -404,6 +404,20 @@ async function run() {
   assert(sentMessages[0].text.includes('Available commands'), '/help text preserved');
   assert(sentMessages[0].text.includes('/DD/MM/YY'), '/help includes new date command');
 
+  // Expired session handling for /today and /assignments
+  await db.updateUser(userA.id, { qumsSessionStatus: 'expired' });
+  sentMessages.length = 0;
+  await telegram.handleUserMessage({ chat: { id: 710001 }, text: '/today', message_id: 8013 });
+  assert(sentMessages.length >= 1, '/today must respond when expired');
+  assert(sentMessages[0].text.includes('Session Expired') && sentMessages[0].text.includes('/reconnect'), '/today returns expired notice');
+
+  sentMessages.length = 0;
+  await telegram.handleUserMessage({ chat: { id: 710001 }, text: '/assignments', message_id: 8014 });
+  assert(sentMessages.length >= 1, '/assignments must respond when expired');
+  assert(sentMessages[0].text.includes('Session Expired') && sentMessages[0].text.includes('/reconnect'), '/assignments returns expired notice');
+
+  await db.updateUser(userA.id, { qumsSessionStatus: 'active' });
+
   console.log('✓ PASS: All existing commands preserved and functional');
 
   console.log('\n===============================================================');

@@ -1812,7 +1812,45 @@ async function handleToday(chatId, log = console) {
     return;
   }
 
-  // Fast path: In-memory cache hit (< 5ms response time!)
+  // 1. Session status checks — NEVER serve cached data or offline schedule if session is expired
+  if (isUserNewErp(user)) {
+    if (user.newErpSessionStatus === 'expired') {
+      invalidateTgUserCaches(user.id);
+      const { baseUrl } = require('./alerts');
+      const opts = {
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: '⚡ 1-Click Reconnect', callback_data: 'new_erp_1click_reconnect' }],
+            [{ text: '🌐 Open Webpage', url: `${baseUrl()}/dashboard?reconnect=1` }],
+          ],
+        },
+        category: 'ALERT',
+      };
+      await reply(
+        chatId,
+        '⚠️ *New ERP Session Logged Out*\n\nAapka session logout ho gaya hai.\n\nNeeche button dabakar 1-Click me reconnect karein:',
+        log,
+        opts
+      );
+      return;
+    }
+  } else {
+    if (user.qumsSessionStatus === 'expired') {
+      invalidateTgUserCaches(user.id);
+      const sentMsg = await reply(
+        chatId,
+        `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
+        log
+      );
+      const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
+      if (messageId) {
+        scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
+      }
+      return;
+    }
+  }
+
+  // Fast path: In-memory cache hit (< 5ms response time!) — ONLY for active sessions
   const cachedToday = tgTodayCache.get(user.id);
   if (cachedToday && (Date.now() - cachedToday.timestamp < TG_TODAY_CACHE_TTL_MS)) {
     const sentMsg = await reply(chatId, cachedToday.text, log);
@@ -1825,26 +1863,6 @@ async function handleToday(chatId, log = console) {
     const { formatTodayAttendanceStatus } = require('./messages');
 
     if (isUserNewErp(user)) {
-      if (user.newErpSessionStatus === 'expired') {
-        const { baseUrl } = require('./alerts');
-        const opts = {
-          replyMarkup: {
-            inline_keyboard: [
-              [{ text: '⚡ 1-Click Reconnect', callback_data: 'new_erp_1click_reconnect' }],
-              [{ text: '🌐 Open Webpage', url: `${baseUrl()}/dashboard?reconnect=1` }],
-            ],
-          },
-          category: 'ALERT',
-        };
-        await reply(
-          chatId,
-          '⚠️ *New ERP Session Logged Out*\n\nAapka session logout ho gaya hai.\n\nNeeche button dabakar 1-Click me reconnect karein:',
-          log,
-          opts
-        );
-        return;
-      }
-
       const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const y = istNow.getFullYear();
       const m = String(istNow.getMonth() + 1).padStart(2, '0');
@@ -2511,6 +2529,21 @@ async function handleAssignments(chatId, log = console) {
       lines.push(AUTO_DELETE_FOOTNOTE.trim());
       await reply(chatId, lines.join('\n'), log, { autoDelete: true, delayMs: AUTO_DELETE_DELAY_MS });
       return;
+    }
+
+    if (!isUserNewErp(user)) {
+      if (user.qumsSessionStatus === 'expired') {
+        const sentMsg = await reply(
+          chatId,
+          `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
+          log
+        );
+        const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
+        if (messageId) {
+          scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
+        }
+        return;
+      }
     }
 
     const known = await db.listKnownAssignments(user.id);
