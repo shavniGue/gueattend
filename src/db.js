@@ -591,13 +591,25 @@ async function importLocalJsonData(log = console) {
   return { users: imported, attendance, assignments, skipped: false };
 }
 
+function sanitizeDatabaseUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+  let s = rawUrl.trim();
+  if (s.includes('2X6Saaws-0')) {
+    s = s.replace('2X6Saaws-0', '2X6S@aws-0');
+  }
+  if (s.includes('zxsKpE9%Qu@2X6S@')) {
+    s = s.replace('zxsKpE9%Qu@2X6S@', 'zxsKpE9%25Qu%402X6S@');
+  }
+  return s;
+}
+
 async function init() {
   if (!USE_PG) return;
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const { Pool } = require('pg');
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: sanitizeDatabaseUrl(process.env.DATABASE_URL),
       ssl: sslConfig(),
       max: Number(process.env.PG_POOL_MAX || 5),
       idleTimeoutMillis: 30000,
