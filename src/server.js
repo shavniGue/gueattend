@@ -1103,6 +1103,19 @@ async function startQumsLoginHandler(req, res) {
     const finalQid = String(qid || req.appUser.qumsQid || '').trim();
     const finalPassword = password != null && String(password).trim() !== '' ? String(password) : undefined;
 
+    // Immediately persist credentials so Telegram /reconnect works even if browser takes time
+    if (finalQid && finalPassword) {
+      try {
+        const { encryptSecret } = require('./crypto');
+        await db.updateUser(req.session.userId, {
+          qumsQid: finalQid,
+          qumsPasswordEncrypted: encryptSecret(finalPassword),
+        });
+      } catch (saveErr) {
+        console.error('[server] Pre-saving GEU credentials failed:', saveErr.message);
+      }
+    }
+
     const result = await qumsLogin.startQumsLogin(
       req.session.userId,
       { qid: finalQid, password: finalPassword, confirmSwitch: Boolean(confirmSwitch) }
@@ -1125,6 +1138,25 @@ async function startQumsLoginHandler(req, res) {
 app.post('/api/qums-login/start', requireAuth, startQumsLoginHandler);
 app.post('/api/geu-login/start', requireAuth, startQumsLoginHandler);
 app.post('/api/gue-login/start', requireAuth, startQumsLoginHandler);
+
+app.post(['/api/user/save-geu-credentials', '/api/user/qums-credentials'], requireAuth, async (req, res) => {
+  try {
+    const { qid, password } = req.body || {};
+    const finalQid = String(qid || req.appUser.qumsQid || '').trim();
+    const finalPassword = String(password || '').trim();
+    if (!finalQid || !finalPassword) {
+      return res.status(400).json({ ok: false, error: 'GEU Student ID and password are required.' });
+    }
+    const { encryptSecret } = require('./crypto');
+    await db.updateUser(req.session.userId, {
+      qumsQid: finalQid,
+      qumsPasswordEncrypted: encryptSecret(finalPassword),
+    });
+    res.json({ ok: true, message: 'GEU ERP credentials saved securely.' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 async function submitQumsCaptchaHandler(req, res) {
   try {
