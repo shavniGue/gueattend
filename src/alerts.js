@@ -29,7 +29,7 @@ const alertInFlight = new Set();
 function baseUrl() {
   const explicit = String(process.env.APP_BASE_URL || '').trim();
   const render = String(process.env.RENDER_EXTERNAL_URL || '').trim();
-  const fallback = 'https://qattend.onrender.com';
+  const fallback = 'https://gueattend.onrender.com';
   return (explicit || render || fallback).replace(/\/+$/, '');
 }
 
@@ -37,7 +37,7 @@ function baseUrl() {
 function reconnectUrl() {
   const base = baseUrl();
   // Telegram Bot API strictly requires HTTPS URLs for inline keyboard buttons
-  const secureBase = /^https:\/\//i.test(base) ? base : 'https://qattend.onrender.com';
+  const secureBase = /^https:\/\//i.test(base) ? base : 'https://gueattend.onrender.com';
   return `${secureBase}/qums-setup?reconnect=1`;
 }
 
