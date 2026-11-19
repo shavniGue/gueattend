@@ -766,6 +766,10 @@ function invalidateUserDataCaches(userId) {
     attendanceCache.delete(userId);
     todayCache.delete(userId);
     timetableCache.delete(userId);
+    try {
+      const { invalidateTgUserCaches } = require('./telegram');
+      invalidateTgUserCaches(userId);
+    } catch {}
   }
 }
 

@@ -1160,6 +1160,10 @@ async function scrapeTimetable(opts = {}) {
     await apiContext.dispose();
   }
 
+  if (opts.skipBrowser || opts.fastOnly) {
+    return null;
+  }
+
   // 2) Fallback: headless browser parse (jqGrid DOM) — retry ke saath
   const { browser, context } = await createSessionContext(sessionPath);
   try {

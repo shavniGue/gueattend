@@ -604,6 +604,28 @@ const MSG_INCORRECT_CAPTCHA = [
 const MSG_RECONNECT_CANCELLED = '❌ Reconnect cancelled.';
 const MSG_TOO_MANY_ATTEMPTS = '❌ Too many failed attempts. Reconnect cancelled.';
 
+// ---- Slash Command Performance Optimization & In-Memory Response Caches ----
+const tgTodayCache = new Map(); // userId -> { text, timestamp }
+const TG_TODAY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+const tgAttendanceCache = new Map(); // userId -> { text, timestamp }
+const TG_ATTENDANCE_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+function invalidateTgUserCaches(userId) {
+  if (userId) {
+    tgTodayCache.delete(userId);
+    tgAttendanceCache.delete(userId);
+  }
+}
+
+function sendTyping(chatId) {
+  try {
+    if (state.bot && typeof state.bot.sendChatAction === 'function' && chatId) {
+      state.bot.sendChatAction(chatId, 'typing').catch(() => {});
+    }
+  } catch {}
+}
+
 function captchaKeyboard() {
   return {
     inline_keyboard: [
@@ -743,6 +765,8 @@ async function handleUserMessage(msg, log = console) {
 
   const chatId = msg.chat && msg.chat.id;
   if (!chatId) return;
+
+  sendTyping(chatId);
 
   const lower = text.toLowerCase();
 
@@ -885,6 +909,8 @@ async function handleUserMessage(msg, log = console) {
         await deleteMessage(user.id, uMsgId, log).catch(() => {});
       }
 
+      invalidateTgUserCaches(user.id);
+
       // Note: submitQumsCaptcha -> runReconnectCatchup -> notifyQumsReconnected
       // sends "✅ QUMS Reconnected", deletes the old session-expired alert, and schedules auto-delete after 1 min!
       return;
@@ -960,7 +986,7 @@ async function executeNewErp1ClickReconnect(user, chatId, log = console, alertMe
   let progressMsg = null;
   const bot = state.bot;
   try {
-    progressMsg = await reply(chatId, '⏳ *1-Click Reconnect in progress...*\n\nAuthenticating with Quantum University New ERP portal and terminating other active sessions...', log);
+    progressMsg = await reply(chatId, '⏳ *1-Click Reconnect in progress...*\n\nAuthenticating with GEU ERP portal and terminating other active sessions...', log);
 
     const email = user.newErpEmail;
     const password = user.newErpPasswordEncrypted ? decryptSecret(user.newErpPasswordEncrypted) : '';
@@ -1447,6 +1473,7 @@ async function handleStart(chatId, payload, log = console) {
 
 /** Backup command: "/link <linkCode>" */
 async function handleLinkCommand(chatId, code, log = console) {
+  sendTyping(chatId);
   if (!code) {
     await reply(chatId, MSG.LINK_USAGE, log);
     return;
@@ -1455,6 +1482,7 @@ async function handleLinkCommand(chatId, code, log = console) {
 }
 
 async function handleStatus(chatId, log = console) {
+  sendTyping(chatId);
   const user = await db.getUserByTelegramChatId(chatId);
   if (user) {
     const isNewErp = isUserNewErp(user);
@@ -1528,6 +1556,7 @@ async function handleStatus(chatId, log = console) {
 }
 
 async function handleHelp(chatId, log = console) {
+  sendTyping(chatId);
   const text = [
     'Welcome to the *GUEAttend Bot*!',
     '',
@@ -1627,7 +1656,7 @@ async function handleAttendance(chatId, log = console) {
 
       if (attData && attData.subjectWise && attData.subjectWise.length) {
         const lines = [
-          '📊 *Quantum University Attendance (New ERP)*',
+          '📊 *GEU ERP Attendance*',
           `👤 Student: *${user.newErpStudentName || user.studentName || 'Student'}*`,
           `🆔 QID: \`${user.newErpQid || '26020181'}\``,
           '',
@@ -1666,6 +1695,17 @@ async function handleAttendance(chatId, log = console) {
     return;
   }
 
+  // Fast path: In-memory cache hit (< 5ms response time!)
+  const cachedAtt = tgAttendanceCache.get(user.id);
+  if (cachedAtt && (Date.now() - cachedAtt.timestamp < TG_ATTENDANCE_CACHE_TTL_MS)) {
+    const sentMsg = await reply(chatId, cachedAtt.text, log);
+    const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
+    if (messageId) {
+      scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
+    }
+    return;
+  }
+
   try {
     await db.ensureSessionOnDisk(user).catch(() => {});
     const { resolveUserRuntime } = require('./credentials');
@@ -1682,6 +1722,8 @@ async function handleAttendance(chatId, log = console) {
     const analysis = analyzeAttendance(subjects);
     let text = formatAttendanceMessage(analysis);
     text += AUTO_DELETE_FOOTNOTE;
+
+    tgAttendanceCache.set(user.id, { text, timestamp: Date.now() });
 
     const sentMsg = await reply(chatId, text, log);
     const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
@@ -1740,9 +1782,19 @@ async function handleAttendance(chatId, log = console) {
 }
 
 async function handleToday(chatId, log = console) {
+  sendTyping(chatId);
   const user = await db.getUserByTelegramChatId(chatId);
   if (!user) {
     await reply(chatId, MSG.STATUS_NONE, log);
+    return;
+  }
+
+  // Fast path: In-memory cache hit (< 5ms response time!)
+  const cachedToday = tgTodayCache.get(user.id);
+  if (cachedToday && (Date.now() - cachedToday.timestamp < TG_TODAY_CACHE_TTL_MS)) {
+    const sentMsg = await reply(chatId, cachedToday.text, log);
+    const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
+    if (messageId) scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
     return;
   }
 
@@ -1879,12 +1931,21 @@ async function handleToday(chatId, log = console) {
           } catch {
             liveRows = [];
           }
-          let timetablePeriods = [];
-          try {
-            const timetable = await scrapeTimetable({ sessionPath: runtime.sessionPath });
-            timetablePeriods = getTimetableForDate(timetable, new Date());
-          } catch {
-            timetablePeriods = [];
+
+          const now = new Date();
+          const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+          const dbSched = await db.getWeeklySchedule(user.id, istDay).catch(() => null);
+
+          let timetablePeriods = (dbSched && dbSched.rows && dbSched.rows.length) ? dbSched.rows : [];
+          if (!timetablePeriods.length) {
+            try {
+              const timetable = await scrapeTimetable({ sessionPath: runtime.sessionPath, skipBrowser: true });
+              if (timetable) {
+                timetablePeriods = getTimetableForDate(timetable, now);
+              }
+            } catch {
+              timetablePeriods = [];
+            }
           }
 
           if (liveRows && liveRows.length) {
@@ -1901,11 +1962,10 @@ async function handleToday(chatId, log = console) {
               attendance: 'N.M.',
             }));
           }
-          if (rows.length) {
-            const dow = new Date().getDay();
+          if (rows.length && (!dbSched || !dbSched.rows || !dbSched.rows.length)) {
             await db.upsertWeeklySchedule(
               user.id,
-              dow,
+              istDay,
               rows.map((r) => ({
                 period: r.period,
                 duration: r.duration || '',
@@ -1956,6 +2016,8 @@ async function handleToday(chatId, log = console) {
 
     let text = formatTodayAttendanceStatus(rows, undefined, user.studentName);
     text += AUTO_DELETE_FOOTNOTE;
+
+    tgTodayCache.set(user.id, { text, timestamp: Date.now() });
 
     const sentMsg = await reply(chatId, text, log);
     const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
@@ -2047,6 +2109,7 @@ function isFutureDate(day, month, year, now = new Date()) {
 }
 
 async function handleDateAttendance(chatId, dateInfo, msg = null, log = console) {
+  sendTyping(chatId);
   const user = await db.getUserByTelegramChatId(chatId);
   if (!user) {
     await reply(chatId, MSG.STATUS_NONE, log);
@@ -2257,12 +2320,23 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
 
         // Cross-match timetable for teacher / room enrichment
         try {
-          const timetable = await scrapeTimetable({ sessionPath: runtime.sessionPath });
-          if (timetable) {
+          const sched = await db.getWeeklySchedule(user.id, dateInfo.dayOfWeek).catch(() => null);
+          if (sched && sched.rows && sched.rows.length) {
             recordsForDate.forEach((r) => {
-              if (!r.teacher) r.teacher = teacherForRecord(timetable, r);
-              if (!r.room) r.room = roomForRecord(timetable, r);
+              const match = sched.rows.find((s) => (s.subjectCode && s.subjectCode === r.subjectCode) || (s.subject && s.subject === r.subject));
+              if (match) {
+                if (!r.teacher && match.teacher) r.teacher = match.teacher;
+                if (!r.room && match.room) r.room = match.room;
+              }
             });
+          } else {
+            const timetable = await scrapeTimetable({ sessionPath: runtime.sessionPath, skipBrowser: true });
+            if (timetable) {
+              recordsForDate.forEach((r) => {
+                if (!r.teacher) r.teacher = teacherForRecord(timetable, r);
+                if (!r.room) r.room = roomForRecord(timetable, r);
+              });
+            }
           }
         } catch {
           // Non-fatal
@@ -2331,6 +2405,7 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
 }
 
 async function handleAssignments(chatId, log = console) {
+  sendTyping(chatId);
   const user = await db.getUserByTelegramChatId(chatId);
   if (!user) {
     await reply(chatId, MSG.STATUS_NONE, log);
@@ -2382,12 +2457,12 @@ async function handleAssignments(chatId, log = console) {
       const pending = items.filter((a) => !a.isSubmitted);
       if (!pending.length) {
         const lines = [
-          '📚 *Quantum University Assignments & Assessments*',
+          '📚 *GEU ERP Assignments & Assessments*',
           '',
           '🎉 *No pending assignments or assessments!*',
           'You are completely caught up.',
           '',
-          '🔗 Official Portal: https://my.quantumuniversity.edu.in/Student/Student/Assessments',
+          '🔗 Official Portal: https://student.geu.ac.in',
           AUTO_DELETE_FOOTNOTE.trim(),
         ];
         await reply(chatId, lines.join('\n'), log, { autoDelete: true, delayMs: AUTO_DELETE_DELAY_MS });
@@ -2409,7 +2484,7 @@ async function handleAssignments(chatId, log = console) {
         }
         lines.push('');
       });
-      lines.push('🔗 Submit here: https://my.quantumuniversity.edu.in/Student/Student/Assessments');
+      lines.push('🔗 Submit here: https://student.geu.ac.in');
       lines.push(AUTO_DELETE_FOOTNOTE.trim());
       await reply(chatId, lines.join('\n'), log, { autoDelete: true, delayMs: AUTO_DELETE_DELAY_MS });
       return;
@@ -2439,6 +2514,7 @@ async function handleAssignments(chatId, log = console) {
 }
 
 async function handleReconnectCommand(chatId, log = console) {
+  sendTyping(chatId);
   const user = await db.getUserByTelegramChatId(chatId);
   if (!user) {
     await reply(chatId, MSG.STATUS_NONE, log);
@@ -2637,6 +2713,8 @@ module.exports = {
   handleToday,
   handleDateAttendance,
   parseDateCommand,
+  invalidateTgUserCaches,
+  sendTyping,
   isValidCalendarDate,
   isFutureDate,
   handleAssignments,
