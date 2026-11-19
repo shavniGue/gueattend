@@ -2381,10 +2381,21 @@ async function addScheduledDeletion(chatId, messageId, deleteAt) {
     [row.chatId, row.messageId]
   );
   if (existing.rows.length === 0) {
-    await pool.query(
-      `INSERT INTO scheduled_message_deletions(chat_id, message_id, delete_at, created_at) VALUES($1, $2, $3, $4)`,
-      [row.chatId, row.messageId, row.deleteAt, row.createdAt]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO scheduled_message_deletions(chat_id, message_id, delete_at, created_at) VALUES($1, $2, $3, $4)`,
+        [row.chatId, row.messageId, row.deleteAt, row.createdAt]
+      );
+    } catch (insertErr) {
+      if (insertErr.message && insertErr.message.includes('created_at')) {
+        await pool.query(
+          `INSERT INTO scheduled_message_deletions(chat_id, message_id, delete_at) VALUES($1, $2, $3)`,
+          [row.chatId, row.messageId, row.deleteAt]
+        );
+      } else {
+        throw insertErr;
+      }
+    }
   }
   return row;
 }

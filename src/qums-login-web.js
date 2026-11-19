@@ -280,6 +280,17 @@ async function startQumsLogin(userId, credsInput, log = console) {
     throw err;
   }
 
+  // Pre-save credentials securely so Telegram /reconnect works immediately
+  if (credsInput && credsInput.password && qid) {
+    try {
+      const { encryptSecret } = require('./crypto');
+      await db.updateUser(userId, {
+        qumsQid: qid,
+        qumsPasswordEncrypted: encryptSecret(password),
+      });
+    } catch {}
+  }
+
   // Enforce One QUMS Account = One Active ERP Session
   const eligibility = await checkSessionEligibility(qid, userId, 'OLD');
   if (!eligibility.allowed) {

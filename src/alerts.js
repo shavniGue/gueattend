@@ -323,7 +323,7 @@ async function notifyNewErpSessionExpired(userId, log = console) {
     await deleteSessionExpiredAlert(userId, log).catch(() => {});
 
     const base = baseUrl();
-    const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://qattend.onrender.com/dashboard?reconnect=1';
+    const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://gueattend.onrender.com/dashboard?reconnect=1';
 
     const text = [
       '⚠️ *GUE Session Logged Out / Expired*',
@@ -364,7 +364,7 @@ async function notifyReconnectionFailed(userId, errorMsg = '', log = console) {
   try {
     if (!userId || !isConfigured()) return false;
     const base = baseUrl();
-    const url = /^https:\/\//i.test(base) ? `${base}/qums-setup` : 'https://qattend.onrender.com/qums-setup';
+    const url = /^https:\/\//i.test(base) ? `${base}/qums-setup` : 'https://gueattend.onrender.com/qums-setup';
 
     const text = [
       '❌ *GUE Reconnection Failed*',
@@ -437,7 +437,7 @@ async function notifySessionConflict(userId, log = console) {
     await deleteSessionExpiredAlert(userId, log).catch(() => {});
 
     const base = baseUrl();
-    const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://qattend.onrender.com/dashboard?reconnect=1';
+    const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://gueattend.onrender.com/dashboard?reconnect=1';
 
     const text = [
       '⚠️ *GUE Session Conflict Detected*',

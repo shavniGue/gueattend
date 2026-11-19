@@ -598,7 +598,7 @@ const TELEGRAM_SESSION_EXPIRED_TEXT = [
 const MSG_INCORRECT_CAPTCHA = [
   '❌ *Incorrect CAPTCHA*',
   '',
-  'Please try again.',
+  'Please try again (capital ya small koi bhi type karein).',
 ].join('\n');
 
 const MSG_RECONNECT_CANCELLED = '❌ Reconnect cancelled.';
@@ -731,8 +731,9 @@ async function startTelegramCaptchaReconnect(userId, log = console, opts = {}) {
       throw new Error('No captcha image returned from QUMS login');
     }
 
+    const photoCaption = '🔐 *GEU ERP Reconnect CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
     const photoOpts = { replyMarkup: captchaKeyboard() };
-    await sendPhoto(userId, res.captchaImage, '', log, photoOpts);
+    await sendPhoto(userId, res.captchaImage, photoCaption, log, photoOpts);
     const captchaMsgId = photoOpts.messageId || null;
     if (captchaMsgId && user.telegramChatId) {
       scheduleAutoDelete(user.telegramChatId, captchaMsgId, AUTO_DELETE_DELAY_MS, log);
@@ -779,6 +780,12 @@ async function handleUserMessage(msg, log = console) {
     } else {
       scheduleAutoDelete(chatId, msg.message_id, AUTO_DELETE_DELAY_MS, log);
     }
+  }
+
+  const loginMatch = text.match(/^\/(?:login|setup)(?:@\w+)?(?:\s+(\S+)\s+(.+))?$/i);
+  if (loginMatch) {
+    await handleTelegramLoginCommand(chatId, loginMatch[1], loginMatch[2], msg, log);
+    return;
   }
 
   if (/^\/reconnect(?:@\w+)?/i.test(text) || lower === 'reconnect') {
@@ -921,7 +928,7 @@ async function handleUserMessage(msg, log = console) {
       log.log(`[telegram-reconnect] ❌ Invalid credentials rejected by QUMS for user ${user.id}`);
       await clearReconnectState(user.id, log);
       const alerts = require('./alerts');
-      const recUrl = typeof alerts.reconnectUrl === 'function' ? alerts.reconnectUrl() : 'https://qattend.onrender.com/qums-setup?reconnect=1';
+      const recUrl = typeof alerts.reconnectUrl === 'function' ? alerts.reconnectUrl() : 'https://gueattend.onrender.com/qums-setup?reconnect=1';
       const msgText = [
         '❌ *Invalid GUE ID or Password*',
         '',
@@ -948,8 +955,9 @@ async function handleUserMessage(msg, log = console) {
 
     // Provide the new captcha image
     if (result && result.captchaImage) {
+      const photoCaption = '🔐 *Fresh GEU ERP CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
       const photoOpts = { replyMarkup: captchaKeyboard() };
-      await sendPhoto(user.id, result.captchaImage, '', log, photoOpts);
+      await sendPhoto(user.id, result.captchaImage, photoCaption, log, photoOpts);
       rState.captchaMessageId = photoOpts.messageId || null;
       if (rState.captchaMessageId && chatId) {
         scheduleAutoDelete(chatId, rState.captchaMessageId, AUTO_DELETE_DELAY_MS, log);
@@ -1082,8 +1090,12 @@ async function handleCallbackQuery(query, log = console) {
           await reply(
             chatId,
             '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-            'Aapka GEU ERP password saved nahi hai, isliye Telegram auto-fill nahi kar sakta.\n\n' +
-            'Kripya neeche button dabayein aur GEU ID + password daal kar ek baar web portal se connect karein:',
+            'Aapka GEU ERP password saved nahi hai. Aap do aasan tarike se connect kar sakte hain:\n\n' +
+            '1️⃣ *Telegram se direct connect karein:*\n' +
+            'Bhejein: `/login <STUDENT_ID> <PASSWORD>`\n' +
+            '_(Security: Aapka password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n' +
+            '2️⃣ *Web Portal se connect karein:*\n' +
+            'Neeche button dabayein:',
             log,
             {
               replyMarkup: {
@@ -1235,8 +1247,9 @@ async function handleCallbackQuery(query, log = console) {
         await deleteMessage(user.id, oldCaptchaMsgId, log).catch(() => {});
       }
 
+      const photoCaption = '🔐 *Regenerated GEU ERP CAPTCHA*\n\nType the characters you see in this image to reconnect (capital ya small koi bhi type karein):';
       const photoOpts = { replyMarkup: captchaKeyboard() };
-      await sendPhoto(user.id, res.captchaImage, '', log, photoOpts);
+      await sendPhoto(user.id, res.captchaImage, photoCaption, log, photoOpts);
       if (photoOpts.messageId && chatId) {
         scheduleAutoDelete(chatId, photoOpts.messageId, AUTO_DELETE_DELAY_MS, log);
       }
@@ -1567,6 +1580,7 @@ async function handleHelp(chatId, log = console) {
     '📚 /assignments — View pending assignments & deadlines',
     'ℹ️ /status — Check your GEU ERP & Telegram account status',
     '🔄 /reconnect — Reconnect your GEU ERP session via Telegram (CAPTCHA)',
+    '🔐 /login <ID> <PASSWORD> — Save GEU credentials & login directly via Telegram',
     '❓ /help — Show this help message',
     '',
     '💡 *Automatic Notifications:*',
@@ -2542,8 +2556,12 @@ async function handleReconnectCommand(chatId, log = console) {
         await reply(
           chatId,
           '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-          'Aapka GEU ERP password saved nahi hai, isliye Telegram auto-fill nahi kar sakta.\n\n' +
-          'Kripya neeche button dabayein aur GEU ID + password daal kar ek baar web portal se connect karein. Uske baad Telegram se direct reconnect hone lagega:',
+          'Aapka GEU ERP password saved nahi hai. Aap do aasan tarike se connect kar sakte hain:\n\n' +
+          '1️⃣ *Telegram se direct connect karein:*\n' +
+          'Bhejein: `/login <STUDENT_ID> <PASSWORD>`\n' +
+          '_(Security: Aapka password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n' +
+          '2️⃣ *Web Portal se connect karein:*\n' +
+          'Neeche button dabayein:',
           log,
           {
             replyMarkup: {
@@ -2557,6 +2575,74 @@ async function handleReconnectCommand(chatId, log = console) {
     }
   } finally {
     reconnectingChats.delete(chatKey);
+  }
+}
+
+async function handleTelegramLoginCommand(chatId, qid, password, msg, log = console) {
+  sendTyping(chatId);
+  const user = await db.getUserByTelegramChatId(chatId);
+  if (!user) {
+    await reply(chatId, MSG.STATUS_NONE, log);
+    return;
+  }
+
+  // If no qid or password provided, show helpful instructions
+  if (!qid || !password) {
+    const infoText = [
+      'ℹ️ *GEU ERP Direct Login via Telegram*',
+      '',
+      'Aap direct Telegram se apna GEU Student ID aur Password save karke login/reconnect kar sakte hain:',
+      '',
+      '👉 *Format:*',
+      '`/login <STUDENT_ID> <ERP_PASSWORD>`',
+      '',
+      '👉 *Example:*',
+      '`/login 2510070038 MyPassword123`',
+      '',
+      '🔒 *Security Notice:* Password bhejte hi aapka message 5 second ke andar automatically delete ho jayega. Uske baad CAPTCHA image direct yahan aayegi aur aap 5 letters type karke turant connect ho sakte hain (capital ya small koi bhi chalega).',
+    ].join('\n');
+    await reply(chatId, infoText, log, { autoDelete: true, delayMs: 120000 });
+    return;
+  }
+
+  // Security: Immediately schedule auto-deletion of the user's message containing password in 5 seconds
+  if (msg && msg.message_id) {
+    scheduleAutoDelete(chatId, msg.message_id, 5000, log);
+  }
+
+  const cleanQid = String(qid).trim();
+  const cleanPassword = String(password).trim();
+
+  try {
+    const { encryptSecret } = require('./crypto');
+    await db.updateUser(user.id, {
+      qumsQid: cleanQid,
+      qumsPasswordEncrypted: encryptSecret(cleanPassword),
+    });
+    log.log(`[telegram] credentials saved securely for user ${user.id} (${cleanQid}) via Telegram /login`);
+  } catch (err) {
+    log.error(`[telegram] failed to save credentials for user ${user.id}: ${err.message}`);
+    await reply(chatId, '❌ Failed to save credentials securely. Please try again.', log);
+    return;
+  }
+
+  const waitMsg = await reply(chatId, '⏳ GEU ERP credentials saved! Launching portal and fetching CAPTCHA...', log);
+
+  try {
+    const started = await startTelegramCaptchaReconnect(user.id, log, { skipAlertText: true });
+    if (waitMsg && waitMsg.message_id) {
+      await deleteMessage(user.id, waitMsg.message_id, log).catch(() => {});
+    }
+    if (!started || !started.ok) {
+      if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
+        await reply(chatId, '⏳ Another login or reconnect is in progress. Please wait 10 seconds and try again.', log);
+      } else {
+        await reply(chatId, `⚠️ Could not start GEU login (${started ? started.error : 'Unknown error'}). Please try again.`, log);
+      }
+    }
+  } catch (err) {
+    log.error(`[telegram] error starting telegram captcha after /login: ${err.message}`);
+    await reply(chatId, '⚠️ Error starting login. Please try again.', log);
   }
 }
 
@@ -2719,6 +2805,7 @@ module.exports = {
   isFutureDate,
   handleAssignments,
   handleReconnectCommand,
+  handleTelegramLoginCommand,
   handleAdminCommand: (chatId, msg, log) => require('./telegram-admin').handleAdminCommand(state.bot, msg || { chat: { id: chatId } }, log),
   toTelegramHtml,
   MSG,
