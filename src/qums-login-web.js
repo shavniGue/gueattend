@@ -138,9 +138,15 @@ async function gotoLoginPage(page) {
   // Fast wait: wait for password input to appear in DOM via browser event
   try {
     await page.waitForSelector('input[type="password"]', { timeout: LOGIN_FORM_WAIT_MS });
+    const mainFrame = page.mainFrame();
+    const [userCount, passCount] = await Promise.all([
+      mainFrame.locator('input[formcontrolname="UserID" i], input[type="text"], input[placeholder*="User ID" i]').count().catch(() => 0),
+      mainFrame.locator('input[formcontrolname="Password" i], input[type="password"]').count().catch(() => 0),
+    ]);
+    if (userCount > 0 && passCount > 0) return mainFrame;
   } catch {}
 
-  // Bounded poll: findLoginForm needs UserID+password inputs in SOME frame
+  // Bounded poll fallback: findLoginForm needs UserID+password inputs in SOME frame
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     const frame = await findLoginForm(page);

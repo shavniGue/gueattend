@@ -160,6 +160,16 @@ async function clickLoginButton(frame) {
  * user ko dikhane ke liye).
  */
 async function captureCaptchaImage(page, frame) {
+  // Fast path 1: Directly wait for GEU ERP's captcha-image element and return data URI instantly (~9ms)
+  try {
+    await frame.waitForSelector('img.captcha-image, img[alt*="CAPTCHA" i], img[src^="data:image/"]', { timeout: 12000 });
+    const fastImg = frame.locator('img.captcha-image, img[alt*="CAPTCHA" i], img[src^="data:image/"]').first();
+    const directSrc = await fastImg.getAttribute('src').catch(() => '');
+    if (directSrc && directSrc.startsWith('data:image/') && directSrc.length > 200) {
+      return directSrc;
+    }
+  } catch {}
+
   await frame.waitForSelector('img[alt*="CAPTCHA" i], img[src^="data:image"], img#imgPhoto, img[src*="captcha" i]', { timeout: 15000 }).catch(() => {});
   const imgs = frame.locator('img');
   const n = await imgs.count();
@@ -210,15 +220,20 @@ async function captureCaptchaImage(page, frame) {
   }
 
   try {
-    await chosen.waitFor({ state: 'visible', timeout: 10000 });
+    await chosen.waitFor({ state: 'visible', timeout: 5000 });
+    const directSrc = await chosen.getAttribute('src').catch(() => '');
+    if (directSrc && directSrc.startsWith('data:image/') && directSrc.length > 200) {
+      return directSrc;
+    }
     // Ensure src attribute is populated with valid image data (not empty and not whitey placeholder)
-    const deadline = Date.now() + 5000;
+    const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
       const src = await chosen.getAttribute('src').catch(() => '');
       if (src && !src.includes('whitey.jpg') && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'))) {
+        if (src.startsWith('data:image/') && src.length > 200) return src;
         break;
       }
-      await (page || frame).waitForTimeout(200);
+      await (page || frame).waitForTimeout(100);
     }
     await chosen.scrollIntoViewIfNeeded();
   } catch {}
