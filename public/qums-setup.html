@@ -69,7 +69,7 @@
           <ol class="steps">
             <li>Enter your GEU ID + ERP password, then press <b id="stepAction">Get Captcha</b></li>
             <li>Type the characters you see in the captcha image and press <b>Login</b></li>
-            <li>Once login succeeds, your GEU credentials are saved securely</li>
+            <li>Once login succeeds, your attendance monitoring will begin</li>
           </ol>
           <label class="form-label" for="qid">GEU ID / Student ID</label>
           <input class="form-input" id="qid" type="text" placeholder="e.g. 21011029" />
@@ -79,9 +79,6 @@
             <button type="button" class="pw-toggle" data-target="qumsPassword" aria-label="Show password">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
-          </div>
-          <div id="saveNotice" style="font-size: 12.5px; color: #16a34a; margin-top: 6px; display: none; align-items: center; gap: 4px;">
-            <span>🔒</span> Password will be saved securely for automatic Telegram reconnects.
           </div>
           <button id="firstTimeCaptchaBtn" class="btn" style="margin-top: 14px; width: 100%;">Get Captcha</button>
         </div>
@@ -99,10 +96,10 @@
               Student: <b id="savedStudentName">—</b>
             </div>
             <div style="font-size: 13.5px; color: var(--muted); margin-bottom: 8px;">
-              GEU ID: <b id="savedQid" style="color: var(--text);">—</b> &nbsp;|&nbsp; Password: <span style="letter-spacing: 2px;">••••••••</span>
+              GEU ID: <b id="savedQid" style="color: var(--text);">—</b>
             </div>
             <p class="sub" style="margin: 0; font-size: 12.5px;">
-              Your GEU ID & password are saved securely. You only need to solve the CAPTCHA to reconnect.
+              Your GEU account is linked. Solve the CAPTCHA to reconnect.
             </p>
           </div>
           <button id="captchaBtn" class="btn" style="margin-top: 4px; width: 100%;">🔐 Reconnect GEU ERP</button>
@@ -147,12 +144,12 @@
       if (m === 'reconnect' && hasSavedCredentials) {
         $('firstTimeBox').classList.add('hidden');
         $('reconnectBox').classList.remove('hidden');
-        $('modeSub').textContent = 'GEU ERP session expired or needs reconnection — solve captcha to resume.';
+        $('modeSub').textContent = 'GEU ERP session needs reconnection — solve captcha to resume.';
         $('captchaBtn').textContent = '🔐 Reconnect GEU ERP';
       } else {
         $('firstTimeBox').classList.remove('hidden');
         $('reconnectBox').classList.add('hidden');
-        $('modeSub').textContent = 'Enter your GEU ID and password once. They will remain securely saved until you reset or delete.';
+        $('modeSub').textContent = 'Enter your GEU ID and password to connect your account.';
       }
     }
 
@@ -220,8 +217,8 @@
 
     let autoSaveTimer = null;
     async function autoSaveCredentials() {
-      const qidVal = $('qid').value.trim() || savedQid;
-      const pwVal = $('qumsPassword').value.trim();
+      const qidVal = ($('qid').value || '').trim() || savedQid;
+      const pwVal = ($('qumsPassword').value || '').trim();
       if (qidVal && pwVal) {
         try {
           const res = await fetch('/api/user/save-geu-credentials', {
@@ -233,11 +230,6 @@
             hasSavedCredentials = true;
             savedQid = qidVal;
             $('savedQid').textContent = savedQid;
-            const sn = $('saveNotice');
-            if (sn) {
-              sn.style.display = 'flex';
-              sn.innerHTML = '<span>✅</span> GEU ID & Password saved securely in database!';
-            }
           }
         } catch {}
       }
@@ -245,17 +237,12 @@
 
     $('qid').addEventListener('input', () => {
       clearTimeout(autoSaveTimer);
-      autoSaveTimer = setTimeout(autoSaveCredentials, 600);
+      autoSaveTimer = setTimeout(autoSaveCredentials, 400);
     });
 
     $('qumsPassword').addEventListener('input', () => {
-      const sn = $('saveNotice');
-      if (sn && $('qumsPassword').value) {
-        sn.style.display = 'flex';
-        sn.innerHTML = '<span>🔒</span> Password will be saved securely for automatic Telegram reconnects.';
-      }
       clearTimeout(autoSaveTimer);
-      autoSaveTimer = setTimeout(autoSaveCredentials, 600);
+      autoSaveTimer = setTimeout(autoSaveCredentials, 400);
     });
 
     $('qid').addEventListener('blur', autoSaveCredentials);

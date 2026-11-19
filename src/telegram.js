@@ -1099,8 +1099,8 @@ async function handleCallbackQuery(query, log = console) {
           const setupUrl = typeof reconnectUrl === 'function' ? reconnectUrl() : `${baseUrl()}/qums-setup`;
           await reply(
             chatId,
-            '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-            'Aapka GEU ERP password saved nahi hai. Web portal par jakar ek baar apna GEU ERP password enter karein. Uske baad password securely save rahega aur Telegram par sirf CAPTCHA solve karke reconnect ho sakega.',
+            '⚠️ *GUE Session Expired*\n\n' +
+            'Please reconnect your GUE ERP account from the web portal to resume tracking.',
             log,
             {
               replyMarkup: {
@@ -2592,9 +2592,9 @@ async function handleReconnectCommand(chatId, log = console) {
         const knownQid = user.qumsQid || user.geuId || '';
         await reply(
           chatId,
-          '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
+          '⚠️ *GUE Session Expired*\n\n' +
           (knownQid ? `Student ID: \`${knownQid}\`\n\n` : '') +
-          'Aapka GEU ERP password saved nahi hai. Web portal par jakar ek baar apna GEU ERP password enter karein. Uske baad password securely save rahega aur Telegram par sirf CAPTCHA solve karke reconnect ho sakega.',
+          'Please reconnect your GUE ERP account from the web portal to resume tracking.',
           log,
           {
             replyMarkup: {

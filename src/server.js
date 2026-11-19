@@ -359,10 +359,12 @@ function withQumsResetControl(html) {
 }
 
 app.get('/dashboard', requireAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const file = path.join(PUBLIC_DIR, 'index.html');
   res.send(withQumsResetControl(fs.readFileSync(file, 'utf8')));
 });
 app.get(['/qums-setup', '/geu-setup', '/gue-setup'], requireAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const file = path.join(PUBLIC_DIR, 'qums-setup.html');
   res.send(withQumsResetControl(fs.readFileSync(file, 'utf8')));
 });
