@@ -1100,12 +1100,7 @@ async function handleCallbackQuery(query, log = console) {
           await reply(
             chatId,
             '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-            'Aapka GEU ERP password saved nahi hai. Aap do aasan tarike se connect kar sakte hain:\n\n' +
-            '1️⃣ *Telegram se direct connect karein:*\n' +
-            'Bhejein: `/login <STUDENT_ID> <PASSWORD>`\n' +
-            '_(Security: Aapka password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n' +
-            '2️⃣ *Web Portal se connect karein:*\n' +
-            'Neeche button dabayein:',
+            'Aapka GEU ERP password saved nahi hai. Web portal par jakar ek baar apna GEU ERP password enter karein. Uske baad password securely save rahega aur Telegram par sirf CAPTCHA solve karke reconnect ho sakega.',
             log,
             {
               replyMarkup: {
@@ -1589,7 +1584,6 @@ async function handleHelp(chatId, log = console) {
     '📚 /assignments — View pending assignments & deadlines',
     'ℹ️ /status — Check your GEU ERP & Telegram account status',
     '🔄 /reconnect — Reconnect your GEU ERP session via Telegram (CAPTCHA)',
-    '🔐 /login <ID> <PASSWORD> — Save GEU credentials & login directly via Telegram',
     '❓ /help — Show this help message',
     '',
     '💡 *Automatic Notifications:*',
@@ -2599,17 +2593,8 @@ async function handleReconnectCommand(chatId, log = console) {
         await reply(
           chatId,
           '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-          'Aapka GEU ERP password saved nahi hai.\n\n' +
-          (knownQid
-            ? `Student ID: \`${knownQid}\`\n\n` +
-              `1️⃣ *Telegram se direct connect karein:*\n` +
-              `Bhejein: \`/login <Aapka_Password>\`\n` +
-              `_Example: \`/login MyPassword123\`_\n` +
-              `_(Security: Password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n`
-            : `1️⃣ *Telegram se direct connect karein:*\n` +
-              `Bhejein: \`/login <STUDENT_ID> <PASSWORD>\`\n\n`) +
-          '2️⃣ *Web Portal se connect karein:*\n' +
-          'Neeche button dabayein:',
+          (knownQid ? `Student ID: \`${knownQid}\`\n\n` : '') +
+          'Aapka GEU ERP password saved nahi hai. Web portal par jakar ek baar apna GEU ERP password enter karein. Uske baad password securely save rahega aur Telegram par sirf CAPTCHA solve karke reconnect ho sakega.',
           log,
           {
             replyMarkup: {
