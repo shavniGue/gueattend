@@ -372,7 +372,7 @@
         <div class="metric-num" id="statTotalUsers">—</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">QUMS Connected</div>
+        <div class="metric-label">GUE Connected</div>
         <div class="metric-num" id="statQumsConnected" style="color: #059669;">—</div>
       </div>
       <div class="metric-card">
@@ -458,16 +458,14 @@
     <div class="card">
       <div class="section-title">User Accounts</div>
       <div class="filter-bar" style="margin-top: 14px;">
-        <input type="search" id="searchInput" placeholder="Search by name, email, or QID…" autocomplete="off" />
+        <input type="search" id="searchInput" placeholder="Search by name, email, or GUE ID…" autocomplete="off" />
 
         <!-- 3 Filter Dropdowns -->
-        <select id="qumsFilterSelect" title="Filter by ERP / QUMS Status" aria-label="Filter by ERP / QUMS Status">
-          <option value="all">ERP / QUMS: All Status</option>
+        <select id="qumsFilterSelect" title="Filter by ERP / GUE Status" aria-label="Filter by ERP / GUE Status">
+          <option value="all">ERP / GUE: All Status</option>
           <option value="connected">Connected (Active)</option>
           <option value="expired">Session Expired</option>
           <option value="not_setup">Not Setup</option>
-          <option value="new_erp">🚀 New ERP Users</option>
-          <option value="old_erp">🏛️ Old ERP Users</option>
         </select>
 
         <select id="telegramFilterSelect" title="Filter by Telegram Status" aria-label="Filter by Telegram Status">
@@ -517,7 +515,7 @@
           🌐 Select all <span id="totalMatchingCount">0</span> users across all pages
         </button>
         <button id="sendBulkReconnectBtn" type="button" class="btn-bulk">
-          <span>📨</span> Send QUMS Reconnect Notification
+          <span>📨</span> Send GUE Reconnect Notification
         </button>
         <button id="clearSelectionBtn" type="button" class="btn-bulk-secondary">Clear Selection</button>
       </div>
@@ -532,8 +530,8 @@
               <th>Student Name</th>
               <th>Email</th>
               <th>Status</th>
-              <th>QID</th>
-              <th>QUMS Session</th>
+              <th>GUE ID</th>
+              <th>GUE Session</th>
               <th>Telegram</th>
               <th>Last Reconnect</th>
               <th>Attendance Last Checked</th>
@@ -563,7 +561,7 @@
           <button type="button" class="modal-close-btn" id="bulkConfirmCloseBtn">&times;</button>
         </div>
         <div style="font-size: 14px; color: #334155; line-height: 1.6;">
-          <p>You are about to send official <strong>QUMS Reconnect Instructions</strong> via Telegram to the selected users.</p>
+          <p>You are about to send official <strong>GUE Reconnect Instructions</strong> via Telegram to the selected users.</p>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin: 12px 0;">
             <div style="font-weight: 600; margin-bottom: 6px;">Recipients Summary:</div>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
@@ -629,13 +627,13 @@
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
             <div style="font-weight: 600; color: #1e40af; margin-bottom: 6px;">Quick 3 Steps to get the key:</div>
             <ol style="margin: 0; padding-left: 20px; font-size: 12px; color: #1e3a8a;">
-              <li>Open <a href="https://console.firebase.google.com/project/qums-forgot-password-test/settings/serviceaccounts/adminsdk" target="_blank" style="color: #2563eb; font-weight: 600; text-decoration: underline;">Firebase Console ➔ Service Accounts</a></li>
+              <li>Open <a href="https://console.firebase.google.com/project/gueattend/settings/serviceaccounts/adminsdk" target="_blank" style="color: #2563eb; font-weight: 600; text-decoration: underline;">Firebase Console ➔ Service Accounts</a></li>
               <li>Click <strong>"Generate new private key"</strong> and download the <code>.json</code> file</li>
               <li>Copy and paste the entire JSON text into the box below (it will be saved securely in Supabase):</li>
             </ol>
           </div>
           <label for="firebaseKeyJsonInput" style="display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px;">Service Account JSON content:</label>
-          <textarea id="firebaseKeyJsonInput" rows="6" style="width: 100%; font-family: monospace; font-size: 11px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;" placeholder='{"type": "service_account", "project_id": "qums-forgot-password-test", ...}'></textarea>
+          <textarea id="firebaseKeyJsonInput" rows="6" style="width: 100%; font-family: monospace; font-size: 11px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;" placeholder='{"type": "service_account", "project_id": "gueattend", ...}'></textarea>
         </div>
         <div class="modal-actions" style="margin-top: 16px;">
           <button type="button" class="btn-bulk-secondary" onclick="closeFirebaseConfigModal()">Cancel</button>
@@ -928,18 +926,6 @@
         nameSpan.style.fontWeight = '600';
         nameSpan.textContent = u.studentName || '—';
         nameHeader.appendChild(nameSpan);
-
-        const erpTypeBadge = document.createElement('span');
-        if (u.activeErpType === 'NEW') {
-          erpTypeBadge.className = 'badge-ok';
-          erpTypeBadge.style.fontSize = '9px';
-          erpTypeBadge.textContent = '🚀 New ERP';
-        } else {
-          erpTypeBadge.className = 'badge-off';
-          erpTypeBadge.style.fontSize = '9px';
-          erpTypeBadge.textContent = '🏛️ Old ERP';
-        }
-        nameHeader.appendChild(erpTypeBadge);
         tdName.appendChild(nameHeader);
 
         if (u.qumsYearSem) {
@@ -998,31 +984,18 @@
         tdQid.textContent = u.qumsQid || '—';
         tr.appendChild(tdQid);
 
-        // QUMS / ERP Session Status
+        // GUE ERP Session Status
         const tdQums = document.createElement('td');
         const qumsBadge = document.createElement('span');
-        if (u.activeErpType === 'NEW') {
-          if (u.sessionExpired || u.newErpSessionStatus === 'expired') {
-            qumsBadge.className = 'badge-warn';
-            qumsBadge.textContent = '⚠️ NEW ERP EXPIRED';
-          } else if (u.qumsConnected || u.newErpConnected) {
-            qumsBadge.className = 'badge-ok';
-            qumsBadge.textContent = '🟢 NEW ERP ACTIVE';
-          } else {
-            qumsBadge.className = 'badge-off';
-            qumsBadge.textContent = 'NOT SETUP';
-          }
+        if (u.sessionExpired || u.qumsSessionStatus === 'expired') {
+          qumsBadge.className = 'badge-warn';
+          qumsBadge.textContent = 'EXPIRED ⚠️';
+        } else if (u.qumsConnected || (u.qumsQid && u.qumsSessionStatus === 'active')) {
+          qumsBadge.className = 'badge-ok';
+          qumsBadge.textContent = 'CONNECTED ✅';
         } else {
-          if (u.sessionExpired) {
-            qumsBadge.className = 'badge-warn';
-            qumsBadge.textContent = '⚠️ OLD ERP EXPIRED';
-          } else if (u.qumsConnected) {
-            qumsBadge.className = 'badge-ok';
-            qumsBadge.textContent = 'CONNECTED';
-          } else {
-            qumsBadge.className = 'badge-off';
-            qumsBadge.textContent = 'NOT SETUP';
-          }
+          qumsBadge.className = 'badge-off';
+          qumsBadge.textContent = 'NOT SETUP';
         }
         tdQums.appendChild(qumsBadge);
         tr.appendChild(tdQums);

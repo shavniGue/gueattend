@@ -132,8 +132,13 @@ async function gotoLoginPage(page) {
     throw e;
   }
 
+  // Fast wait: wait for password input to appear in DOM via browser event
+  try {
+    await page.waitForSelector('input[type="password"]', { timeout: LOGIN_FORM_WAIT_MS });
+  } catch {}
+
   // Bounded poll: findLoginForm needs UserID+password inputs in SOME frame
-  const deadline = Date.now() + LOGIN_FORM_WAIT_MS;
+  const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     const frame = await findLoginForm(page);
     try {
@@ -145,7 +150,7 @@ async function gotoLoginPage(page) {
     } catch {
       /* frame detached mid-check — retry */
     }
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
   }
 
   const e = new Error('GEU ERP login form load nahi hua (page khula par form nahi mila).');
@@ -203,10 +208,21 @@ async function openLoginFormPage() {
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1, // 1x saves 4x RAM and GPU compared to 2x
   });
-  // Abort non-essential network requests (fonts, media) to cut bandwidth and speed up page load
+  // Abort non-essential network requests (fonts, media, trackers) to cut bandwidth and speed up page load
   await context.route('**/*', (route) => {
+    const url = route.request().url().toLowerCase();
     const type = route.request().resourceType();
     if (type === 'font' || type === 'media') {
+      return route.abort();
+    }
+    if (
+      url.includes('google-analytics') ||
+      url.includes('googletagmanager') ||
+      url.includes('facebook') ||
+      url.includes('razorpay') ||
+      url.includes('cloudflareinsights') ||
+      url.includes('challenges.cloudflare.com')
+    ) {
       return route.abort();
     }
     return route.continue();
