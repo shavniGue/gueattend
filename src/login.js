@@ -155,18 +155,71 @@ async function clickLoginButton(frame) {
   throw new Error('Login button not found on the login form.');
 }
 
+// Official Graphic Era Cyborg ERP portal dark navy slate background
+const GEU_PORTAL_CAPTCHA_BG = '#2e3f55';
+
+/**
+ * Composite the captcha image onto the official GEU ERP portal dark navy background.
+ * The GEU ERP captcha uses bright pastel letters (pink, white, cyan, lime, cream)
+ * and translucent circles specifically designed for a dark background. On a white background
+ * they become completely washed-out and invisible. Compositing them onto the official
+ * portal slate-navy (#2e3f55) ensures 100% crystal-clear readability on web and Telegram.
+ */
+async function compositeCaptchaOnPortalBg(pageOrFrame, rawSrc) {
+  if (!pageOrFrame || typeof pageOrFrame.evaluate !== 'function' || !rawSrc) return rawSrc;
+  try {
+    const composited = await pageOrFrame.evaluate(({ srcUrl, bgColor }) => {
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 1500);
+        const img = new Image();
+        img.onload = () => {
+          clearTimeout(timeout);
+          const w = img.naturalWidth || img.width || 220;
+          const h = img.naturalHeight || img.height || 55;
+          const scale = 2; // 2x sharp display
+          const padX = 40; // safe horizontal margin so Android Telegram bubbles never clip edge letters
+          const padY = 16; // safe vertical margin
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(w * scale + padX * 2);
+          canvas.height = Math.round(h * scale + padY * 2);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, padX, padY, w * scale, h * scale);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => {
+          clearTimeout(timeout);
+          resolve(null);
+        };
+        img.src = srcUrl;
+      });
+    }, { srcUrl: rawSrc, bgColor: GEU_PORTAL_CAPTCHA_BG }).catch(() => null);
+
+    if (composited && typeof composited === 'string' && composited.startsWith('data:image/png;base64,')) {
+      return composited;
+    }
+  } catch {}
+  return rawSrc;
+}
+
 /**
  * Screenshot the captcha image element -> base64 data URL (web login flow me
  * user ko dikhane ke liye).
  */
 async function captureCaptchaImage(page, frame) {
-  // Fast path 1: Directly wait for GEU ERP's captcha-image element and return data URI instantly (~9ms)
+  const pageOrFrame = page || frame;
+
+  // Fast path 1: Directly wait for GEU ERP's captcha-image element and composite onto official portal background
   try {
     await frame.waitForSelector('img.captcha-image, img[alt*="CAPTCHA" i], img[src^="data:image/"]', { timeout: 12000 });
     const fastImg = frame.locator('img.captcha-image, img[alt*="CAPTCHA" i], img[src^="data:image/"]').first();
     const directSrc = await fastImg.getAttribute('src').catch(() => '');
     if (directSrc && directSrc.startsWith('data:image/') && directSrc.length > 200) {
-      return directSrc;
+      const composited = await compositeCaptchaOnPortalBg(pageOrFrame, directSrc);
+      return composited || directSrc;
     }
   } catch {}
 
@@ -223,14 +276,18 @@ async function captureCaptchaImage(page, frame) {
     await chosen.waitFor({ state: 'visible', timeout: 5000 });
     const directSrc = await chosen.getAttribute('src').catch(() => '');
     if (directSrc && directSrc.startsWith('data:image/') && directSrc.length > 200) {
-      return directSrc;
+      const composited = await compositeCaptchaOnPortalBg(pageOrFrame, directSrc);
+      return composited || directSrc;
     }
     // Ensure src attribute is populated with valid image data (not empty and not whitey placeholder)
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
       const src = await chosen.getAttribute('src').catch(() => '');
       if (src && !src.includes('whitey.jpg') && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'))) {
-        if (src.startsWith('data:image/') && src.length > 200) return src;
+        if (src.startsWith('data:image/') && src.length > 200) {
+          const composited = await compositeCaptchaOnPortalBg(pageOrFrame, src);
+          return composited || src;
+        }
         break;
       }
       await (page || frame).waitForTimeout(100);
@@ -240,48 +297,8 @@ async function captureCaptchaImage(page, frame) {
   const buf = await chosen.screenshot({ type: 'png' });
   const rawBase64 = `data:image/png;base64,${buf.toString('base64')}`;
 
-  // Pad the captcha image onto a clean canvas with generous margins so mobile Telegram
-  // (especially Android) never clips the letters on the left or right edges.
-  try {
-    const pageOrFrame = page || frame;
-    if (pageOrFrame && typeof pageOrFrame.evaluate === 'function') {
-      const padded = await pageOrFrame.evaluate((srcUrl) => {
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve(null), 1500);
-          const img = new Image();
-          img.onload = () => {
-            clearTimeout(timeout);
-            const w = img.naturalWidth || img.width || 180;
-            const h = img.naturalHeight || img.height || 45;
-            const scale = 2; // 2x sharp display
-            const padX = 65; // safe horizontal margin so Android Telegram rounded bubbles never clip the edge letters
-            const padY = 28; // safe vertical margin so Telegram bottom-right timestamp badge never covers the captcha text
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(w * scale + padX * 2);
-            canvas.height = Math.round(h * scale + padY * 2);
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, padX, padY, w * scale, h * scale);
-            resolve(canvas.toDataURL('image/png'));
-          };
-          img.onerror = () => {
-            clearTimeout(timeout);
-            resolve(null);
-          };
-          img.src = srcUrl;
-        });
-      }, rawBase64).catch(() => null);
-
-      if (padded && typeof padded === 'string' && padded.startsWith('data:image/png;base64,')) {
-        return padded;
-      }
-    }
-  } catch {}
-
-  return rawBase64;
+  const composited = await compositeCaptchaOnPortalBg(pageOrFrame, rawBase64);
+  return composited || rawBase64;
 }
 
 module.exports = {
