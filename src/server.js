@@ -334,19 +334,19 @@ function withQumsResetControl(html) {
       btn = document.createElement('button');
       btn.id = 'permanentQumsResetBtn';
       btn.type = 'button';
-      btn.textContent = 'Reset / Delete QUMS Connection';
+      btn.textContent = 'Reset / Delete GEU ERP Connection';
       const resetTarget = document.getElementById('qumsResetSlot') || document.getElementById('setupCard') || document.querySelector('.card') || document.body;
       resetTarget.appendChild(btn);
     }
     btn.onclick = async () => {
-      if (!confirm('QUMS connection permanently reset karna hai? Saved QID/password aur session delete ho jayenge.')) return;
+      if (!confirm('GEU ERP connection permanently reset karna hai? Saved GEU ID/password aur session delete ho jayenge.')) return;
       btn.disabled = true; btn.textContent = 'Resetting...';
       try {
         const r = await fetch('/api/qums-reset', { method:'POST', headers:{'Content-Type':'application/json'} });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || 'Reset failed');
         window.location.href = j.redirect || '/qums-setup';
-      } catch (e) { alert(e.message || 'QUMS reset failed'); btn.disabled = false; btn.textContent = 'Reset / Delete QUMS Connection'; }
+      } catch (e) { alert(e.message || 'GEU ERP reset failed'); btn.disabled = false; btn.textContent = 'Reset / Delete GEU ERP Connection'; }
     };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupReset); else setupReset();
@@ -668,7 +668,7 @@ app.post('/api/forgot', rateLimit('/api/forgot'), async (req, res) => {
       return res.status(404).json({
         ok: false,
         registered: false,
-        error: '❌ Email not registered\n\nThis email is not registered with QUMS Attendance Bot.\nPlease check your email address or create a new account.',
+        error: '❌ Email not registered\n\nThis email is not registered with GUE Attendance Bot.\nPlease check your email address or create a new account.',
       });
     }
     console.log(`[auth] forgot-password requested (Firebase flow) -> ${user.email}`);
@@ -1052,7 +1052,7 @@ app.get('/api/timetable', requireAuth, async (req, res) => {
         ...cached.data,
         _cached: true,
         _stale: true,
-        warning: 'QUMS timetable currently unreachable, showing cached timetable.',
+        warning: 'GEU timetable currently unreachable, showing cached timetable.',
       });
     }
     res.status(httpStatusFor(err)).json({ error: err.message, hint: err.hint || null, code: err.name });
@@ -1300,7 +1300,7 @@ app.post('/api/new-erp/login', requireAuth, rateLimit('/api/login'), async (req,
       }
       return res.status(409).json({
         ok: false,
-        error: 'Your QUMS account is already active on another session.',
+        error: 'Your GEU account is already active on another session.',
         code: 'PORTAL_ACTIVE_SESSION_CONFLICT',
         canLogoutAll: true,
       });
@@ -1606,13 +1606,13 @@ app.post('/api/new-erp/reconnect', requireAuth, async (req, res) => {
     if (req.appUser && req.appUser.telegramChatId) {
       await sendMessage(
         req.appUser.id,
-        '⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired.\nPlease reconnect your QUMS account to continue using ERP services.',
+        '⚠️ *GUE Session Expired*\n\nYour GUE session has expired.\nPlease reconnect your GUE account to continue using ERP services.',
         console,
         {
           category: 'ALERT',
           autoDelete: false,
           replyMarkup: {
-            inline_keyboard: [[{ text: '🔐 Reconnect QUMS', url: `${BASE_URL}/qums-setup?reconnect=1` }]],
+            inline_keyboard: [[{ text: '🔐 Reconnect GUE', url: `${BASE_URL}/qums-setup?reconnect=1` }]],
           },
         }
       ).catch(() => {});
@@ -1723,7 +1723,7 @@ app.get('/api/admin/export/excel', requireAdmin, async (req, res) => {
     // Sheet 2: System & Reconnect Metrics
     const metricsData = [
       { Metric: 'Total Registered Users', Value: stats.totalUsers },
-      { Metric: 'QUMS / ERP Connected (Total)', Value: stats.qumsConnected },
+      { Metric: 'GUE / ERP Connected (Total)', Value: stats.qumsConnected },
       { Metric: 'New ERP Connected Users', Value: stats.newErpConnected || 0 },
       { Metric: 'Old ERP Connected Users', Value: stats.oldErpConnected || 0 },
       { Metric: 'Sessions Expired', Value: stats.sessionExpired },
@@ -2048,7 +2048,7 @@ app.post('/api/admin/users/bulk-reconnect-notify', requireAdmin, async (req, res
           const replyMarkup = typeof telegram.reconnectKeyboard === 'function' ? telegram.reconnectKeyboard(canTelegramReconnect) : null;
           const msgSent = await sendMessage(
             user.id,
-            '⚠️ <b>QUMS Reconnect Notice (Admin Alert)</b>\n\nYour QUMS portal session requires updating. Send /reconnect or use the action below to restore live monitoring.',
+            '⚠️ <b>GUE Reconnect Notice (Admin Alert)</b>\n\nYour GUE portal session requires updating. Send /reconnect or use the action below to restore live monitoring.',
             console,
             { category: 'ALERT', autoDelete: false, replyMarkup }
           );
@@ -2128,7 +2128,7 @@ if (require.main === module) {
       catchUpMorningSchedule().catch((e) => console.error('[server] morning catch-up failed:', e.message));
 
       app.listen(PORT,() => {
-    console.log(`[server] QUMS Attendance Bot (multi-user) running at ${BASE_URL}`);
+    console.log(`[server] GUE Attendance Bot (multi-user) running at ${BASE_URL}`);
     console.log(`[server] (listening on 0.0.0.0:${PORT}${IS_PROD ? ', production mode' : ', development mode'})`);
     console.log('[server] Pages: / (home) /features /how-it-works /about /faq /contact /privacy /terms | /register /login /dashboard /qums-setup /telegram-setup /forgot /reset');
     console.log('[server] APIs: /api/attendance | /api/today | /api/trigger-telegram | /health');

@@ -789,7 +789,7 @@ async function loginNewErp({ email, password, logoutOtherSessions = false }, log
 
       if (!logoutOtherSessions) {
         // Do NOT automatically logout without explicit user consent
-        const conflictErr = new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        const conflictErr = new NewErpSessionConflictError('Your GUE account is already active on another session.');
         conflictErr.canLogoutAll = true;
         conflictErr.code = 'PORTAL_ACTIVE_SESSION_CONFLICT';
         throw conflictErr;
@@ -816,7 +816,7 @@ async function loginNewErp({ email, password, logoutOtherSessions = false }, log
       if (!logoutTriggered) {
         log.log('[new-erp] Could not find clickable logout element on portal');
         throw new NewErpSessionConflictError(
-          'Could not find official "Logout All Session" button on portal. Please log in directly at https://my.quantumuniversity.edu.in/ to reset your session.'
+          'Could not find official "Logout All Session" button on portal. Please log in directly at https://student.geu.ac.in/ to reset your session.'
         );
       }
 
@@ -836,7 +836,7 @@ async function loginNewErp({ email, password, logoutOtherSessions = false }, log
         log.log(`[new-erp] Logout verification status: "${currentMsg}"`);
         if (!/logged out from all devices|successfully/i.test(currentMsg)) {
           throw new NewErpSessionConflictError(
-            'Official portal did not confirm session logout. Please try again or log in directly at https://my.quantumuniversity.edu.in/'
+            'Official portal did not confirm session logout. Please try again or log in directly at https://student.geu.ac.in/'
           );
         }
       }
@@ -863,7 +863,7 @@ async function loginNewErp({ email, password, logoutOtherSessions = false }, log
         log.log(`[new-erp] Post-logout retry login failed: "${retryError}"`);
         if (/already active|logout all session/i.test(retryError)) {
           throw new NewErpSessionConflictError(
-            'Your QUMS account is already active on another session. Please log in directly at https://my.quantumuniversity.edu.in/'
+            'Your GUE account is already active on another session. Please log in directly at https://student.geu.ac.in/'
           );
         }
         throw new NewErpAuthError(`Login failed: ${retryError}`);
@@ -880,7 +880,7 @@ async function loginNewErp({ email, password, logoutOtherSessions = false }, log
     if (currentUrl === LOGIN_URL || currentUrl.endsWith('/Login') || currentUrl.endsWith('/Login/')) {
       const bodyHtml = await page.content();
       if (/user session is already active|already active/i.test(bodyHtml)) {
-        throw new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        throw new NewErpSessionConflictError('Your GUE account is already active on another session.');
       }
       if (bodyHtml.includes('Invalid UserName Or Password')) {
         throw new NewErpAuthError('Invalid UserName or Password.');
@@ -1017,7 +1017,7 @@ async function scrapeNewErpTimetable({ sessionPath, startDate = null, endDate = 
     if (page.url() === LOGIN_URL || (res && (res.status() === 401 || res.status() === 403))) {
       const pageHtml = await page.content().catch(() => '');
       if (/user session is already active|already active/i.test(pageHtml)) {
-        throw new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        throw new NewErpSessionConflictError('Your GUE account is already active on another session.');
       }
       throw new NewErpSessionExpiredError();
     }
@@ -1156,7 +1156,7 @@ async function scrapeAllNewErpLectureRecords({ sessionPath, startDate = '2026-01
     if (page.url() === LOGIN_URL || (res && (res.status() === 401 || res.status() === 403))) {
       const pageHtml = await page.content().catch(() => '');
       if (/user session is already active|already active/i.test(pageHtml)) {
-        throw new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        throw new NewErpSessionConflictError('Your GUE account is already active on another session.');
       }
       throw new NewErpSessionExpiredError();
     }
@@ -1267,7 +1267,7 @@ async function scrapeNewErpAttendance({ sessionPath, startDate = null, endDate =
     if (page.url() === LOGIN_URL || (res && (res.status() === 401 || res.status() === 403))) {
       const pageHtml = await page.content().catch(() => '');
       if (/user session is already active|already active/i.test(pageHtml)) {
-        throw new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        throw new NewErpSessionConflictError('Your GUE account is already active on another session.');
       }
       throw new NewErpSessionExpiredError();
     }
@@ -1461,7 +1461,7 @@ async function scrapeNewErpAssignments({ sessionPath }, log = console) {
     if (page.url() === LOGIN_URL || (res && (res.status() === 401 || res.status() === 403))) {
       const pageHtml = await page.content().catch(() => '');
       if (/user session is already active|already active/i.test(pageHtml)) {
-        throw new NewErpSessionConflictError('Your QUMS account is already active on another session.');
+        throw new NewErpSessionConflictError('Your GUE account is already active on another session.');
       }
       throw new NewErpSessionExpiredError();
     }

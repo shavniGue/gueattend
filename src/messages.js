@@ -168,7 +168,7 @@ function formatBackdatedUpdate(rec, prev = null) {
 
   if (rec.teacher) lines.push(`Teacher: ${rec.teacher}`);
   lines.push('');
-  lines.push('QUMS attendance was updated for a previous class.');
+  lines.push('GUE attendance was updated for a previous class.');
   return lines.join('\n');
 }
 
@@ -186,7 +186,7 @@ function fullDateLabelFromYMD(ymd) {
  */
 function formatAttendanceMessage(analysis) {
   const lines = [];
-  lines.push('*\u{1F4CA} QUMS Attendance Report*');
+  lines.push('*\u{1F4CA} GUE Attendance Report*');
   const stamp = new Date(analysis.generatedAt).toLocaleString('en-IN', {
     timeZone: 'Asia/Kolkata',
     dateStyle: 'medium',
@@ -206,7 +206,7 @@ function formatAttendanceMessage(analysis) {
   if (analysis.demoData) {
     lines.push('_(DEMO data — live scrape nahi hua)_');
   }
-  lines.push('_Auto-sent by QUMS Attendance Bot \u{1F916}_');
+  lines.push('_Auto-sent by GUE Attendance Bot \u{1F916}_');
   return lines.join('\n');
 }
 
@@ -234,7 +234,7 @@ function formatNewAssignment(a) {
   if (a.deadlineYMD) lines.push(`Last Date: ${fullDateLabelFromYMD(a.deadlineYMD)}`);
   if (a.teacher) lines.push(`Faculty: ${a.teacher}`);
   lines.push('');
-  lines.push(`🔗 Open QUMS: ${QUMS_ASSIGNMENT_URL}`);
+  lines.push(`🔗 Open GUE: ${QUMS_ASSIGNMENT_URL}`);
   return lines.join('\n');
 }
 
@@ -259,7 +259,7 @@ function formatAssignmentDeadlineReminder(a) {
     'Today is the last date to submit this assignment.',
     'Please submit it before the deadline.',
     '',
-    `🔗 Open QUMS: ${QUMS_ASSIGNMENT_URL}`,
+    `🔗 Open GUE: ${QUMS_ASSIGNMENT_URL}`,
   ].join('\n');
 }
 
@@ -374,7 +374,7 @@ function formatDateAttendanceReport(dateInfo, rows, options = {}) {
   ];
 
   if (options.isCached) {
-    lines.push('_Showing offline cached records. Live QUMS portal was unreachable._');
+    lines.push('_Showing offline cached records. Live GUE portal was unreachable._');
     lines.push('');
   }
 

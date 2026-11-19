@@ -264,7 +264,7 @@ const quiet = { log: () => {}, error: () => {} };
     ok('4b. session_expiry_state populated in DB', Boolean(user5State && user5State.expiredAt));
     check('4c. Telegram notification sent to user5', telegramSends.some((s) => s.userId === user5.id), true);
     const sentMsg = telegramSends.find((s) => s.userId === user5.id);
-    ok('4d. Telegram message contains Reconnect label', Boolean(sentMsg && sentMsg.text.includes('QUMS Session Expired')));
+    ok('4d. Telegram message contains Reconnect label', Boolean(sentMsg && (sentMsg.text.includes('QUMS Session Expired') || sentMsg.text.includes('GUE Session Expired'))));
     ok('4e. Reconnect button attached', Boolean(sentMsg?.opts?.replyMarkup?.inline_keyboard?.[0]));
 
     // =========================================================================

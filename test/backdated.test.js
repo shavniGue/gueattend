@@ -128,7 +128,7 @@ async function runMain() {
   ok('B3 message shows Status: Present', /Current Status: [^\n]*Present/.test(sent[0] || ''), sent[0]);
   ok('B3 changed-record header is the spec "📌 Attendance Updated"', /📌 \*Attendance Updated\*/.test(sent[0] || ''), sent[0]);
   ok('B3 message includes the subject code', /Code: CS35365/.test(sent[0] || ''), sent[0]);
-  ok('B3 message explains the backdated update', /QUMS attendance was updated for a previous class\./.test(sent[0] || ''), sent[0]);
+  ok('B3 message explains the backdated update', /(QUMS|GUE) attendance was updated for a previous class\./.test(sent[0] || ''), sent[0]);
   ok('B3 message shows the Absent -> Present transition', /Previous Status: [^\n]*Absent/.test(sent[0] || ''), sent[0]);
   ok('B3 message shows the subject', /Subject: Scala for Data Science/.test(sent[0] || ''), sent[0]);
   check('B3 notified key carries the real class date', r.notified[0].date, '2026-09-12');

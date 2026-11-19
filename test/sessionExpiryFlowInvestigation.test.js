@@ -137,7 +137,7 @@ async function run() {
 
   const expiryMsg = capturedSends.find((s) => s.userId === user1.id);
   ok('4. Telegram chat ID is correctly resolved (message sent for user)', Boolean(expiryMsg));
-  ok('5. Session Expired Telegram message is sent', expiryMsg && expiryMsg.text.includes('⚠️ *QUMS Session Expired*'));
+  ok('5. Session Expired Telegram message is sent', expiryMsg && (expiryMsg.text.includes('⚠️ *QUMS Session Expired*') || expiryMsg.text.includes('⚠️ *GUE Session Expired*')));
   ok('6. Reconnect button is present', Boolean(expiryMsg?.opts?.replyMarkup?.inline_keyboard?.[0]));
 
   // 7. Deduplication: subsequent pass should NOT re-alert

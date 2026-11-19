@@ -169,7 +169,7 @@ function ok(label, condition) {
   check('Valid user: maybeNotifySessionExpired returns true', notifyResult, true);
   check('Valid user: Telegram notification was sent', telegramSends.length, 1);
   check('Valid user: Sent to correct user ID', telegramSends[0].userId, userA.id);
-  ok('Valid user: Message contains QUMS Session Expired text', telegramSends[0].text.includes('QUMS Session Expired'));
+  ok('Valid user: Message contains QUMS Session Expired text', telegramSends[0].text.includes('QUMS Session Expired') || telegramSends[0].text.includes('GUE Session Expired'));
   ok('Valid user: Inline button contains Reconnect', Boolean(telegramSends[0].opts.replyMarkup));
 
   // Verify persisted state in db

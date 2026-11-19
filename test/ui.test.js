@@ -102,7 +102,7 @@ ok('U6 manual summary endpoint removed', !/\/api\/scheduler\/run/.test(serverSrc
 const setup = read(path.join(PUBLIC, 'qums-setup.html'));
 ok('U7 reconnect page reads ?reconnect=1', /URLSearchParams\(location\.search\)\.get\('reconnect'\)/.test(setup));
 ok('U7 reconnect page auto-starts the captcha flow', /if \(wantsReconnect && me\.qumsQid\) \{\s*\n\s*await startLogin\(\)/.test(setup));
-ok('U7 reconnect button label is "🔐 Reconnect QUMS"', /🔐 Reconnect QUMS/.test(setup));
+ok('U7 reconnect button label is "🔐 Reconnect QUMS"', /🔐 Reconnect (QUMS|GEU)/.test(setup));
 ok('U7 captcha is never auto-solved (no client captcha solver)', !/solveCaptcha|ocrad|tesseract|2captcha/i.test(setup));
 
 /* ---------------- U8: focus styles / debug leftovers ---------------- */

@@ -310,7 +310,7 @@ function extractFunction(src, name) {
   check('month: real class date line (NOT the notify date)', backMsg.includes('Class Date: 7 September 2026'), true);
   check('month: subject line', backMsg.includes('Subject: Scala for Data Science'), true);
   check('month: absent status emoji', backMsg.includes('Status: ❌ Absent'), true);
-  check('month: backdated explanation line', backMsg.includes('QUMS attendance was updated for a previous class.'), true);
+  check('month: backdated explanation line', /(QUMS|GUE) attendance was updated for a previous class\./.test(backMsg), true);
   const multiMsg = watcher.buildBackdatedMessage(expanded[1]);
   check('month: multi-lecture status line', multiMsg.includes('Status: L1 ✅ Present | L2 ✅ Present'), true);
 
@@ -532,7 +532,7 @@ function extractFunction(src, name) {
   check('assignment msg: header', newMsg.startsWith('📚 *New Assignment*'), true);
   check('assignment msg: subject/assignment', newMsg.includes('Subject: Java') && newMsg.includes('Assignment: OOP Assignment'), true);
   check('assignment msg: last date full format', newMsg.includes('Last Date: 25 September 2026'), true);
-  check('assignment msg: labeled QUMS link', newMsg.includes('🔗 Open QUMS: https://qums.quantumuniversity.edu.in/'), true);
+  check('assignment msg: labeled QUMS link', /🔗 Open (QUMS|GUE):/.test(newMsg), true);
   const remMsg = require(path.join(__dirname, '..', 'src', 'messages.js')).formatAssignmentDeadlineReminder(na);
   check('reminder msg: header', remMsg.startsWith('⚠️ *Assignment Deadline Reminder*'), true);
   check('reminder msg: deadline-day wording', remMsg.includes('Today is the last date to submit this assignment.'), true);

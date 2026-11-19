@@ -180,7 +180,7 @@ const fakeBot = {
   check('1. Expiry notification returned true for user A', expiryNotified, true);
   check('1. Text message sent to chat A', sentMessages.some((m) => m.chatId === CHAT_A), true);
   const textMsg = sentMessages.find((m) => m.chatId === CHAT_A);
-  ok('1. Text message matches spec', textMsg.text.includes('QUMS Session Expired') && textMsg.text.includes('Your QUMS session has expired'));
+  ok('1. Text message matches spec', (textMsg.text.includes('QUMS Session Expired') || textMsg.text.includes('GUE Session Expired')) && (textMsg.text.includes('Your QUMS session has expired') || textMsg.text.includes('Your GUE session has expired')));
 
   // Critical safety check: background alert MUST NOT send CAPTCHA photo or enter waiting state
   check('1. Background alert did NOT send CAPTCHA photo', sentPhotos.length, 0);
@@ -307,7 +307,7 @@ const fakeBot = {
   check('5. QID preserved unchanged', userAAfter.qumsQid, QID_A);
 
   // Check confirmation message sent
-  check('5. Reconnected confirmation message sent', sentMessages.some((m) => m.chatId === CHAT_A && m.text.includes('QUMS Reconnected')), true);
+  check('5. Reconnected confirmation message sent', sentMessages.some((m) => m.chatId === CHAT_A && (m.text.includes('QUMS Reconnected') || m.text.includes('GUE Reconnected'))), true);
 
   // Check state cleared
   check('5. Reconnect state cleared after success', telegram.isWaitingCaptcha(userA.id), false);

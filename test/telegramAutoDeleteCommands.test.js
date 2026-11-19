@@ -248,7 +248,7 @@ async function run() {
   await alerts.maybeNotifySessionExpired(console, user1.id);
   assert(sentMessages.length >= 1, 'Must send session expired alert');
   const sessionMsg = sentMessages[sentMessages.length - 1];
-  assert(sessionMsg.text.includes('QUMS Session Expired'), 'Must be session expired text');
+  assert(sessionMsg.text.includes('QUMS Session Expired') || sessionMsg.text.includes('GUE Session Expired'), 'Must be session expired text');
 
   const pendingAfterSession = await db.listPendingDeletions();
   const sessionEntry = pendingAfterSession.find((p) => p.messageId === sessionMsg.message_id);
@@ -262,7 +262,7 @@ async function run() {
   await alerts.notifyQumsReconnected(console, user1.id);
   assert(sentMessages.length >= 1, 'Must send QUMS Reconnected message');
   const reconnectedMsg = sentMessages[sentMessages.length - 1];
-  assert(reconnectedMsg.text.includes('QUMS Reconnected'), 'Must be QUMS Reconnected text');
+  assert(reconnectedMsg.text.includes('QUMS Reconnected') || reconnectedMsg.text.includes('GUE Reconnected'), 'Must be Reconnected text');
 
   // Also confirm old Session Expired message was deleted early on reconnect
   assert(

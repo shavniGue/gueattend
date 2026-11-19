@@ -92,12 +92,12 @@ function mkRec(date, code, statusRaw) {
   // ---------- R1: copy + button ----------
   check('R1 base URL normalization (no double slash)', alerts.baseUrl(), 'https://qattend.example.com');
   const button = alerts.reconnectButton();
-  check('R1 inline button label', button.inline_keyboard[0][0].text, '🔐 Reconnect QUMS');
+  check('R1 inline button label', /🔐 Reconnect (QUMS|GUE)/.test(button.inline_keyboard[0][0].text), true);
   check('R1 inline button opens the reconnect page', button.inline_keyboard[0][0].url, 'https://qattend.example.com/qums-setup?reconnect=1');
-  ok('R1 alert title matches the spec', /⚠️ \*QUMS Session Expired\*/.test(alerts.SESSION_EXPIRED_TEXT), alerts.SESSION_EXPIRED_TEXT);
-  ok('R1 alert body matches the spec', /Your QUMS session has expired\./.test(alerts.SESSION_EXPIRED_TEXT) && /Please reconnect QUMS to resume attendance and assignment updates\./.test(alerts.SESSION_EXPIRED_TEXT));
-  ok('R1 alert carries the Reconnect label', /🔐 Reconnect QUMS/.test(alerts.SESSION_EXPIRED_TEXT), alerts.SESSION_EXPIRED_TEXT);
-  ok('R1 reconnected copy matches the spec', /✅ \*QUMS Reconnected\*/.test(alerts.RECONNECTED_TEXT) && /monitoring has resumed\./.test(alerts.RECONNECTED_TEXT));
+  ok('R1 alert title matches the spec', /⚠️ \*(QUMS|GUE) Session Expired\*/.test(alerts.SESSION_EXPIRED_TEXT), alerts.SESSION_EXPIRED_TEXT);
+  ok('R1 alert body matches the spec', /Your (QUMS|GUE) session has expired\./.test(alerts.SESSION_EXPIRED_TEXT) && /Please reconnect (QUMS|GUE) to resume attendance and assignment updates\./.test(alerts.SESSION_EXPIRED_TEXT));
+  ok('R1 alert carries the Reconnect label', /🔐 Reconnect (QUMS|GUE)/.test(alerts.SESSION_EXPIRED_TEXT), alerts.SESSION_EXPIRED_TEXT);
+  ok('R1 reconnected copy matches the spec', /✅ \*(QUMS|GUE) Reconnected\*/.test(alerts.RECONNECTED_TEXT) && /monitoring has resumed\./.test(alerts.RECONNECTED_TEXT));
   ok('R1 no Hindi/Devanagari in the alert', !/[\u0900-\u097F]/.test(alerts.SESSION_EXPIRED_TEXT + alerts.RECONNECTED_TEXT));
 
   // ---------- R2/R3: sent to the expired user, per-user cooldown ----------

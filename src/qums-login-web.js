@@ -39,7 +39,7 @@ const MAX_CONCURRENT_PENDING = parseInt(process.env.MAX_CONCURRENT_PENDING, 10) 
 const MAX_CONCURRENT_LAUNCHES = parseInt(process.env.MAX_CONCURRENT_LAUNCHES, 10) || 6;
 
 class ConcurrentLoginError extends Error {
-  constructor(message = 'Another QUMS reconnect or login is already in progress. Please wait a moment and try again.') {
+  constructor(message = 'Another GEU reconnect or login is already in progress. Please wait a moment and try again.') {
     super(message);
     this.name = 'ConcurrentLoginError';
     this.code = 'CONCURRENT_LOGIN_LIMIT';
@@ -120,7 +120,7 @@ const LOGIN_FORM_WAIT_MS = 20000; // form may render late / inside an iframe
 async function gotoLoginPage(page) {
   try {
     await page.goto(LOGIN_URL, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'commit',
       timeout: LOGIN_NAV_TIMEOUT_MS,
     });
   } catch (err) {
@@ -266,15 +266,15 @@ async function startQumsLogin(userId, credsInput, log = console) {
 
   const confirmSwitch = Boolean(credsInput && credsInput.confirmSwitch);
   if (!qid || !password) {
-    const e = new Error('Please enter your QUMS QID and password.');
+    const e = new Error('Please enter your GEU ID and password.');
     e.name = 'QumsCredsRequired';
-    e.hint = 'Enter your QID and password once. They will remain securely saved until you reset or delete your connection.';
+    e.hint = 'Enter your GEU ID and password once. They will remain securely saved until you reset or delete your connection.';
     throw e;
   }
 
   // Detect identity change: if current active QID is different, require confirmation
   if (user && user.qumsQid && user.qumsQid !== qid && !confirmSwitch) {
-    const err = new Error(`A different QUMS student ID was detected (old: ${user.qumsQid}, new: ${qid}). Explicit confirmation required before switching active QUMS identity.`);
+    const err = new Error(`A different GEU student ID was detected (old: ${user.qumsQid}, new: ${qid}). Explicit confirmation required before switching active GEU identity.`);
     err.name = 'IdentityConflictError';
     err.code = 'IdentityConflict';
     err.oldQid = user.qumsQid;
@@ -366,7 +366,7 @@ async function startQumsLogin(userId, credsInput, log = console) {
 async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {}) {
   const p = pending.get(userId);
   if (!p) {
-    const e = new Error('No pending QUMS login — captcha dobara generate karo.');
+    const e = new Error('No pending GEU login — captcha dobara generate karo.');
     e.name = 'NoPendingLogin';
     e.code = 'SESSION_EXPIRED';
     e.hint = 'Captcha 5 min me expire ho jata hai. Start Login dobara dabao.';
@@ -456,20 +456,20 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     } catch {}
 
     let errorCode = 'UNEXPECTED_RESPONSE';
-    let userMessage = portalError || 'Login failed on QUMS portal.';
+    let userMessage = portalError || 'Login failed on GEU ERP portal.';
 
     if (/captcha/i.test(portalError)) {
       errorCode = 'INVALID_CAPTCHA';
       userMessage = 'Captcha galat lagii ya login nahi hua — nayi captcha le lo, dobara try karo.';
     } else if (/user|password|credential|login id|roll/i.test(portalError)) {
       errorCode = 'INVALID_CREDENTIALS';
-      userMessage = 'Invalid QID or password. Please verify your credentials and try again.';
+      userMessage = 'Invalid GEU ID or password. Please verify your credentials and try again.';
     } else if (/expired|timeout|token/i.test(portalError)) {
       errorCode = 'SESSION_EXPIRED';
-      userMessage = 'QUMS session or CAPTCHA expired. Please try again.';
+      userMessage = 'GEU session or CAPTCHA expired. Please try again.';
     } else if (outcome === 'timeout') {
       errorCode = 'PORTAL_TIMEOUT';
-      userMessage = 'QUMS portal did not respond in time (network timeout). Please try again in a moment.';
+      userMessage = 'GEU portal did not respond in time (network timeout). Please try again in a moment.';
     }
 
     log.log(`[qums-login] Login attempt failed for user ${userId}: [${errorCode}] ${userMessage} (portal: "${portalError}")`);

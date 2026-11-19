@@ -68,7 +68,7 @@ async function checkSessionEligibility(identity, userId, targetErp) {
     if (target === 'OLD' && isNewActive) {
       return {
         allowed: false,
-        conflictMessage: `This QUMS account is already active in New ERP. Please disconnect the existing session before switching to Old ERP.`,
+        conflictMessage: `This GUE account is already active in New ERP. Please disconnect the existing session before switching to Old ERP.`,
         activeErp: 'NEW',
       };
     }
@@ -76,7 +76,7 @@ async function checkSessionEligibility(identity, userId, targetErp) {
     if (target === 'NEW' && isOldActive) {
       return {
         allowed: false,
-        conflictMessage: `This QUMS account is already active in Old ERP. Please disconnect the existing session before switching to New ERP.`,
+        conflictMessage: `This GUE account is already active in Old ERP. Please disconnect the existing session before switching to New ERP.`,
         activeErp: 'OLD',
       };
     }
@@ -88,7 +88,7 @@ async function checkSessionEligibility(identity, userId, targetErp) {
     if (existing && existing.status === 'active' && existing.erpType !== target) {
       return {
         allowed: false,
-        conflictMessage: `This QUMS account is already active in ${otherErpLabel}. Please disconnect the existing session before switching to ${targetErpLabel}.`,
+        conflictMessage: `This GUE account is already active in ${otherErpLabel}. Please disconnect the existing session before switching to ${targetErpLabel}.`,
         activeErp: existing.erpType,
         existing,
       };

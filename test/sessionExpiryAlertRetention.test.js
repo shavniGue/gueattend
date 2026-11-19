@@ -83,7 +83,7 @@ async function run() {
   assert.strictEqual(notified, true, 'Alert should be sent');
   assert.strictEqual(sentMessages.length, 1, 'Exactly one Telegram alert sent');
   const alertMsg = sentMessages[0];
-  assert(alertMsg.text.includes('QUMS Session Expired'), 'Message text must mention QUMS Session Expired');
+  assert(alertMsg.text.includes('QUMS Session Expired') || alertMsg.text.includes('GUE Session Expired'), 'Message text must mention Session Expired');
   assert(alertMsg.opts && alertMsg.opts.reply_markup, 'Message must have reconnect reply_markup button');
 
   // Verify DB pending deletions does NOT contain this message
@@ -141,7 +141,7 @@ async function run() {
   assert(stateAfterReconnect.resolvedAt > 0, 'resolvedAt in state must be recorded');
 
   // Reconnected confirmation message sent and scheduled for 1-minute auto-delete
-  const reconnectMsg = sentMessages.find((m) => m.text.includes('QUMS Reconnected'));
+  const reconnectMsg = sentMessages.find((m) => m.text.includes('QUMS Reconnected') || m.text.includes('GUE Reconnected'));
   assert(reconnectMsg, 'Confirmation reconnected message must be sent');
   const pendingAfterReconnect = await db.listPendingDeletions();
   const reconnectInPending = (pendingAfterReconnect || []).find((p) => p.messageId === reconnectMsg.message_id);

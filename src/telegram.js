@@ -242,6 +242,10 @@ function classifyMessage(opts, text) {
 
   // Expiry alert patterns -> ALERT (never auto-deleted after 60s)
   if (
+    t.includes('⚠️ GUE Session Expired') ||
+    t.includes('GUE Session Expired') ||
+    t.includes('Your GUE session has expired') ||
+    t.includes('GUE Reconnect Notice') ||
     t.includes('⚠️ QUMS Session Expired') ||
     t.includes('QUMS Session Expired') ||
     t.includes('Your QUMS session has expired') ||
@@ -586,9 +590,9 @@ const reconnectingChats = new Set();
 const reconnectingUsers = new Set();
 
 const TELEGRAM_SESSION_EXPIRED_TEXT = [
-  '⚠️ *QUMS Session Expired*',
+  '⚠️ *GUE Session Expired*',
   '',
-  'Your QUMS session has expired. Please reconnect to continue receiving attendance and assignment updates.',
+  'Your GUE session has expired. Please reconnect to continue receiving attendance and assignment updates.',
 ].join('\n');
 
 const MSG_INCORRECT_CAPTCHA = [
@@ -893,12 +897,12 @@ async function handleUserMessage(msg, log = console) {
       const alerts = require('./alerts');
       const recUrl = typeof alerts.reconnectUrl === 'function' ? alerts.reconnectUrl() : 'https://qattend.onrender.com/qums-setup?reconnect=1';
       const msgText = [
-        '❌ *Invalid QID or Password*',
+        '❌ *Invalid GUE ID or Password*',
         '',
-        'Your saved QUMS credentials were not accepted by the portal. Please update your password on the web setup page:',
+        'Your saved GUE credentials were not accepted by the portal. Please update your password on the web setup page:',
       ].join('\n');
       const keyboard = {
-        inline_keyboard: [[{ text: '⚙️ Open QUMS Setup', url: recUrl }]],
+        inline_keyboard: [[{ text: '⚙️ Open GUE Setup', url: recUrl }]],
       };
       await reply(chatId, msgText, log, { replyMarkup: keyboard });
       return;
@@ -1082,7 +1086,7 @@ async function handleCallbackQuery(query, log = console) {
     }
     reconnectingChats.add(chatKey);
     if (bot && typeof bot.answerCallbackQuery === 'function') {
-      await bot.answerCallbackQuery(query.id, { text: 'Starting QUMS reconnect...' }).catch(() => {});
+      await bot.answerCallbackQuery(query.id, { text: 'Starting GUE reconnect...' }).catch(() => {});
     }
   }
 
@@ -1113,7 +1117,7 @@ async function handleCallbackQuery(query, log = console) {
         if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
           await reply(chatId, '⏳ Another reconnect is currently in progress. Please wait a moment and tap Reconnect again.', log);
         } else {
-          await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your QUMS credentials are saved.', log);
+          await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your GUE credentials are saved.', log);
         }
       }
     } finally {
@@ -1401,7 +1405,7 @@ async function handleStart(chatId, payload, log = console) {
         '📅 /today — View today\'s class timetable & status (auto-deletes in 1 min)',
         '📚 /assignments — View pending assignments & deadlines',
         'ℹ️ /status — Check account connection status',
-        '🔄 /reconnect — Reconnect QUMS session',
+        '🔄 /reconnect — Reconnect GUE session',
         '❓ /help — Detailed help & commands list',
         AUTO_DELETE_FOOTNOTE.trim(),
       ].join('\n');
@@ -1480,9 +1484,9 @@ async function handleStatus(chatId, log = console) {
       'ℹ️ *Account Status*',
       '',
       `👤 Student: ${name}`,
-      `🎓 QID: ${qid}`,
+      `🎓 GUE ID: ${qid}`,
       `📡 Monitoring: ${sessionActive ? 'Active ✅' : 'Paused ⚠️'}`,
-      `🔐 QUMS Session: ${sessionStatusText}`,
+      `🔐 GUE Session: ${sessionStatusText}`,
     ];
     if (!sessionActive && (user.qumsPasswordEncrypted || user.qumsQid)) {
       lines.push('');
@@ -1548,7 +1552,7 @@ async function handleAttendance(chatId, log = console) {
       };
       await reply(
         chatId,
-        '⚠️ *New ERP Session Logged Out*\n\nAapka QUMS session kisi aur device/portal par login hone ke karan logout ho gaya hai.\n\nNeeche button dabakar 1-Click me turant reconnect karein:',
+        '⚠️ *GEU ERP Session Logged Out*\n\nAapka GUE session kisi aur device/portal par login hone ke karan logout ho gaya hai.\n\nNeeche button dabakar 1-Click me turant reconnect karein:',
         log,
         opts
       );
@@ -1626,12 +1630,12 @@ async function handleAttendance(chatId, log = console) {
   }
 
   if (!user.qumsQid || !user.qumsSessionPath) {
-    await reply(chatId, '⚠️ *QUMS Setup Pending*\n\nPlease complete QUMS setup on the web dashboard first to view your attendance.', log);
+    await reply(chatId, '⚠️ *GUE Setup Pending*\n\nPlease complete GUE ERP setup on the web dashboard first to view your attendance.', log);
     return;
   }
 
   if (user.qumsSessionStatus === 'expired') {
-    await reply(chatId, '⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired. Send /reconnect to log in again via Telegram.', log);
+    await reply(chatId, '⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.', log);
     return;
   }
 
@@ -1665,7 +1669,7 @@ async function handleAttendance(chatId, log = console) {
       const { maybeNotifySessionExpired } = require('./alerts');
       const sent = await maybeNotifySessionExpired(log, user.id, { evidence: true }).catch(() => false);
       if (!sent) {
-        const sentMsg = await reply(chatId, `⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`, log);
+        const sentMsg = await reply(chatId, `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`, log);
         const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
         if (messageId) {
           scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
@@ -1689,7 +1693,7 @@ async function handleAttendance(chatId, log = console) {
           lines.push(`${icon} *${sub}*: ${st.present}/${st.total} (${pct}%)`);
         }
         lines.push('');
-        lines.push('_Live QUMS portal is temporarily unreachable or session expired._');
+        lines.push('_Live GUE ERP portal is temporarily unreachable or session expired._');
         lines.push('Send /reconnect if your session needs refreshing.');
         lines.push(AUTO_DELETE_FOOTNOTE);
         const sentMsg = await reply(chatId, lines.join('\n'), log);
@@ -1894,7 +1898,7 @@ async function handleToday(chatId, log = console) {
           const { maybeNotifySessionExpired } = require('./alerts');
           const sent = await maybeNotifySessionExpired(log, user.id, { evidence: true }).catch(() => false);
           if (!sent) {
-            const sentMsg = await reply(chatId, `⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`, log);
+            const sentMsg = await reply(chatId, `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`, log);
             const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
             if (messageId) {
               scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
@@ -2122,7 +2126,7 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
   if (!user.qumsQid || !user.qumsSessionPath) {
     const sentMsg = await reply(
       chatId,
-      `⚠️ *QUMS Setup Pending*\n\nPlease complete QUMS setup on the web dashboard first to view your attendance.${AUTO_DELETE_FOOTNOTE}`,
+      `⚠️ *GUE Setup Pending*\n\nPlease complete GUE ERP setup on the web dashboard first to view your attendance.${AUTO_DELETE_FOOTNOTE}`,
       log
     );
     const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
@@ -2135,7 +2139,7 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
   if (user.qumsSessionStatus === 'expired') {
     const sentMsg = await reply(
       chatId,
-      `⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
+      `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
       log
     );
     const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
@@ -2246,7 +2250,7 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
           if (!sent) {
             const sentMsg = await reply(
               chatId,
-              `⚠️ *QUMS Session Expired*\n\nYour QUMS session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
+              `⚠️ *GUE Session Expired*\n\nYour GUE session has expired. Send /reconnect to log in again via Telegram.${AUTO_DELETE_FOOTNOTE}`,
               log
             );
             const messageId = (sentMsg && typeof sentMsg === 'object' && sentMsg.message_id) ? sentMsg.message_id : null;
@@ -2398,7 +2402,7 @@ async function handleAssignments(chatId, log = console) {
       }
       lines.push('');
     });
-    lines.push('🔗 Open QUMS portal to submit.');
+    lines.push('🔗 Open GUE portal to submit.');
     lines.push(AUTO_DELETE_FOOTNOTE.trim());
     await reply(chatId, lines.join('\n'), log, { autoDelete: true, delayMs: AUTO_DELETE_DELAY_MS });
   } catch (err) {
@@ -2430,7 +2434,7 @@ async function handleReconnectCommand(chatId, log = console) {
       if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
         await reply(chatId, '⏳ Another reconnect is currently in progress. Please wait a moment and send /reconnect again.', log);
       } else {
-        await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your QUMS credentials are saved.', log);
+        await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your GUE credentials are saved.', log);
       }
     }
   } finally {

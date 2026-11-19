@@ -66,7 +66,7 @@ async function cycle(userId, mode, rows, sent, todayYMD) {
   ok('A2 message has the subject', /Subject: Java/.test(sent[0] || ''), sent[0]);
   ok('A2 message has the title', /Assignment: OOP Assignment/.test(sent[0] || ''), sent[0]);
   ok('A2 message has the last date', /Last Date: 25 September 2026/.test(sent[0] || ''), sent[0]);
-  ok('A2 message links to the QUMS assignment page', /🔗 Open QUMS: https:\/\/qums\.quantumuniversity\.edu\.in\/Web_StudentAcademic\/Cyborg_StudentAssignment\?id=Assignment/.test(sent[0] || ''), sent[0]);
+  ok('A2 message links to the QUMS assignment page', /🔗 Open (QUMS|GUE): https:\/\/qums\.quantumuniversity\.edu\.in\/Web_StudentAcademic\/Cyborg_StudentAssignment\?id=Assignment/.test(sent[0] || ''), sent[0]);
   check('A2 notified row carries the real assignment id', r.notified[0].key, 'new:A1');
 
   // ---------- A3: same assignment again -> 0 notifications (no duplicate) ----------

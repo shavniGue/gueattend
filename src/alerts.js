@@ -43,17 +43,17 @@ function reconnectUrl() {
 
 // ---- exact user-facing copy (English only; single source of truth) ----
 const SESSION_EXPIRED_TEXT = [
-  '⚠️ *QUMS Session Expired*',
+  '⚠️ *GUE Session Expired*',
   '',
-  'Your QUMS session has expired. Please reconnect QUMS to resume attendance and assignment updates.',
+  'Your GUE session has expired. Please reconnect GUE to resume attendance and assignment updates.',
   '',
-  '🔐 Reconnect QUMS',
+  '🔐 Reconnect GUE',
 ].join('\n');
 
 const RECONNECTED_TEXT = [
-  '✅ *QUMS Reconnected*',
+  '✅ *GUE Reconnected*',
   '',
-  'Your QUMS session has been restored. Attendance and assignment monitoring has resumed.',
+  'Your GUE session has been restored. Attendance and assignment monitoring has resumed.',
 ].join('\n');
 
 const NEW_ERP_RECONNECTED_TEXT = [
@@ -71,14 +71,14 @@ function reconnectButton(canTelegramReconnect = false) {
     return {
       inline_keyboard: [
         [
-          { text: '🔄 Reconnect QUMS', callback_data: 'qums_start_reconnect' },
+          { text: '🔄 Reconnect GUE', callback_data: 'qums_start_reconnect' },
           { text: '🔐 Dashboard', url },
         ],
       ],
     };
   }
   return {
-    inline_keyboard: [[{ text: '🔐 Reconnect QUMS', url }]],
+    inline_keyboard: [[{ text: '🔐 Reconnect GUE', url }]],
   };
 }
 
@@ -326,9 +326,9 @@ async function notifyNewErpSessionExpired(userId, log = console) {
     const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://qattend.onrender.com/dashboard?reconnect=1';
 
     const text = [
-      '⚠️ *QUMS Session Logged Out / Expired*',
+      '⚠️ *GUE Session Logged Out / Expired*',
       '',
-      'Aapka New ERP session logout ho gaya hai (kisi aur device/portal par login hone ke karan ya session expire hone par).',
+      'Aapka GEU ERP session logout ho gaya hai (kisi aur device/portal par login hone ke karan ya session expire hone par).',
       '',
       'Neeche button dabayein: dusri device se logout ho jayega aur yahan 1-Click me turant reconnect ho jayega:',
     ].join('\n');
@@ -337,7 +337,7 @@ async function notifyNewErpSessionExpired(userId, log = console) {
       replyMarkup: {
         inline_keyboard: [
           [{ text: '⚡ 1-Click Reconnect', callback_data: 'new_erp_1click_reconnect' }],
-          [{ text: '🔐 Reconnect QUMS', url }],
+          [{ text: '🔐 Reconnect GUE', url }],
         ],
       },
       category: 'ALERT',
@@ -367,16 +367,16 @@ async function notifyReconnectionFailed(userId, errorMsg = '', log = console) {
     const url = /^https:\/\//i.test(base) ? `${base}/qums-setup` : 'https://qattend.onrender.com/qums-setup';
 
     const text = [
-      '❌ *QUMS Reconnection Failed*',
+      '❌ *GUE Reconnection Failed*',
       '',
-      `Could not reconnect your QUMS session: ${errorMsg || 'Authentication failed or portal unreachable'}.`,
+      `Could not reconnect your GUE session: ${errorMsg || 'Authentication failed or portal unreachable'}.`,
       '',
-      'Please open QUMS Setup to reconnect.',
+      'Please open GUE Setup to reconnect.',
     ].join('\n');
 
     const opts = {
       replyMarkup: {
-        inline_keyboard: [[{ text: '⚙️ Open QUMS Setup', url }]],
+        inline_keyboard: [[{ text: '⚙️ Open GUE Setup', url }]],
       },
       category: 'ALERT',
       autoDelete: false,
@@ -440,9 +440,9 @@ async function notifySessionConflict(userId, log = console) {
     const url = /^https:\/\//i.test(base) ? `${base}/dashboard?reconnect=1` : 'https://qattend.onrender.com/dashboard?reconnect=1';
 
     const text = [
-      '⚠️ *QUMS Session Conflict Detected*',
+      '⚠️ *GUE Session Conflict Detected*',
       '',
-      'Aapne official portal (my.quantumuniversity.edu.in) par kisi aur device se login kiya hai, isliye yahan session logout ho gaya.',
+      'Aapne official portal (student.geu.ac.in) par kisi aur device se login kiya hai, isliye yahan session logout ho gaya.',
       '',
       'Neeche button dabayein: dusri device se logout ho jayega aur yahan 1-Click me turant reconnect ho jayega:',
     ].join('\n');
@@ -451,7 +451,7 @@ async function notifySessionConflict(userId, log = console) {
       replyMarkup: {
         inline_keyboard: [
           [{ text: '⚡ 1-Click Reconnect', callback_data: 'new_erp_1click_reconnect' }],
-          [{ text: '🔐 Reconnect QUMS', url }],
+          [{ text: '🔐 Reconnect GUE', url }],
         ],
       },
       category: 'ALERT',
