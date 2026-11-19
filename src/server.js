@@ -357,7 +357,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
   const file = path.join(PUBLIC_DIR, 'index.html');
   res.send(withQumsResetControl(fs.readFileSync(file, 'utf8')));
 });
-app.get('/qums-setup', requireAuth, (req, res) => {
+app.get(['/qums-setup', '/geu-setup', '/gue-setup'], requireAuth, (req, res) => {
   const file = path.join(PUBLIC_DIR, 'qums-setup.html');
   res.send(withQumsResetControl(fs.readFileSync(file, 'utf8')));
 });
@@ -1054,8 +1054,8 @@ app.all('/api/trigger-telegram', requireAuth, async (req, res) => {
   }
 });
 
-// ---- QUMS web login (HEADLESS captcha relay) ----
-app.post('/api/qums-login/start', requireAuth, async (req, res) => {
+// ---- QUMS / GEU web login handlers (HEADLESS captcha relay) ----
+async function startQumsLoginHandler(req, res) {
   try {
     const { qid, password, confirmSwitch } = req.body || {};
     const finalQid = String(qid || req.appUser.qumsQid || '').trim();
@@ -1078,16 +1078,20 @@ app.post('/api/qums-login/start', requireAuth, async (req, res) => {
     }
     res.status(httpStatusFor(err)).json({ error: err.message, hint: err.hint || null, code: err.name });
   }
-});
+}
 
-app.post('/api/qums-login/submit-captcha', requireAuth, async (req, res) => {
+app.post('/api/qums-login/start', requireAuth, startQumsLoginHandler);
+app.post('/api/geu-login/start', requireAuth, startQumsLoginHandler);
+app.post('/api/gue-login/start', requireAuth, startQumsLoginHandler);
+
+async function submitQumsCaptchaHandler(req, res) {
   try {
     const { captchaText, captcha } = req.body || {};
     const text = String(captchaText || captcha || '').trim().toUpperCase();
     const result = await qumsLogin.submitQumsCaptcha(req.session.userId, text, console, { source: 'web' });
     if (result && result.ok) {
       invalidateUserDataCaches(req.session.userId);
-      // Seed baseline marked periods for today
+      // Seed baseline marked periods for today (background)
       runBaselineForUser(req.session.userId).catch((e) =>
         console.error('[qums-setup] baseline fetch fail:', e.message)
       );
@@ -1096,10 +1100,14 @@ app.post('/api/qums-login/submit-captcha', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(httpStatusFor(err)).json({ error: err.message, hint: err.hint || null, code: err.name });
   }
-});
+}
 
-// ---- QUMS reset (permanent reset for req.session.userId only) ----
-app.post('/api/qums-reset', requireAuth, async (req, res) => {
+app.post('/api/qums-login/submit-captcha', requireAuth, submitQumsCaptchaHandler);
+app.post('/api/geu-login/submit-captcha', requireAuth, submitQumsCaptchaHandler);
+app.post('/api/gue-login/submit-captcha', requireAuth, submitQumsCaptchaHandler);
+
+// ---- QUMS / GEU reset & credential deletion handler (permanent reset for req.session.userId only) ----
+async function handleErpReset(req, res) {
   try {
     invalidateUserDataCaches(req.session.userId);
     const user = await db.getUserById(req.session.userId);
@@ -1122,16 +1130,23 @@ app.post('/api/qums-reset', requireAuth, async (req, res) => {
     await clearSessionAlert(req.session.userId);
     res.json({
       ok: true,
-      redirect: '/qums-setup',
-      message: 'QUMS connection permanently reset. Ab QID/password dobara enter karo.',
+      redirect: '/geu-setup',
+      message: 'GEU connection permanently reset. Ab User ID/password dobara enter karo.',
     });
   } catch (err) {
     safeServerError(res, err);
   }
-});
+}
 
-// ---- QUMS logout (deletes session file for req.session.userId only; retains QID for reconnect) ----
-app.post('/api/qums-logout', requireAuth, async (req, res) => {
+app.post('/api/qums-reset', requireAuth, handleErpReset);
+app.post('/api/geu-reset', requireAuth, handleErpReset);
+app.post('/api/gue-reset', requireAuth, handleErpReset);
+app.delete('/api/user/qums-credentials', requireAuth, handleErpReset);
+app.delete('/api/user/geu-credentials', requireAuth, handleErpReset);
+app.delete('/api/user/gue-credentials', requireAuth, handleErpReset);
+
+// ---- QUMS / GEU logout (deletes session file for req.session.userId only; retains User ID for reconnect) ----
+async function logoutErpHandler(req, res) {
   try {
     invalidateUserDataCaches(req.session.userId);
     const user = await db.getUserById(req.session.userId);
@@ -1143,12 +1158,16 @@ app.post('/api/qums-logout', requireAuth, async (req, res) => {
     await db.updateUser(req.session.userId, { qumsSessionPath: '', qumsSessionStatus: 'disconnected' });
     res.json({
       ok: true,
-      message: 'QUMS logout — session delete ho gayi. Reconnect karne ke liye QUMS Setup → "Reconnect QUMS" (sirf captcha).',
+      message: 'GEU ERP logout — session delete ho gayi. Reconnect karne ke liye GEU Setup → "Reconnect GEU" (sirf captcha).',
     });
   } catch (err) {
     safeServerError(res, err);
   }
-});
+}
+
+app.post('/api/qums-logout', requireAuth, logoutErpHandler);
+app.post('/api/geu-logout', requireAuth, logoutErpHandler);
+app.post('/api/gue-logout', requireAuth, logoutErpHandler);
 
 // ---------------------------------------------------------------------------
 // NEW ERP ENDPOINTS (Separate Authentication, Session Management & Scrapers)

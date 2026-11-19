@@ -15,7 +15,7 @@ function isLoginLikeUrl(urlString) {
     if (p === '/' || p === '' || p === '/#' || p.endsWith('/index.aspx') || p.endsWith('/default.aspx')) {
       return true;
     }
-    return p.includes('login');
+    return p.includes('login') || p.includes('n0j5ha0');
   } catch {
     return false;
   }

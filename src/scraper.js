@@ -146,7 +146,48 @@ function clearCachedRegId(sessionPath) {
 /** Fetch the dashboard page and pull out the embedded RegID + selected Year/Sem. */
 async function getStudentContext(apiContext, opts = {}) {
   const sessionPath = opts.sessionPath || null;
-  const resp = await apiGet(apiContext, DASHBOARD_URL, { timeout: 60000 });
+
+  // FAST PATH 0 (GEU ERP): Check StudentAttendanceAcademic_Fill with zeroed payload (~200ms)
+  try {
+    const geuResp = await apiPost(apiContext, GEU_ATTENDANCE_API, {
+      data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: 0, SYID: 0 },
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      timeout: 10000,
+    }).catch(() => null);
+
+    if (geuResp && geuResp.ok()) {
+      const raw = await geuResp.text();
+      if (raw && !raw.trim().startsWith('<')) {
+        const parsed = JSON.parse(raw);
+        let studentName = opts.studentName || '';
+        let regId = '0';
+        let yearSem = opts.yearSem || '';
+        if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
+          const info = parsed.StudentInfo[0];
+          if (!studentName) studentName = norm(info.StudentName || info.Name || '');
+          if (info.RegID) regId = String(info.RegID);
+          if (!yearSem) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
+        }
+        if (sessionPath && regId && regId !== '0') setCachedRegId(sessionPath, regId);
+
+        const candidateRows = parsed.Table || parsed.Rows || parsed.Subjects || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
+        if (Array.isArray(candidateRows) && candidateRows.length > 0) {
+          return {
+            regId,
+            yearSem: yearSem || '1',
+            availableYearSems: [yearSem || '1'],
+            studentName,
+            attendancePayload: {
+              data: JSON.stringify(candidateRows),
+              state: JSON.stringify(parsed.Totals || parsed.StudentInfo || []),
+            },
+          };
+        }
+      }
+    }
+  } catch {}
+
+  const resp = await apiGet(apiContext, DASHBOARD_URL, { timeout: 15000 });
 
   if (!resp.ok()) {
     throw new ScrapeError(
@@ -166,14 +207,7 @@ async function getStudentContext(apiContext, opts = {}) {
     html.match(/var\s+RegID\s*=\s*[\'\"](\d+)[\'\"]/i) ||
     html.match(/\bRegID\s*[:=]\s*[\'\"]?(\d+)[\'\"]?/i);
 
-  const regId = regIdMatch ? regIdMatch[1] : null;
-
-  if (!regId) {
-    throw new ScrapeError(
-      'Dashboard HTML me RegID nahi mila.',
-      'Dashboard → QUMS Setup → Reconnect QUMS try karo.'
-    );
-  }
+  const regId = regIdMatch ? regIdMatch[1] : (sessionPath ? getCachedRegId(sessionPath) || '0' : '0');
   if (sessionPath) setCachedRegId(sessionPath, regId);
 
   const detectedYearSems = [];
@@ -322,15 +356,15 @@ function mapAttendanceRow(raw) {
     return Number.isFinite(n) ? n : null;
   };
   const row = {
-    subject: norm(raw.Subject),
-    subjectCode: norm(raw.SubjectCode),
-    percentage: num(raw.Percentage),
-    topAttendance: norm(raw.Toper) || undefined,
-    totalClasses: num(raw.TotalLecture) ?? undefined,
-    attended: num(raw.TotalPresent) ?? undefined,
-    totalAbsent: num(raw.TotalAbsent) ?? undefined,
-    totalLeave: num(raw.TotalLeave) ?? undefined,
-    yearSem: norm(raw.YearSem) || undefined,
+    subject: norm(raw.Subject || raw.SubjectName || raw.CourseName || raw.SubName),
+    subjectCode: norm(raw.SubjectCode || raw.CourseCode || raw.SubCode),
+    percentage: num(raw.Percentage ?? raw.AttendancePercentage ?? raw.TotalPercentage),
+    topAttendance: norm(raw.Toper || raw.TopAttendance) || undefined,
+    totalClasses: num(raw.TotalLecture ?? raw.TotalLectures ?? raw.TotalClass ?? raw.TotalClasses) ?? undefined,
+    attended: num(raw.TotalPresent ?? raw.Present ?? raw.Attended) ?? undefined,
+    totalAbsent: num(raw.TotalAbsent ?? raw.Absent) ?? undefined,
+    totalLeave: num(raw.TotalLeave ?? raw.Leave) ?? undefined,
+    yearSem: norm(raw.YearSem || raw.Semester || raw.Sem) || undefined,
   };
   // Recompute percentage from exact counts when they exist and look sane.
   if (row.totalClasses > 0 && row.attended != null && row.attended >= 0) {
@@ -443,11 +477,12 @@ async function scrapeAttendance(opts = {}) {
 
     let summary = null;
     try {
-      const st = JSON.parse(payload.state || '[]')[0];
+      const parsedSt = JSON.parse(payload.state || '[]');
+      const st = Array.isArray(parsedSt) ? parsedSt[0] : parsedSt;
       if (st) {
         const rawTot = st.TotalPercentage !== undefined && st.TotalPercentage !== null && String(st.TotalPercentage).trim() !== ''
           ? String(st.TotalPercentage).trim()
-          : null;
+          : (st.Percentage !== undefined && st.Percentage !== null ? String(st.Percentage).trim() : null);
         const numTot = rawTot !== null && !isNaN(Number(rawTot)) ? Number(rawTot) : null;
         summary = {
           dateFrom: norm(st.DateFrom),
@@ -501,16 +536,16 @@ function normalizeAttendanceValue(value) {
 
 /** Map one raw API row to the watcher's row shape (+ dedupe key). */
 function mapTodayRow(raw) {
-  const period = norm(raw.Period);
-  const subjectCode = norm(raw.SubjectCode);
+  const period = norm(raw.Period || raw.period || raw.PeriodName);
+  const subjectCode = norm(raw.SubjectCode || raw.CourseCode || raw.SubCode);
   return {
     period,
-    duration: norm(raw.Duration),
-    subject: norm(raw.subject),
+    duration: norm(raw.Duration || raw.duration || raw.TimeSlot),
+    subject: norm(raw.subject || raw.Subject || raw.SubjectName || raw.CourseName),
     subjectCode,
-    employee: norm(raw.Employeename),
-    attendance: norm(raw.Attend),
-    status: normalizeAttendanceValue(raw.Attend),
+    employee: norm(raw.Employeename || raw.EmployeeName || raw.Teacher || raw.FacultyName),
+    attendance: norm(raw.Attend || raw.Attendance || raw.Status),
+    status: normalizeAttendanceValue(raw.Attend || raw.Attendance || raw.Status),
     key: `${period}-${subjectCode}`,
   };
 }
@@ -529,10 +564,18 @@ async function scrapeTodaysAttendance(opts = {}) {
     const regId = await getRegIdLight(apiContext, { sessionPath });
     const date = dateStr || istDateString();
 
-    const resp = await apiPost(apiContext, TODAY_ATTENDANCE_API, {
-      form: { RegID: regId, date },
-      timeout: 60000,
-    });
+    let resp = await apiPost(apiContext, GEU_TODAY_API, {
+      data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: Number(regId) || 0, date },
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      timeout: 10000,
+    }).catch(() => null);
+
+    if (!resp || !resp.ok()) {
+      resp = await apiPost(apiContext, TODAY_ATTENDANCE_API, {
+        form: { RegID: regId, date },
+        timeout: 20000,
+      });
+    }
     if (!resp.ok()) {
       throw new ScrapeError(
         `Today's-attendance API failed (HTTP ${resp.status()}).`,
@@ -1039,13 +1082,35 @@ async function scrapeTimetable(opts = {}) {
   const sessionPath = opts.sessionPath || SESSION_FILE;
   assertSessionFile(sessionPath);
 
-  // 1) API-first: FillStudentTimeTable — browser-free (fast + VPS-safe).
-  //    Rooms/teachers wahi text format me aate hain jo parser expect karta hai.
+  // 1) API-first: GEU StudentTimeTable_Fill / QUMS FillStudentTimeTable — browser-free (fast + VPS-safe).
   const apiContext = await newApiContext(sessionPath);
   try {
+    // Try GEU endpoint first (~200ms)
+    try {
+      const geuResp = await apiPost(apiContext, GEU_TIMETABLE_API, {
+        data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: 0, TTID: 0 },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        timeout: 10000,
+      }).catch(() => null);
+      if (geuResp && geuResp.ok()) {
+        const body = await geuResp.text();
+        if (body && !body.trim().startsWith('<')) {
+          const parsed = JSON.parse(body);
+          const rows = parsed.Table || parsed.Rows || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
+          if (Array.isArray(rows) && rows.length > 0) {
+            const geuTt = parseTimetableApiState(rows);
+            if (geuTt && geuTt.days && geuTt.days.length) {
+              geuTt.source = 'api';
+              return geuTt;
+            }
+          }
+        }
+      }
+    } catch {}
+
     const regId = await getRegIdLight(apiContext, { sessionPath });
     const viaApi = await fetchTimetableViaApi(apiContext, regId);
-    if (viaApi.days && viaApi.days.length) {
+    if (viaApi && viaApi.days && viaApi.days.length) {
       viaApi.source = 'api';
       return viaApi;
     }
@@ -1179,10 +1244,39 @@ async function scrapeAssignments(opts = {}) {
   assertSessionFile(sessionPath);
   const apiContext = await newApiContext(sessionPath);
   try {
+    // Try GEU assignment API first
+    try {
+      const geuResp = await apiPost(apiContext, '/api/Student/Assignment_GetStudentAssignment', {
+        data: { RegID: 0, AssignID: 0, AssignmentDetailID: 0, UploadID: 0, ExcellentID: 0, FileName: "", ImageExtension: "", flag: 0 },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        timeout: 10000,
+      }).catch(() => null);
+      if (geuResp && geuResp.ok()) {
+        const body = await geuResp.text();
+        if (body && !body.trim().startsWith('<')) {
+          const payload = JSON.parse(body);
+          const rowsOf = (v) => {
+            try {
+              if (typeof v === 'string') return JSON.parse(v || '[]');
+              if (Array.isArray(v)) return v;
+            } catch { /* empty */ }
+            return [];
+          };
+          const out = [];
+          const candidateRows = payload.Table || payload.Rows || rowsOf(payload.state) || (Array.isArray(payload) ? payload : []);
+          for (const r of candidateRows) {
+            const n = normalizeAssignmentRow(r, 'state');
+            if (n) out.push(n);
+          }
+          if (out.length > 0) return out;
+        }
+      }
+    } catch {}
+
     const regId = await getRegIdLight(apiContext, { sessionPath });
     const resp = await apiPost(apiContext, ASSIGNMENT_API, {
       form: { RegID: regId },
-      timeout: 60000,
+      timeout: 15000,
     });
     if (!resp.ok()) {
       throw new ScrapeError(
@@ -1750,7 +1844,29 @@ async function getRegIdLight(apiContext, opts = {}) {
     if (cached) return cached;
   }
 
-  const resp = await apiContext.get(DASHBOARD_URL, { timeout: 60000 });
+  // FAST PATH 1 (GEU ERP): Check StudentAttendanceAcademic_Fill with zeroed payload (~200ms)
+  try {
+    const geuResp = await apiPost(apiContext, GEU_ATTENDANCE_API, {
+      data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: 0, SYID: 0 },
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      timeout: 10000,
+    }).catch(() => null);
+
+    if (geuResp && geuResp.ok()) {
+      const raw = await geuResp.text();
+      if (raw && !raw.trim().startsWith('<')) {
+        const parsed = JSON.parse(raw);
+        if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0] && parsed.StudentInfo[0].RegID) {
+          const foundRegId = String(parsed.StudentInfo[0].RegID);
+          if (sessionPath) setCachedRegId(sessionPath, foundRegId);
+          if (opts && opts.returnHtml) return { regId: foundRegId, html: raw };
+          return foundRegId;
+        }
+      }
+    }
+  } catch {}
+
+  const resp = await apiContext.get(DASHBOARD_URL, { timeout: 15000 });
   if (!resp.ok()) {
     throw new ScrapeError(
       `Dashboard load failed (HTTP ${resp.status()}).`,
@@ -1770,10 +1886,12 @@ async function getRegIdLight(apiContext, opts = {}) {
     html.match(/value=['"](\d+)['"][^>]*id=['"]RegID['"]/i) ||
     html.match(/data-regid=['"](\d+)['"]/i);
   if (!regIdMatch) {
-    throw new ScrapeError(
-      'Dashboard HTML me RegID nahi mila.',
-      'Dashboard → QUMS Setup → Reconnect QUMS try karo.'
-    );
+    const fallbackRegId = (sessionPath && getCachedRegId(sessionPath)) || '0';
+    if (sessionPath) setCachedRegId(sessionPath, fallbackRegId);
+    if (opts && opts.returnHtml) {
+      return { regId: fallbackRegId, html };
+    }
+    return fallbackRegId;
   }
   const regId = regIdMatch[1];
   if (sessionPath) setCachedRegId(sessionPath, regId);
@@ -1841,10 +1959,58 @@ async function fetchQumsProfile(sessionPath, log = console) {
   assertSessionFile(sessionPath);
   const apiContext = await newApiContext(sessionPath);
   try {
-    const { regId, html: dashHtml } = await getRegIdLight(apiContext, { returnHtml: true });
-    log.log(`[QUMS-Profile] Profile request started | RegID=${regId ? 'found' : 'missing'}`);
     let studentName = '';
     let yearSem = '';
+
+    // Primary (GEU Fast Path): POST /api/Student/StudentAttendanceAcademic_Fill (~200ms)
+    try {
+      const geuResp = await apiPost(apiContext, GEU_ATTENDANCE_API, {
+        data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: 0, SYID: 0 },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        timeout: 10000,
+      }).catch(() => null);
+
+      if (geuResp && geuResp.ok()) {
+        const raw = await geuResp.text();
+        if (raw && !raw.trim().startsWith('<')) {
+          const parsed = JSON.parse(raw);
+          if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
+            const info = parsed.StudentInfo[0];
+            studentName = norm(info.StudentName || info.Name || '');
+            yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
+            if (info.RegID) setCachedRegId(sessionPath, String(info.RegID));
+          }
+          if (!studentName) {
+            const extracted = extractProfileFromPayload(parsed);
+            studentName = extracted.studentName;
+            yearSem = extracted.yearSem;
+          }
+          if (studentName) {
+            log.log(`[GEU-Profile] Profile resolved via GEU REST API: studentName=${studentName}, yearSem=${yearSem || 'N/A'}`);
+            return { studentName, yearSem };
+          }
+        }
+      }
+    } catch {}
+
+    // Secondary (GEU WhoAmI): GET /api/Auth/WhoAmI
+    try {
+      const whoResp = await apiGet(apiContext, '/api/Auth/WhoAmI', { timeout: 8000 }).catch(() => null);
+      if (whoResp && whoResp.ok()) {
+        const whoData = await whoResp.json().catch(() => null);
+        if (whoData) {
+          studentName = norm(whoData.name || whoData.userName || whoData.StudentName || '');
+          if (whoData.regId) setCachedRegId(sessionPath, String(whoData.regId));
+          if (studentName) {
+            log.log(`[GEU-Profile] Profile resolved via WhoAmI: studentName=${studentName}`);
+            return { studentName, yearSem };
+          }
+        }
+      }
+    } catch {}
+
+    const { regId, html: dashHtml } = await getRegIdLight(apiContext, { returnHtml: true });
+    log.log(`[QUMS-Profile] Profile request started | RegID=${regId ? 'found' : 'missing'}`);
 
     // Primary: Call GetStudentDetailOnRegID with JSON body { "RegID": "<actual RegID>" }
     let resp = await apiPost(apiContext, STUDENT_DETAIL_API, {

@@ -340,52 +340,80 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
   const captchaInput = await locateCaptchaInput(p.frame);
   await captchaInput.fill(captchaText);
-  await clickLoginButton(p.frame);
 
   // Fast response detection: submit form and wait for POST response & DOM load.
   // This guarantees we evaluate only the response to THIS attempt, eliminating
   // Promise.race background leaks, stale error element matching, and false timeouts.
   let postResponse = null;
   let outcome = 'unknown';
+  let portalError = '';
   try {
     const [res] = await Promise.all([
       p.page.waitForResponse(
-        (r) => r.request().method() === 'POST' && (r.url().includes('qums') || r.url().includes('/')),
-        { timeout: 20000 }
-      ),
+        (r) =>
+          r.request().method() === 'POST' &&
+          (r.url().includes('login') ||
+            r.url().includes('Login') ||
+            r.url().includes('api/Auth') ||
+            r.url().includes('N0j5Ha0') ||
+            r.url().includes('qums') ||
+            r.url().includes('/api/')),
+        { timeout: 15000 }
+      ).catch(() => null),
       clickLoginButton(p.frame),
     ]);
     postResponse = res;
-    await p.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    await p.page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
   } catch (err) {
     log.log(`[qums-login] POST submission error or timeout for user ${userId}: ${err.message}`);
   }
 
-  // Check if navigation succeeded (redirected to dashboard / away from login URL)
-  if (!isLoginLikeUrl(p.page.url())) {
-    outcome = 'navigated';
-  } else if (!postResponse) {
-    outcome = 'timeout';
-  } else {
-    // If QUMS uses a short client-side script redirect before navigating, allow up to 3s
+  // Check JSON API response if present
+  let jsonResp = null;
+  if (postResponse) {
     try {
-      await p.page.waitForURL((url) => !isLoginLikeUrl(url.toString()), { timeout: 3000 });
+      jsonResp = await postResponse.json().catch(() => null);
+    } catch {}
+  }
+  if (jsonResp && typeof jsonResp === 'object') {
+    if (jsonResp.Flag === 1 || jsonResp.Token || jsonResp.Status === 1 || jsonResp.Success === true) {
       outcome = 'navigated';
-    } catch {
+    } else if (jsonResp.Flag === 0 || jsonResp.Msg || jsonResp.Message || jsonResp.error) {
       outcome = 'validation_error';
+      portalError = jsonResp.Msg || jsonResp.Message || jsonResp.error;
+    }
+  }
+
+  if (outcome === 'unknown') {
+    // Check if navigation succeeded (redirected to dashboard / away from login URL)
+    if (!isLoginLikeUrl(p.page.url())) {
+      outcome = 'navigated';
+    } else if (!postResponse) {
+      outcome = 'timeout';
+    } else {
+      // If portal uses a short client-side script redirect before navigating, allow up to 3s
+      try {
+        await p.page.waitForURL((url) => !isLoginLikeUrl(url.toString()), { timeout: 3000 });
+        outcome = 'navigated';
+      } catch {
+        outcome = 'validation_error';
+      }
     }
   }
 
   if (outcome !== 'navigated') {
     // Read the exact error rendered on the portal
-    let portalError = '';
     try {
-      portalError = await p.page.evaluate(() => {
-        const errors = Array.from(document.querySelectorAll('.validation-summary-errors, .field-validation-error'))
+      const domError = await p.page.evaluate(() => {
+        const sel = '.toast-message, .alert-danger, .text-danger, .validation-summary-errors, .field-validation-error, [role="alert"], .swal2-html-container';
+        const errors = Array.from(document.querySelectorAll(sel))
           .map((el) => el.innerText.trim())
           .filter(Boolean);
         return errors.join('; ');
       });
+      if (domError) {
+        portalError = portalError ? `${portalError}; ${domError}` : domError;
+      }
     } catch {}
 
     let errorCode = 'UNEXPECTED_RESPONSE';
@@ -494,15 +522,19 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     log.log(`[qums-login] profile fetch skipped: ${err.name || 'Error'}: ${err.message}`);
   }
 
-  // Baseline vs Reconnect catch-up:
+  // Baseline vs Reconnect catch-up (run asynchronously in background so response returns immediately):
   try {
     const catchup = require('./catchup');
     if (isFirstTime) {
       log.log(`[qums-login] initializing silent baseline for user ${userId} (QID ${p.qid})...`);
-      await catchup.initializeSilentBaseline(userId, sessionPath, log);
+      catchup.initializeSilentBaseline(userId, sessionPath, log).catch((e) => {
+        log.log(`[qums-login] background baseline error: ${e.message}`);
+      });
     } else {
       log.log(`[qums-login] running reconnect catch-up for user ${userId} (QID ${p.qid})...`);
-      await catchup.runReconnectCatchup(userId, sessionPath, log);
+      catchup.runReconnectCatchup(userId, sessionPath, log).catch((e) => {
+        log.log(`[qums-login] background reconnect catch-up error: ${e.message}`);
+      });
     }
   } catch (err) {
     log.log(`[qums-login] baseline/catch-up deferred: ${err.message}`);

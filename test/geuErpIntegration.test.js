@@ -94,12 +94,31 @@ async function checkAsync(label, fn) {
     assert.strictEqual(result.allowed, true, 'Single ERP should allow login cleanly');
   });
 
-  // 7. Form selectors in login.js
-  check('6a. Login form helpers support GEU ERP Angular inputs', () => {
+  // 7. Form selectors and URL detection in login.js
+  check('6a. Login form helpers support GEU ERP Angular inputs and N0j5Ha0 URL', () => {
+    const login = require('../src/login');
+    assert.strictEqual(login.isLoginLikeUrl('https://student.geu.ac.in/N0j5Ha0'), true, 'Must recognize N0j5Ha0 as login URL');
+    assert.strictEqual(login.isLoginLikeUrl('https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAp3scwF-NOlX6'), false, 'Must not classify dashboard as login URL');
     const loginCode = fs.readFileSync(path.join(__dirname, '../src/login.js'), 'utf8');
     assert.ok(loginCode.includes('formcontrolname="UserID" i') || loginCode.includes('formcontrolname'), 'Must support UserID formcontrol');
     assert.ok(loginCode.includes('formcontrolname="CaptchaText" i') || loginCode.includes('CaptchaText'), 'Must support CaptchaText formcontrol');
     assert.ok(loginCode.includes('img[alt*="CAPTCHA" i]'), 'Must support GEU captcha image');
+  });
+
+  // 8. Server GEU aliases and DELETE credential support
+  check('7a. Server registers GEU route aliases and credential deletion', () => {
+    const serverCode = fs.readFileSync(path.join(__dirname, '../src/server.js'), 'utf8');
+    assert.ok(serverCode.includes("'/geu-setup'"), 'Server must route /geu-setup');
+    assert.ok(serverCode.includes("'/api/geu-login/start'"), 'Server must route /api/geu-login/start');
+    assert.ok(serverCode.includes("'/api/geu-login/submit-captcha'"), 'Server must route /api/geu-login/submit-captcha');
+    assert.ok(serverCode.includes("'/api/user/qums-credentials'"), 'Server must handle DELETE /api/user/qums-credentials');
+  });
+
+  // 9. Scraper fast path for GEU endpoints
+  check('8a. Scraper implements GEU REST endpoints for attendance and timetable', () => {
+    const scraperCode = fs.readFileSync(path.join(__dirname, '../src/scraper.js'), 'utf8');
+    assert.ok(scraperCode.includes('GEU_ATTENDANCE_API') && scraperCode.includes('StudentAttendanceAcademic_Fill'), 'Must use StudentAttendanceAcademic_Fill');
+    assert.ok(scraperCode.includes('GEU_TIMETABLE_API') && scraperCode.includes('StudentTimeTable_Fill'), 'Must use StudentTimeTable_Fill');
   });
 
   console.log(`\n=============================================================`);
@@ -107,4 +126,5 @@ async function checkAsync(label, fn) {
   console.log(`=============================================================\n`);
 
   if (failed > 0) process.exit(1);
+  process.exit(0);
 })();
