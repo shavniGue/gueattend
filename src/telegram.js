@@ -2472,6 +2472,11 @@ function initTelegram(log = console) {
       log.error(`[telegram] polling CONFLICT — koi dusra instance (@${BOT_USERNAME}) usi bot token se getUpdates kar raha hai, isliye ek /start ka jawab DO baar jaa sakta hai. Sirf EK poller chalao (dusre pe TELEGRAM_POLLING=off set karo ya usse kill karo). (${msg})`);
       return;
     }
+    if (/401|unauthorized/i.test(msg)) {
+      state.tokenInvalid = true;
+      log.error(`[telegram] ❌ CRITICAL: TELEGRAM_BOT_TOKEN is INVALID or REVOKED (401 Unauthorized). Updates cannot be received. Please check @BotFather and update TELEGRAM_BOT_TOKEN.`);
+      return;
+    }
     log.error(`[telegram] polling error: ${msg}`);
   });
 
@@ -2529,6 +2534,7 @@ module.exports = {
   initTelegram,
   ensureSendOnlyBot,
   isConfigured,
+  isTokenInvalid: () => Boolean(state.tokenInvalid),
   isReady,
   getBotUsername,
   deepLink,

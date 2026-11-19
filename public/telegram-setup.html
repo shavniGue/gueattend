@@ -186,6 +186,11 @@
         if (res.status === 401) { location.href = '/login'; return; }
         const st = await res.json();
 
+        if (st.tokenInvalid) {
+          $('errorBox').textContent = '⚠️ Telegram bot token is invalid or revoked (401 Unauthorized). Please copy the active token from @BotFather and update TELEGRAM_BOT_TOKEN in your environment.';
+          $('errorBox').classList.remove('hidden');
+        }
+
         if (!st.configured) {
           stopPoll();
           $('connectBox').classList.add('hidden');

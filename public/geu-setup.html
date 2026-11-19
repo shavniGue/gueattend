@@ -296,22 +296,34 @@
 
     (async () => {
       try {
-        const res = await fetch('/api/status');
-        if (!res.ok) {
-          if (res.status === 401) { location.href = '/login'; return; }
+        let res = await fetch('/api/status').catch(() => null);
+        if (!res || !res.ok) {
+          res = await fetch('/api/me').catch(() => null);
+        }
+        if (!res || !res.ok) {
+          if (res && res.status === 401) { location.href = '/login'; return; }
+          setMode('first-time');
+          $('qumsConnBadge').textContent = 'Not Connected';
+          $('qumsConnBadge').className = 'badge-soft off';
           return;
         }
         const data = await res.json();
-        if (data.user) {
-          $('userName').textContent = data.user.studentName || data.user.email || 'Account';
-          hasSavedCredentials = Boolean(data.hasSavedQumsCredentials || (data.user.qumsQid && (data.user.qumsPasswordEncrypted || data.user.hasPassword)));
-          savedQid = data.user.qumsQid || data.user.geuId || '';
-          savedStudentName = data.user.studentName || 'Student';
+        const me = data.user || data;
+        if (me) {
+          $('userName').textContent = me.studentName || me.email || 'Account';
+          hasSavedCredentials = Boolean(
+            data.hasSavedQumsCredentials ||
+            data.hasSavedGeuCredentials ||
+            me.qumsCredentialsSaved ||
+            (me.qumsQid && (me.qumsPasswordEncrypted || me.hasPassword))
+          );
+          savedQid = me.qumsQid || me.geuId || '';
+          savedStudentName = me.studentName || 'Student';
           $('savedQid').textContent = savedQid || '—';
           $('savedStudentName').textContent = savedStudentName;
 
-          const isConnected = Boolean(data.user.qumsSessionPath && data.user.qumsSessionStatus !== 'expired');
-          const isExpired = Boolean(data.user.qumsSessionStatus === 'expired');
+          const isConnected = Boolean(me.qumsSessionPath || me.qumsConfigured) && me.qumsSessionStatus !== 'expired';
+          const isExpired = Boolean(me.qumsSessionStatus === 'expired');
 
           if (isConnected) {
             $('qumsConnBadge').textContent = 'Connected ✅';
@@ -335,9 +347,16 @@
           } else {
             setMode('first-time');
           }
+        } else {
+          setMode('first-time');
+          $('qumsConnBadge').textContent = 'Not Connected';
+          $('qumsConnBadge').className = 'badge-soft off';
         }
       } catch (e) {
         console.error('Status fetch error:', e);
+        setMode('first-time');
+        $('qumsConnBadge').textContent = 'Not Connected';
+        $('qumsConnBadge').className = 'badge-soft off';
       }
     })();
   </script>

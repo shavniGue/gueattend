@@ -114,6 +114,11 @@ async function checkAsync(label, fn) {
     assert.ok(serverCode.includes("'/api/user/qums-credentials'"), 'Server must handle DELETE /api/user/qums-credentials');
   });
 
+  check('7b. Server registers /api/status route for setup pages', () => {
+    const serverCode = fs.readFileSync(path.join(__dirname, '../src/server.js'), 'utf8');
+    assert.ok(serverCode.includes("'/api/status'"), 'Server must route /api/status');
+  });
+
   // 9. Scraper fast path for GEU endpoints
   check('8a. Scraper implements GEU REST endpoints for attendance and timetable', () => {
     const scraperCode = fs.readFileSync(path.join(__dirname, '../src/scraper.js'), 'utf8');

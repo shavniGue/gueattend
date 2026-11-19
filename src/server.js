@@ -838,6 +838,33 @@ app.get('/api/me', requireAuth, async (req, res) => {
   });
 });
 
+app.get(['/api/status', '/api/geu/status'], requireAuth, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasSavedCreds = Boolean(user && user.qumsQid && (user.qumsPasswordEncrypted || (await db.getQumsEncryptedPassword(user.id))));
+    res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        studentName: user.studentName || '',
+        qumsQid: user.qumsQid || '',
+        geuId: user.qumsQid || '',
+        qumsSessionPath: user.qumsSessionPath || '',
+        qumsSessionStatus: user.qumsSessionStatus || 'not_setup',
+        hasPassword: Boolean(user.qumsPasswordEncrypted),
+      },
+      hasSavedQumsCredentials: hasSavedCreds,
+      hasSavedGeuCredentials: hasSavedCreds,
+      telegramConnected: Boolean(user.telegramChatId),
+      telegramConfigured: telegram.isConfigured(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/attendance', requireAuth, async (req, res) => {
   try {
     const runtime = resolveUserRuntime(req.appUser);
@@ -1591,12 +1618,15 @@ app.post('/api/new-erp/reconnect', requireAuth, async (req, res) => {
 app.get('/api/telegram/status', requireAuth, async (req, res) => {
   const user = await db.getUserById(req.appUser.id);
   const code = await db.telegramLinkCodeFor(req.appUser.id);
+  const tokenInvalid = Boolean(telegram.isTokenInvalid && telegram.isTokenInvalid());
 
   res.json({
     configured: telegram.isConfigured(),
+    tokenInvalid,
     connected: Boolean(user?.telegramChatId),
     botUsername: telegram.getBotUsername(),
     linkUrl: telegram.deepLink(code),
+    tokenError: tokenInvalid ? 'Telegram bot token is invalid or revoked (401). Please update TELEGRAM_BOT_TOKEN with active token from @BotFather.' : null,
   });
 });
 
