@@ -125,6 +125,16 @@ function ok(label, cond) {
   const finalUser = await db.getUserById(user.id);
   check('5. Session status restored to active via lowercase captcha', finalUser.qumsSessionStatus, 'active');
 
+  // TEST 6: Single-argument /login <PASSWORD> works when QID already linked
+  await telegram.handleUserMessage({
+    chat: { id: '99887766' },
+    text: '/login NewPass999',
+    message_id: 404,
+  });
+  const recheckedUser = await db.getUserById(user.id);
+  check('6. Single-argument /login preserved QID', recheckedUser.qumsQid, '2510070038');
+  check('6. Single-argument /login saved new password', decryptSecret(recheckedUser.qumsPasswordEncrypted), 'NewPass999');
+
   console.log(`\nALL TELEGRAM LOGIN COMMAND TESTS PASSED (${failures} failures)`);
   if (failures > 0) process.exit(1);
   process.exit(0);

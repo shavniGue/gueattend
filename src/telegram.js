@@ -781,9 +781,21 @@ async function handleUserMessage(msg, log = console) {
     }
   }
 
-  const loginMatch = text.match(/^\/(?:login|setup)(?:@\w+)?(?:\s+(\S+)\s+(.+))?$/i);
+  const loginMatch = text.match(/^\/(?:login|setup)(?:@\w+)?(?:\s+(.+))?$/i);
   if (loginMatch) {
-    await handleTelegramLoginCommand(chatId, loginMatch[1], loginMatch[2], msg, log);
+    const rawArgs = (loginMatch[1] || '').trim();
+    let qid = '';
+    let password = '';
+    if (rawArgs) {
+      const parts = rawArgs.split(/\s+/);
+      if (parts.length >= 2) {
+        qid = parts[0];
+        password = parts.slice(1).join(' ');
+      } else if (parts.length === 1) {
+        password = parts[0];
+      }
+    }
+    await handleTelegramLoginCommand(chatId, qid, password, msg, log);
     return;
   }
 
@@ -2550,13 +2562,19 @@ async function handleReconnectCommand(chatId, log = console) {
       } else if (started && started.error === 'no-credentials') {
         const { reconnectUrl } = require('./alerts');
         const setupUrl = typeof reconnectUrl === 'function' ? reconnectUrl() : `${baseUrl()}/qums-setup`;
+        const knownQid = user.qumsQid || user.geuId || '';
         await reply(
           chatId,
           '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
-          'Aapka GEU ERP password saved nahi hai. Aap do aasan tarike se connect kar sakte hain:\n\n' +
-          '1️⃣ *Telegram se direct connect karein:*\n' +
-          'Bhejein: `/login <STUDENT_ID> <PASSWORD>`\n' +
-          '_(Security: Aapka password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n' +
+          'Aapka GEU ERP password saved nahi hai.\n\n' +
+          (knownQid
+            ? `Student ID: \`${knownQid}\`\n\n` +
+              `1️⃣ *Telegram se direct connect karein:*\n` +
+              `Bhejein: \`/login <Aapka_Password>\`\n` +
+              `_Example: \`/login MyPassword123\`_\n` +
+              `_(Security: Password 5 second me auto-delete ho jayega aur CAPTCHA turant yahan aa jayega)_\n\n`
+            : `1️⃣ *Telegram se direct connect karein:*\n` +
+              `Bhejein: \`/login <STUDENT_ID> <PASSWORD>\`\n\n`) +
           '2️⃣ *Web Portal se connect karein:*\n' +
           'Neeche button dabayein:',
           log,
@@ -2583,21 +2601,33 @@ async function handleTelegramLoginCommand(chatId, qid, password, msg, log = cons
     return;
   }
 
+  let cleanQid = String(qid || '').trim();
+  let cleanPassword = String(password || '').trim();
+
+  // If only 1 argument was provided (cleanPassword), auto-use user.qumsQid
+  if (!cleanQid && cleanPassword && (user.qumsQid || user.geuId)) {
+    cleanQid = String(user.qumsQid || user.geuId).trim();
+  } else if (!cleanPassword && cleanQid && (user.qumsQid || user.geuId)) {
+    // If user passed just 1 token, treat it as password if user.qumsQid is already set
+    cleanPassword = cleanQid;
+    cleanQid = String(user.qumsQid || user.geuId).trim();
+  }
+
   // If no qid or password provided, show helpful instructions
-  if (!qid || !password) {
+  if (!cleanQid || !cleanPassword) {
+    const knownQid = user.qumsQid || user.geuId || '';
     const infoText = [
       'ℹ️ *GEU ERP Direct Login via Telegram*',
       '',
-      'Aap direct Telegram se apna GEU Student ID aur Password save karke login/reconnect kar sakte hain:',
+      knownQid ? `Aapka GEU Student ID: \`${knownQid}\`` : '',
+      'Aap direct Telegram se apna password save karke login/reconnect kar sakte hain:',
       '',
-      '👉 *Format:*',
-      '`/login <STUDENT_ID> <ERP_PASSWORD>`',
-      '',
-      '👉 *Example:*',
-      '`/login 2510070038 MyPassword123`',
+      knownQid
+        ? `👉 *Turant connect karne ke liye bhejein:*\n\`/login <Aapka_Password>\`\n_Example: \`/login MyPassword123\`_`
+        : `👉 *Format:*\n\`/login <STUDENT_ID> <ERP_PASSWORD>\`\n_Example: \`/login 2510070038 MyPassword123\`_`,
       '',
       '🔒 *Security Notice:* Password bhejte hi aapka message 5 second ke andar automatically delete ho jayega. Uske baad CAPTCHA image direct yahan aayegi aur aap 5 letters type karke turant connect ho sakte hain (capital ya small koi bhi chalega).',
-    ].join('\n');
+    ].filter(Boolean).join('\n');
     await reply(chatId, infoText, log, { autoDelete: true, delayMs: 120000 });
     return;
   }
@@ -2606,9 +2636,6 @@ async function handleTelegramLoginCommand(chatId, qid, password, msg, log = cons
   if (msg && msg.message_id) {
     scheduleAutoDelete(chatId, msg.message_id, 5000, log);
   }
-
-  const cleanQid = String(qid).trim();
-  const cleanPassword = String(password).trim();
 
   try {
     const { encryptSecret } = require('./crypto');

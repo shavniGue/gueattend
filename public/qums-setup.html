@@ -367,7 +367,7 @@
             data.hasSavedQumsCredentials ||
             data.hasSavedGeuCredentials ||
             me.qumsCredentialsSaved ||
-            me.qumsQid
+            (me.qumsQid && (me.qumsPasswordEncrypted || me.hasPassword))
           );
           savedQid = me.qumsQid || me.geuId || '';
           savedStudentName = me.studentName || 'Student';
