@@ -1035,14 +1035,41 @@ async function handleCallbackQuery(query, log = console) {
   if (data === 'new_erp_1click_reconnect') {
     const chatId = (query.message && query.message.chat && query.message.chat.id) || (query.from && query.from.id);
     if (bot && typeof bot.answerCallbackQuery === 'function') {
-      await bot.answerCallbackQuery(query.id, { text: '⚡ Reconnecting New ERP session...', show_alert: false }).catch(() => {});
+      await bot.answerCallbackQuery(query.id, { text: '⚡ Reconnecting session...', show_alert: false }).catch(() => {});
     }
     const user = await db.getUserByTelegramChatId(chatId);
     if (!user) {
       await reply(chatId, MSG.STATUS_NONE, log);
       return;
     }
-    await executeNewErp1ClickReconnect(user, chatId, log, query.message?.message_id);
+    const alertMsgId = query.message?.message_id || null;
+    if (user.newErpEmail && user.newErpPasswordEncrypted) {
+      await executeNewErp1ClickReconnect(user, chatId, log, alertMsgId);
+    } else {
+      const started = await startTelegramCaptchaReconnect(user.id, log, { alertMessageId: alertMsgId });
+      if (!started || !started.ok) {
+        if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
+          await reply(chatId, '⏳ Another reconnect is currently in progress. Please wait a moment and tap Reconnect again.', log);
+        } else if (started && started.error === 'no-credentials') {
+          const { reconnectUrl } = require('./alerts');
+          const setupUrl = typeof reconnectUrl === 'function' ? reconnectUrl() : `${baseUrl()}/qums-setup`;
+          await reply(
+            chatId,
+            '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
+            'Aapka GEU ERP password saved nahi hai, isliye Telegram auto-fill nahi kar sakta.\n\n' +
+            'Kripya neeche button dabayein aur GEU ID + password daal kar ek baar web portal se connect karein:',
+            log,
+            {
+              replyMarkup: {
+                inline_keyboard: [[{ text: '🔐 Open GEU Setup', url: setupUrl }]],
+              },
+            }
+          );
+        } else {
+          await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your GUE credentials are saved.', log);
+        }
+      }
+    }
     return;
   }
 
@@ -2433,6 +2460,21 @@ async function handleReconnectCommand(chatId, log = console) {
     if (!started || !started.ok) {
       if (started && (started.error === 'concurrent-limit' || started.error === 'CONCURRENT_LOGIN_LIMIT')) {
         await reply(chatId, '⏳ Another reconnect is currently in progress. Please wait a moment and send /reconnect again.', log);
+      } else if (started && started.error === 'no-credentials') {
+        const { reconnectUrl } = require('./alerts');
+        const setupUrl = typeof reconnectUrl === 'function' ? reconnectUrl() : `${baseUrl()}/qums-setup`;
+        await reply(
+          chatId,
+          '⚠️ *GEU ERP Credentials Not Saved*\n\n' +
+          'Aapka GEU ERP password saved nahi hai, isliye Telegram auto-fill nahi kar sakta.\n\n' +
+          'Kripya neeche button dabayein aur GEU ID + password daal kar ek baar web portal se connect karein. Uske baad Telegram se direct reconnect hone lagega:',
+          log,
+          {
+            replyMarkup: {
+              inline_keyboard: [[{ text: '🔐 Open GEU Setup', url: setupUrl }]],
+            },
+          }
+        );
       } else {
         await reply(chatId, '⚠️ Unable to start Telegram reconnect. Please reconnect via the dashboard or ensure your GUE credentials are saved.', log);
       }

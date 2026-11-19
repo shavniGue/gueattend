@@ -350,6 +350,13 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key)`,
     ],
   },
+  {
+    id: '023_scheduled_message_deletions_columns',
+    statements: [
+      `ALTER TABLE scheduled_message_deletions ADD COLUMN IF NOT EXISTS created_at BIGINT DEFAULT 0`,
+      `ALTER TABLE scheduled_message_deletions ADD COLUMN IF NOT EXISTS delete_at BIGINT DEFAULT 0`,
+    ],
+  },
 ];
 
 /**

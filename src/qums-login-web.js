@@ -16,6 +16,9 @@
  * Pending login 5 min me auto-expires (browser close).
  */
 require('dotenv').config();
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
+}
 const fs = require('fs');
 const { chromium } = require('playwright');
 const db = require('./db');
@@ -191,7 +194,7 @@ async function openLoginFormPage() {
       console.warn('[Playwright] Chromium browser executable not found. Running auto-install (npx playwright install chromium)...');
       try {
         const { execSync } = require('child_process');
-        execSync('npx playwright install chromium', { stdio: 'inherit', timeout: 180000 });
+        execSync('PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium', { stdio: 'inherit', timeout: 180000 });
         browser = await chromium.launch(launchOptions);
       } catch (retryErr) {
         console.error('[Playwright] Auto-install failed:', retryErr.message);
