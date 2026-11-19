@@ -199,7 +199,9 @@
     function chip(label, val) {
       const span = document.createElement('span');
       span.className = 'chip';
-      span.innerHTML = `<strong>${label}:</strong> ${val}`;
+      const isDate = typeof val === 'string' && (val.includes('–') || (val.includes('-') && val.length > 10));
+      const valClass = isDate ? 'chip-val chip-date' : 'chip-val';
+      span.innerHTML = `<strong class="chip-label">${label}:</strong> <b class="${valClass}">${val}</b>`;
       return span;
     }
 
