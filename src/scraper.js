@@ -13,7 +13,7 @@ const DASHBOARD_URL =
 const TIMETABLE_URL =
   process.env.GEU_TIMETABLE_URL ||
   process.env.QUMS_TIMETABLE_URL ||
-  'https://student.geu.ac.in/P0btHKF1DtpZzThe_BuxfULbSZc_QvAAt3MCzUmDOUv7';
+  'https://student.geu.ac.in/dashboard/cyborg-studenttimetable';
 const ATTENDANCE_API = '/Web_StudentAcademic/GetYearSemWiseAttendance';
 const GEU_ATTENDANCE_API = '/api/Student/StudentAttendanceAcademic_Fill';
 const GEU_TODAY_API = '/api/Student/Dashboard_GetTodayAttendance';

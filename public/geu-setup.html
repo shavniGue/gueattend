@@ -26,6 +26,7 @@
       <a href="/dashboard">Dashboard</a>
       <a href="/geu-setup" class="active">GEU Setup</a>
       <a href="/telegram-setup">Telegram</a>
+      <a href="/admin" id="adminLink" class="hidden">Admin</a>
     </nav>
     <div class="nav-actions">
       <span class="pill" id="userName">…</span>
@@ -44,6 +45,7 @@
       <a href="/dashboard">🏠 Dashboard</a>
       <a href="/geu-setup">⚙️ GEU Setup</a>
       <a href="/telegram-setup">💬 Telegram</a>
+      <a href="/admin" id="adminDrawerLink" class="hidden">🛡️ Admin</a>
       <a href="/logout" class="drawer-logout">🚪 Logout</a>
     </nav>
   </aside>
@@ -331,6 +333,10 @@
         const me = data.user || data;
         if (me) {
           $('userName').textContent = me.studentName || me.email || 'Account';
+          if (me.isAdmin || (data && data.user && data.user.isAdmin) || me.email === 'shavnikumarigue@gmail.com') {
+            const al = $('adminLink'); if (al) al.classList.remove('hidden');
+            const adl = $('adminDrawerLink'); if (adl) adl.classList.remove('hidden');
+          }
           hasSavedCredentials = Boolean(
             data.hasSavedQumsCredentials ||
             data.hasSavedGeuCredentials ||

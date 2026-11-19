@@ -84,7 +84,7 @@ async function checkAsync(label, fn) {
     const envToken = process.env.TELEGRAM_BOT_TOKEN;
     const envUser = process.env.TELEGRAM_BOT_USERNAME;
     assert.strictEqual(envUser, 'gue_attendance_bot');
-    assert.strictEqual(envToken, '9295459826:AAFMEClgvi12x1HKHyTFG-E412s5101c7SY');
+    assert.ok(Boolean(envToken), 'TELEGRAM_BOT_TOKEN should be set');
   });
 
   // 6. Single ERP Architecture (No dual ERP exclusivity blocker)

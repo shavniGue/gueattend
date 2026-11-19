@@ -50,7 +50,7 @@ function analyzeSubject(entry, totalClasses) {
   const exactTotal = Number(entry && entry.totalClasses);
   const exactAttended = Number(entry && entry.attended);
   const hasExact =
-    Number.isFinite(exactTotal) && exactTotal > 0 &&
+    Number.isFinite(exactTotal) && exactTotal >= 0 &&
     Number.isFinite(exactAttended) && exactAttended >= 0;
 
   const tc = hasExact ? exactTotal : fallbackTc;
@@ -61,7 +61,7 @@ function analyzeSubject(entry, totalClasses) {
   // Display % : portal's official Percentage; if missing, derive from counts.
   const displayPct = Number.isFinite(rawPct)
     ? rawPct
-    : (hasExact ? Math.round((exactAttended / exactTotal) * 1000) / 10 : null);
+    : (hasExact ? (exactTotal > 0 ? Math.round((exactAttended / exactTotal) * 1000) / 10 : 0) : null);
 
   const subject = (entry && entry.subject) || 'Unknown subject';
   const subjectCode = (entry && entry.subjectCode) || '';
@@ -74,6 +74,17 @@ function analyzeSubject(entry, totalClasses) {
     totalClassesAssumed: tc,
     countSource: hasExact ? 'exact' : 'estimated',
   };
+
+  if (hasExact && exactTotal === 0) {
+    return {
+      ...base,
+      percentage: 0,
+      status: 'no-classes',
+      canSkip: 0,
+      classesNeeded: 0,
+      guidance: 'Abhi tak koi class conduct nahi hui (0/0 classes).',
+    };
+  }
 
   if (displayPct === null || attended === null) {
     return {

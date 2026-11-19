@@ -25,6 +25,7 @@
       <a href="/dashboard">Dashboard</a>
       <a href="/qums-setup">GEU Setup</a>
       <a href="/telegram-setup" class="active">Telegram</a>
+      <a href="/admin" id="adminLink" class="hidden">Admin</a>
     </nav>
     <div class="nav-actions">
       <span class="pill" id="userName">…</span>
@@ -43,6 +44,7 @@
       <a href="/dashboard">🏠 Dashboard</a>
       <a href="/qums-setup">⚙️ GEU Setup</a>
       <a href="/telegram-setup">💬 Telegram</a>
+      <a href="/admin" id="adminDrawerLink" class="hidden">🛡️ Admin</a>
       <a href="/logout" class="drawer-logout">🚪 Logout</a>
     </nav>
   </aside>
@@ -67,7 +69,7 @@
       <div id="connectBox" class="hidden">
         <div class="section-title">How to connect</div>
         <ol class="steps">
-          <li>Press <b>Connect Telegram</b> — the QAttend bot opens in Telegram.</li>
+          <li>Press <b>Connect Telegram</b> — the GUEAttend bot opens in Telegram.</li>
           <li>Press <b>Start</b> in that chat (this is what links the chat to your account).</li>
           <li>Come back here — the status updates automatically.</li>
         </ol>
@@ -153,6 +155,10 @@
         const me = await res.json();
         studentName = me.studentName || 'Student';
         $('userName').textContent = studentName;
+        if (me.isAdmin || me.email === 'shavnikumarigue@gmail.com') {
+          const al = $('adminLink'); if (al) al.classList.remove('hidden');
+          const adl = $('adminDrawerLink'); if (adl) adl.classList.remove('hidden');
+        }
       } catch {
         /* offline — the status loader will surface what it can */
       }

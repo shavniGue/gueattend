@@ -316,6 +316,8 @@ app.get('/attendance-calculator-guide', sendPage('attendance-calculator-guide.ht
 app.get('/guides/attendance-calculator', sendPage('attendance-calculator-guide.html'));
 app.get('/qums-troubleshooting', sendPage('qums-troubleshooting.html'));
 app.get('/guides/qums-troubleshooting', sendPage('qums-troubleshooting.html'));
+app.get('/geu-troubleshooting', sendPage('geu-troubleshooting.html'));
+app.get('/guides/geu-troubleshooting', sendPage('geu-troubleshooting.html'));
 app.get('/telegram-guide', sendPage('telegram-guide.html'));
 app.get('/guides/telegram-guide', sendPage('telegram-guide.html'));
 app.get('/security-and-privacy', sendPage('security-and-privacy.html'));
@@ -815,7 +817,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
 
   res.json({
     email: user.email,
-    studentName: activeErp === 'NEW' ? (user.newErpStudentName || user.studentName || 'Piyanshu Vishwakarma') : (user.studentName || ''),
+    studentName: user.studentName || (user.email && user.email.toLowerCase().includes('shavni') ? 'SHAVNI' : ''),
     qumsYearSem: activeErp === 'NEW' ? `${user.newErpAcademicYear || '2026 - 2029'} Sem ${user.newErpSemester || '1'}`.trim() : (user.qumsYearSem || ''),
     qumsQid: activeErp === 'NEW' ? sanitizedNewErpQid : (user.qumsQid || ''),
     qumsConfigured: hasSession,

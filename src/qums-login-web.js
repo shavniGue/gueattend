@@ -522,6 +522,23 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
   }
 
   await p.page.waitForTimeout(2000); // post-login JS settle
+
+  // Extract student name directly from post-login dashboard DOM
+  let inPageStudentName = '';
+  try {
+    inPageStudentName = await p.page.evaluate(() => {
+      const candidates = Array.from(document.querySelectorAll('app-root div, app-root span, app-root h4, app-root h5, app-root strong'))
+        .map((el) => (el.innerText || el.textContent || '').trim())
+        .filter((t) => t.length >= 2 && t.length <= 30 && !t.includes('\n'));
+      for (const t of candidates) {
+        if (/^[A-Z\s]{3,30}$/.test(t) && !/CYBORG|PORTAL|STUDENT|BACHELOR|MASTER|MENU|DASHBOARD|ATTENDANCE|FEE|EXAM/i.test(t)) {
+          return t;
+        }
+      }
+      return '';
+    }).catch(() => '');
+  } catch {}
+
   const sessionPath = db.sessionPathFor(userId);
   await p.context.storageState({ path: sessionPath });
   const pendingPassword = p.password;
@@ -536,6 +553,9 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     password: pendingPassword,
     confirmSwitch: p.confirmSwitch,
   });
+  if (inPageStudentName) {
+    await db.updateUser(userId, { studentName: inPageStudentName }).catch(() => {});
+  }
   // Centralized session registry: record active Old ERP session
   await acquireSession({ identity: p.qid, userId, targetErp: 'OLD' }).catch(() => {});
   log.log(`[qums-login] QUMS session saved for user ${userId} -> ${sessionPath}`);

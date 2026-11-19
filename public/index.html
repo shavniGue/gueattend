@@ -124,6 +124,8 @@
           <div class="status-value" id="todayCount">—</div>
           <div class="status-note">
             <button type="button" class="link" id="todayLoadBtn">Load today's classes</button>
+            <span style="color:var(--line); margin: 0 4px;">|</span>
+            <button type="button" class="link" id="timetableToggleBtn">Weekly Timetable</button>
           </div>
         </div>
       </div>
@@ -131,6 +133,15 @@
       <div id="todayBox" class="hidden">
         <div class="section-title" style="margin-top:16px;">Today's classes</div>
         <ul class="today-list" id="todayList"></ul>
+      </div>
+
+      <div id="timetableBox" class="hidden" style="margin-top: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px; box-shadow: var(--shadow);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+          <div class="section-title" style="margin:0;">📅 GEU Weekly Timetable</div>
+          <button id="closeTimetableBtn" type="button" class="btn" style="background:#f1f5f9; color:var(--text); border:1px solid var(--line); padding:4px 12px; font-size:12px; border-radius:6px; cursor:pointer;">Close</button>
+        </div>
+        <div id="timetableLoading" style="text-align:center; padding:16px; color:var(--muted); font-size:13.5px;">Loading weekly timetable from GEU ERP…</div>
+        <div id="timetableContainer" class="hidden"></div>
       </div>
 
       <div id="status" class="form-ok hidden"></div>
@@ -220,6 +231,7 @@
       (data.subjects || []).forEach((sub) => {
         const tr = document.createElement('tr');
         const isBelow = sub.status === 'below-75';
+        const isNoClasses = sub.status === 'no-classes' || sub.totalClassesAssumed === 0;
 
         const nameTd = document.createElement('td'); nameTd.textContent = sub.subject || '-'; tr.appendChild(nameTd);
 
@@ -232,14 +244,22 @@
 
         const pctTd = document.createElement('td');
         const pctSpan = document.createElement('span');
-        pctSpan.className = isBelow ? 'pct-bad' : 'pct-ok';
-        pctSpan.textContent = sub.percentage != null ? sub.percentage + '%' : '-';
+        pctSpan.className = isBelow ? 'pct-bad' : (isNoClasses ? 'pct-muted' : 'pct-ok');
+        pctSpan.textContent = isNoClasses ? '0%' : (sub.percentage != null ? sub.percentage + '%' : '-');
         pctTd.appendChild(pctSpan); tr.appendChild(pctTd);
 
         const stTd = document.createElement('td');
         const badge = document.createElement('span');
-        badge.className = 'badge ' + (isBelow ? 'bad' : 'ok');
-        badge.textContent = isBelow ? 'ATTENTION' : 'OK';
+        if (isBelow) {
+          badge.className = 'badge bad';
+          badge.textContent = 'ATTENTION';
+        } else if (isNoClasses) {
+          badge.className = 'badge off';
+          badge.textContent = 'NOT STARTED';
+        } else {
+          badge.className = 'badge ok';
+          badge.textContent = 'OK';
+        }
         stTd.appendChild(badge); tr.appendChild(stTd);
 
         const gTd = document.createElement('td');
@@ -495,6 +515,82 @@
 
     $('todayLoadBtn').addEventListener('click', (e) => {
       loadToday(e.currentTarget);
+    });
+
+    // ---- Weekly Timetable ----
+    async function loadTimetable() {
+      const box = $('timetableBox'), loading = $('timetableLoading'), cont = $('timetableContainer');
+      box.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      cont.classList.add('hidden');
+      cont.innerHTML = '';
+      try {
+        const res = await fetch('/api/timetable');
+        if (res.status === 401) { location.href = '/login'; return; }
+        const data = await res.json();
+        loading.classList.add('hidden');
+        cont.classList.remove('hidden');
+        const days = (data.timetable && data.timetable.days) || [];
+        if (!days.length || !data.hasData) {
+          cont.innerHTML = '<div style="text-align:center; padding:16px; color:var(--muted);">No weekly timetable found on GEU ERP. Check again during active semester.</div>';
+          return;
+        }
+        days.forEach((d) => {
+          const dayWrap = document.createElement('div');
+          dayWrap.style.marginBottom = '18px';
+          const dayTitle = document.createElement('h3');
+          dayTitle.style.cssText = 'font-size:14px; font-weight:700; color:var(--primary); margin:0 0 8px 0; border-bottom:1.5px solid var(--line); padding-bottom:4px;';
+          dayTitle.textContent = d.day;
+          dayWrap.appendChild(dayTitle);
+
+          if (!d.classes || !d.classes.length) {
+            const noCl = document.createElement('div');
+            noCl.style.cssText = 'font-size:12.5px; color:var(--muted); font-style:italic; padding:4px 0;';
+            noCl.textContent = 'No classes';
+            dayWrap.appendChild(noCl);
+          } else {
+            const grid = document.createElement('div');
+            grid.className = 'timetable-grid';
+            d.classes.forEach((c) => {
+              const card = document.createElement('div');
+              card.className = 'timetable-card';
+              const timeDiv = document.createElement('div');
+              timeDiv.className = 'timetable-time';
+              timeDiv.textContent = `${c.period || ''} (${c.duration || (c.startTime ? `${c.startTime} - ${c.endTime}` : 'Time TBA')})`;
+              const subDiv = document.createElement('div');
+              subDiv.className = 'timetable-sub';
+              subDiv.textContent = c.subject || c.subjectCode || 'Class';
+              const metaDiv = document.createElement('div');
+              metaDiv.className = 'timetable-meta';
+              if (c.subjectCode) metaDiv.innerHTML += `<span><b>Code:</b> ${c.subjectCode}</span>`;
+              if (c.teacher) metaDiv.innerHTML += `<span><b>Faculty:</b> ${c.teacher}</span>`;
+              if (c.room) metaDiv.innerHTML += `<span><b>Room:</b> ${c.room}</span>`;
+              card.appendChild(timeDiv);
+              card.appendChild(subDiv);
+              card.appendChild(metaDiv);
+              grid.appendChild(card);
+            });
+            dayWrap.appendChild(grid);
+          }
+          cont.appendChild(dayWrap);
+        });
+      } catch (err) {
+        loading.classList.add('hidden');
+        cont.classList.remove('hidden');
+        cont.innerHTML = `<div style="text-align:center; padding:16px; color:#ef4444;">Failed to load timetable: ${err.message}</div>`;
+      }
+    }
+
+    $('timetableToggleBtn').addEventListener('click', () => {
+      if ($('timetableBox').classList.contains('hidden')) {
+        loadTimetable();
+      } else {
+        $('timetableBox').classList.add('hidden');
+      }
+    });
+
+    $('closeTimetableBtn').addEventListener('click', () => {
+      $('timetableBox').classList.add('hidden');
     });
 
     // Instant First Paint from localStorage cache if present (0ms display!)
