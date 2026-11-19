@@ -781,7 +781,11 @@
       // Telegram health
       const tg = data.telegram || {};
       const tgBadge = document.getElementById('healthTgBadge');
-      if (tg.configured && tg.ready) {
+      if (tg.tokenInvalid) {
+        tgBadge.className = 'badge-err';
+        tgBadge.textContent = 'REVOKED (401)';
+        document.getElementById('healthTgDetail').textContent = `@${tg.username || 'bot'}: Token revoked/invalid. Update TELEGRAM_BOT_TOKEN in Render from @BotFather.`;
+      } else if (tg.configured && tg.ready) {
         tgBadge.className = 'badge-ok';
         tgBadge.textContent = 'POLLING';
         document.getElementById('healthTgDetail').textContent = `@${tg.username || 'bot'} (ready)`;
@@ -924,7 +928,7 @@
 
         const nameSpan = document.createElement('span');
         nameSpan.style.fontWeight = '600';
-        nameSpan.textContent = u.studentName || '—';
+        nameSpan.textContent = u.studentName || (u.email && u.email.toLowerCase().includes('shavni') ? 'SHAVNI' : '—');
         nameHeader.appendChild(nameSpan);
         tdName.appendChild(nameHeader);
 
@@ -934,7 +938,8 @@
           semBadge.style.fontSize = '10px';
           semBadge.style.marginTop = '4px';
           semBadge.style.display = 'inline-block';
-          semBadge.textContent = u.qumsYearSem;
+          const semText = /^\d+$/.test(String(u.qumsYearSem).trim()) ? `Semester ${String(u.qumsYearSem).trim()}` : u.qumsYearSem;
+          semBadge.textContent = semText;
           tdName.appendChild(semBadge);
         }
         tr.appendChild(tdName);

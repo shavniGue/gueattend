@@ -993,12 +993,19 @@ footer {
 /* ---- Reset / Delete QUMS Connection (#permanentQumsResetBtn) ---- */
 .qums-reset-slot {
   display: flex !important;
+  flex-direction: column !important;
   justify-content: center !important;
   align-items: center !important;
-  margin: 20px auto 10px !important;
+  margin: 24px auto 12px !important;
   padding: 0 !important;
   width: 100% !important;
   text-align: center !important;
+}
+
+.qums-reset-slot .form-hint {
+  text-align: center !important;
+  margin: 8px auto 0 !important;
+  max-width: 500px !important;
 }
 
 #permanentQumsResetBtn {

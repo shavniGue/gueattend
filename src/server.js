@@ -887,6 +887,9 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
     });
     // Successful authenticated scrape clears any stale expiry state
     await db.clearSessionExpiry(userId, { maxExpiredAt: fetchStart }).catch(() => {});
+    if (!req.appUser.studentName && req.appUser.email && req.appUser.email.toLowerCase().includes('shavni')) {
+      await db.updateUser(userId, { studentName: 'SHAVNI' }).catch(() => {});
+    }
     const analysis = analyzeAttendance(
       subjects,
       Number.isFinite(overrideTotal) && overrideTotal > 0 ? overrideTotal : undefined
@@ -978,6 +981,9 @@ app.get('/api/today', requireAuth, async (req, res) => {
     let periods = await scrapeTodaysAttendance({ sessionPath: runtime.sessionPath });
     // Successful authenticated scrape clears any stale expiry state
     await db.clearSessionExpiry(userId, { maxExpiredAt: fetchStart }).catch(() => {});
+    if (!req.appUser.studentName && req.appUser.email && req.appUser.email.toLowerCase().includes('shavni')) {
+      await db.updateUser(userId, { studentName: 'SHAVNI' }).catch(() => {});
+    }
 
     // Room and teacher enrichment from timetable when available
     try {
@@ -1786,7 +1792,8 @@ app.get('/api/admin/health', requireAdmin, async (req, res) => {
     const schedulerStatus = typeof getSchedulerStatus === 'function' ? getSchedulerStatus() : {};
     const telegramInfo = {
       configured: telegram.isConfigured(),
-      ready: telegram.isReady(),
+      tokenInvalid: telegram.isTokenInvalid(),
+      ready: telegram.isReady() && !telegram.isTokenInvalid(),
       username: telegram.getBotUsername(),
     };
     res.json({

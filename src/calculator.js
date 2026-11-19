@@ -174,8 +174,11 @@ function analyzeAttendance(subjects, totalClasses) {
     period,
     summary: {
       totalSubjects: detailed.length,
+      subjectsTotal: detailed.length,
       below75: below.length,
       ok: detailed.length - below.length,
+      okOrAbove: detailed.length - below.length,
+      overallPercentage: overall && overall.percentage != null ? overall.percentage : null,
       overallStatus: below.length ? 'ATTENTION' : 'ALL GOOD',
       attentionSubjects: below.map((b) => `${b.subject} (${b.subjectCode}) — ${b.percentage}%`),
     },

@@ -201,6 +201,26 @@
       }
     }
 
+    $('captcha').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        $('submitBtn').click();
+      }
+    });
+
+    $('qumsPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const firstBtn = $('firstTimeCaptchaBtn');
+        const cBtn = $('captchaBtn');
+        if (firstBtn && !firstBtn.classList.contains('hidden') && firstBtn.offsetParent !== null) {
+          firstBtn.click();
+        } else if (cBtn && !cBtn.classList.contains('hidden') && cBtn.offsetParent !== null) {
+          cBtn.click();
+        }
+      }
+    });
+
     $('firstTimeCaptchaBtn').addEventListener('click', async () => {
       if (busy) return;
       const qidVal = $('qid').value.trim();

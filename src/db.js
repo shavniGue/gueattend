@@ -1726,9 +1726,13 @@ function safeAdminUser(u, expiredUserIds = []) {
   const isExpired = activeErp === 'NEW' ? isNewExpired : isOldExpired;
 
   // Student name: prefer New ERP name for New ERP users, fallback to Old ERP name
-  const studentName = activeErp === 'NEW'
+  let studentName = activeErp === 'NEW'
     ? (u.newErpStudentName || u.studentName || '')
     : (u.studentName || u.newErpStudentName || '');
+
+  if (!studentName && u.email && u.email.toLowerCase().includes('shavni')) {
+    studentName = 'SHAVNI';
+  }
 
   // QID: clean QID from New ERP or Old ERP
   const rawQid = activeErp === 'NEW'
@@ -1738,6 +1742,9 @@ function safeAdminUser(u, expiredUserIds = []) {
 
   // Year / Sem
   let yearSem = u.qumsYearSem || '';
+  if (/^\d+$/.test(String(yearSem).trim())) {
+    yearSem = `Semester ${yearSem.trim()}`;
+  }
   if (activeErp === 'NEW') {
     const parts = [
       u.newErpCourse && !u.newErpCourse.includes('{') ? u.newErpCourse : '',

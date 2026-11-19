@@ -181,9 +181,9 @@
       Scheduler: 8:30 AM IST today's classes (IST). Watcher: alerts when a teacher marks attendance on GEU ERP.
     </footer>
 
-    <div id="qumsResetSlot" class="qums-reset-slot">
+    <div id="qumsResetSlot" class="qums-reset-slot" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin: 24px auto 12px; width: 100%;">
       <button id="permanentQumsResetBtn" type="button">Reset / Delete GEU ERP Connection</button>
-      <p class="form-hint">Troubleshooting: if you switched GEU ID or changed password, reset here to enter new credentials.</p>
+      <p class="form-hint" style="text-align: center; margin-top: 8px;">Troubleshooting: if you switched GEU ID or changed password, reset here to enter new credentials.</p>
     </div>
   </div>
 
@@ -206,13 +206,17 @@
     function render(data) {
       chipsEl.innerHTML = '';
       const s = data.summary || {};
-      chipsEl.appendChild(chip('Subjects', s.subjectsTotal != null ? s.subjectsTotal : '-'));
+      const totalSubjects = s.totalSubjects != null ? s.totalSubjects : (s.subjectsTotal != null ? s.subjectsTotal : (data.subjects ? data.subjects.length : '-'));
+      const okCount = s.ok != null ? s.ok : (s.okOrAbove != null ? s.okOrAbove : '-');
+      chipsEl.appendChild(chip('Subjects', totalSubjects));
       chipsEl.appendChild(chip('Below 75%', s.below75 != null ? s.below75 : '-'));
-      chipsEl.appendChild(chip('OK (≥75%)', s.okOrAbove != null ? s.okOrAbove : '-'));
+      chipsEl.appendChild(chip('OK (≥75%)', okCount));
 
-      const overallVal = (data.analysis && data.analysis.overallPercentageExact != null)
-        ? data.analysis.overallPercentageExact
-        : s.overallPercentage;
+      const overallVal = (data.overall && data.overall.percentage != null)
+        ? data.overall.percentage
+        : ((data.analysis && data.analysis.overallPercentageExact != null)
+          ? data.analysis.overallPercentageExact
+          : s.overallPercentage);
 
       if (overallVal != null) {
         chipsEl.appendChild(chip('Overall', overallVal + '%'));
