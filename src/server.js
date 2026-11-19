@@ -1626,6 +1626,9 @@ app.post('/api/new-erp/reconnect', requireAuth, async (req, res) => {
 app.get('/api/telegram/status', requireAuth, async (req, res) => {
   const user = await db.getUserById(req.appUser.id);
   const code = await db.telegramLinkCodeFor(req.appUser.id);
+  if (!telegram.isTokenInvalid()) {
+    await telegram.checkTokenValidity().catch(() => {});
+  }
   const tokenInvalid = Boolean(telegram.isTokenInvalid && telegram.isTokenInvalid());
 
   res.json({

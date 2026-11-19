@@ -193,8 +193,14 @@
         const st = await res.json();
 
         if (st.tokenInvalid) {
-          $('errorBox').textContent = '⚠️ Telegram bot token is invalid or revoked (401 Unauthorized). Please copy the active token from @BotFather and update TELEGRAM_BOT_TOKEN in your environment.';
+          $('errorBox').innerHTML = '<strong>❌ Telegram Bot Offline — Token Revoked (401 Unauthorized):</strong><br>Bot ka API token Telegram par revoke ho chuka hai. Is wajah se bot messages receive nahi kar pa raha hai aur <code>/start</code> par response nahi de raha.<br><br><strong>Fix (Sirf 1 minute):</strong><br>1. Telegram me <b><a href="https://t.me/BotFather" target="_blank" style="color:#1d4ed8; font-weight:600;">@BotFather</a></b> open karein.<br>2. <code>/mybots</code> send karke <b>@' + (st.botUsername || 'gue_attendance_bot') + '</b> select karein.<br>3. <b>API Token</b> dabayein ➔ <b>Revoke current token</b> click karein.<br>4. BotFather se naya token copy karein aur Render Dashboard (Environment ➔ <code>TELEGRAM_BOT_TOKEN</code>) me save kar dein.<br>Save hote hi bot online ho jayega!';
           $('errorBox').classList.remove('hidden');
+          $('connectBtn').classList.add('disabled');
+          $('connectBtn').style.pointerEvents = 'none';
+          $('connectBtn').style.opacity = '0.6';
+          $('connectBtn').textContent = '⚠️ Bot Offline (Token Revoked)';
+          $('tgBadge').className = 'badge-soft bad';
+          $('tgBadge').textContent = 'Bot Offline (Token Revoked)';
         }
 
         if (!st.configured) {

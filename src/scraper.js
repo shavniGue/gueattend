@@ -100,8 +100,9 @@ function looksLikeLoginHtml(html) {
   const lower = (html || '').toLowerCase();
   const hasLoginForm = /<input[^>]+type=["']password["']/.test(lower);
   const titleSaysLogin = /<title>[^<]*(login|sign in)/.test(lower);
-  const noStudentData = !/var\s+RegID\s*=\s*'/i.test(lower);
-  return (hasLoginForm && noStudentData) || titleSaysLogin;
+  const isGeuLogin = lower.includes('n0j5ha0') || lower.includes('cyborg-login') || lower.includes('studentlogin');
+  const noStudentData = !/var\s+RegID\s*=\s*'/i.test(lower) && !lower.includes('course-wise attendance');
+  return (hasLoginForm && noStudentData) || titleSaysLogin || isGeuLogin;
 }
 
 /**
@@ -155,39 +156,62 @@ async function getStudentContext(apiContext, opts = {}) {
       timeout: 10000,
     }).catch(() => null);
 
-    if (geuResp && geuResp.ok()) {
-      const raw = await geuResp.text();
-      if (raw && !raw.trim().startsWith('<')) {
-        const parsed = JSON.parse(raw);
-        let studentName = opts.studentName || '';
-        let regId = '0';
-        let yearSem = opts.yearSem || '';
-        if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
-          const info = parsed.StudentInfo[0];
-          if (!studentName) studentName = norm(info.StudentName || info.Name || '');
-          if (info.RegID) regId = String(info.RegID);
-          if (!yearSem) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
-        }
-        if (sessionPath && regId && regId !== '0') setCachedRegId(sessionPath, regId);
+    if (geuResp) {
+      if (geuResp.status() === 401 || geuResp.status() === 403) {
+        if (sessionPath) clearCachedRegId(sessionPath);
+        throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
+      }
+      if (geuResp.ok()) {
+        const raw = await geuResp.text();
+        if (raw && !raw.trim().startsWith('<')) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.isSuccess === false || parsed.error === 'unauthorized')) {
+            if (sessionPath) clearCachedRegId(sessionPath);
+            throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
+          }
+          let studentName = opts.studentName || '';
+          let regId = '0';
+          let yearSem = opts.yearSem || '';
+          if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
+            const info = parsed.StudentInfo[0];
+            if (!studentName) studentName = norm(info.StudentName || info.Name || '');
+            if (info.RegID) regId = String(info.RegID);
+            if (!yearSem) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
+          }
+          if (sessionPath && regId && regId !== '0') setCachedRegId(sessionPath, regId);
 
-        const candidateRows = parsed.Table || parsed.Rows || parsed.Subjects || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
-        if (Array.isArray(candidateRows) && candidateRows.length > 0) {
-          return {
-            regId,
-            yearSem: yearSem || '1',
-            availableYearSems: [yearSem || '1'],
-            studentName,
-            attendancePayload: {
-              data: JSON.stringify(candidateRows),
-              state: JSON.stringify(parsed.Totals || parsed.StudentInfo || []),
-            },
-          };
+          const candidateRows = parsed.Table || parsed.Rows || parsed.Subjects || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
+          if (Array.isArray(candidateRows) && candidateRows.length > 0) {
+            return {
+              regId,
+              yearSem: yearSem || '1',
+              availableYearSems: [yearSem || '1'],
+              studentName,
+              attendancePayload: {
+                data: JSON.stringify(candidateRows),
+                state: JSON.stringify(parsed.Totals || parsed.StudentInfo || []),
+              },
+            };
+          }
         }
       }
     }
-  } catch {}
+  } catch (err) {
+    if (err instanceof SessionExpiredError) throw err;
+  }
 
   const resp = await apiGet(apiContext, DASHBOARD_URL, { timeout: 15000 });
+
+  if (resp && (resp.status() === 401 || resp.status() === 403)) {
+    if (sessionPath) clearCachedRegId(sessionPath);
+    throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
+  }
+
+  const finalUrl = (typeof resp.url === 'function' ? resp.url() : (resp.url || '')).toLowerCase();
+  if (finalUrl.includes('n0j5ha0') || finalUrl.includes('cyborg-login') || finalUrl.includes('studentlogin') || finalUrl.includes('login')) {
+    if (sessionPath) clearCachedRegId(sessionPath);
+    throw new SessionExpiredError('GEU ERP session expire ho gaya hai (Login redirect). Please GEU Setup me Reconnect karein.');
+  }
 
   if (!resp.ok()) {
     throw new ScrapeError(
@@ -199,7 +223,7 @@ async function getStudentContext(apiContext, opts = {}) {
   const html = await resp.text();
   if (looksLikeLoginHtml(html)) {
     if (sessionPath) clearCachedRegId(sessionPath);
-    throw new SessionExpiredError();
+    throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
   }
 
   // QUMS embeds RegID in the dashboard page.
@@ -299,8 +323,8 @@ async function getStudentContext(apiContext, opts = {}) {
 
   if (!yearSem) {
     throw new ScrapeError(
-      'QUMS se current Year/Sem aur subjects detect nahi hue.',
-      'GetYearSemWiseAttendance ne Sem 1-8 me kisi bhi value par subjects return nahi kiye. QUMS Setup → Reconnect QUMS karke retry karo.'
+      'GEU ERP se current Semester aur subjects detect nahi hue.',
+      'GEU Setup → Reconnect GEU ERP karke dobara login karein.'
     );
   }
 
@@ -468,12 +492,12 @@ async function scrapeAttendance(opts = {}) {
     if (!payload) {
       throw new ScrapeError(
         `Attendance API returned no subjects (tried Year/Sem: ${candidates.join(', ')}).`,
-        'QUMS ne valid subjects return nahi kiye. Reconnect QUMS karke retry karo.'
+        'GEU ERP ne valid subjects return nahi kiye. Reconnect GEU ERP karke retry karo.'
       );
     }
 
     const rows = JSON.parse(payload.data).map(mapAttendanceRow).filter((r) => r.subject);
-    if (!rows.length) throw new ScrapeError(`Attendance API returned an empty subject list (YearSem=${usedYearSem}).`, 'Reconnect QUMS karke retry karo.');
+    if (!rows.length) throw new ScrapeError(`Attendance API returned an empty subject list (YearSem=${usedYearSem}).`, 'Reconnect GEU ERP karke retry karo.');
 
     let summary = null;
     try {
@@ -579,7 +603,7 @@ async function scrapeTodaysAttendance(opts = {}) {
     if (!resp.ok()) {
       throw new ScrapeError(
         `Today's-attendance API failed (HTTP ${resp.status()}).`,
-        'Portal down ya session issue — thodi der baad retry, ya Dashboard → QUMS Setup → Reconnect QUMS.'
+        'Portal down ya session issue — thodi der baad retry, ya Dashboard → GEU Setup → Reconnect GEU ERP.'
       );
     }
     const body = await resp.text();
@@ -588,7 +612,7 @@ async function scrapeTodaysAttendance(opts = {}) {
         clearCachedRegId(sessionPath);
         throw new SessionExpiredError(); // Confirmed portal login page
       }
-      throw new QumsUnreachableError('QUMS portal returned a temporary HTML error page for today\'s attendance.');
+      throw new QumsUnreachableError('GEU ERP portal returned a temporary HTML error page for today\'s attendance.');
     }
 
     let rawRows = [];
@@ -1296,13 +1320,13 @@ async function scrapeAssignments(opts = {}) {
     if (!resp.ok()) {
       throw new ScrapeError(
         `Assignment API failed (HTTP ${resp.status()}).`,
-        'Portal down ya session issue — thodi der baad retry, ya Dashboard → QUMS Setup → Reconnect QUMS.'
+        'Portal down ya session issue — thodi der baad retry, ya Dashboard → GEU Setup → Reconnect GEU ERP.'
       );
     }
     const body = await resp.text();
     if (body.trim().startsWith('<')) {
       if (looksLikeLoginHtml(body)) throw new SessionExpiredError(); // Confirmed portal login page
-      throw new QumsUnreachableError('QUMS portal returned a temporary HTML error page for assignments.');
+      throw new QumsUnreachableError('GEU ERP portal returned a temporary HTML error page for assignments.');
     }
     let payload = {};
     try {
@@ -1418,13 +1442,13 @@ async function scrapeMonthRegister(opts = {}) {
     if (!resp.ok()) {
       throw new ScrapeError(
         `Month Register API failed (HTTP ${resp.status()}).`,
-        'Portal down ya session issue — thodi der baad retry, ya Dashboard → QUMS Setup → Reconnect QUMS.'
+        'Portal down ya session issue — thodi der baad retry, ya Dashboard → GEU Setup → Reconnect GEU ERP.'
       );
     }
     const body = await resp.text();
     if (body.trim().startsWith('<')) {
       if (looksLikeLoginHtml(body)) throw new SessionExpiredError(); // Confirmed portal login page
-      throw new QumsUnreachableError('QUMS portal returned a temporary HTML error page for month register.');
+      throw new QumsUnreachableError('GEU ERP portal returned a temporary HTML error page for month register.');
     }
     let payload = {};
     try {

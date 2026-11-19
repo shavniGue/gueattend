@@ -61,6 +61,25 @@ function isConfigured() {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN);
 }
 
+async function checkTokenValidity() {
+  if (!isConfigured()) return false;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`);
+    const data = await res.json().catch(() => ({}));
+    if (data && data.ok) {
+      state.tokenInvalid = false;
+      return true;
+    }
+    if (data && data.error_code === 401) {
+      state.tokenInvalid = true;
+      return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 function isReady() {
   return Boolean(state.bot);
 }
@@ -2534,6 +2553,7 @@ module.exports = {
   initTelegram,
   ensureSendOnlyBot,
   isConfigured,
+  checkTokenValidity,
   isTokenInvalid: () => Boolean(state.tokenInvalid),
   isReady,
   getBotUsername,
