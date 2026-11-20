@@ -645,17 +645,22 @@ const ALL_USERS_COLUMNS = [
   'email',
   'password_hash',
   'qums_qid',
+  'geu_id',
   'qums_session_path',
+  'geu_session_path',
   "CASE WHEN (qums_session_data IS NOT NULL AND qums_session_data != '') THEN '__HAS_SESSION__' ELSE '' END AS qums_session_data",
+  "CASE WHEN (geu_session_data IS NOT NULL AND geu_session_data != '') THEN '__HAS_SESSION__' ELSE '' END AS geu_session_data",
   'telegram_link_code',
   'telegram_chat_id',
   'firebase_uid',
   'student_name',
   'qums_year_sem',
+  'geu_year_sem',
   'is_admin',
   'email_verified',
   'is_suspended',
   'qums_session_status',
+  'geu_session_status',
   'active_erp_type',
   'new_erp_email',
   'new_erp_password_encrypted',
@@ -683,6 +688,7 @@ const ALL_USERS_COLUMNS = [
   'created_at',
   'updated_at',
   'qums_password_encrypted',
+  'geu_password_encrypted',
 ].join(', ');
 
 async function allUsers() {
@@ -903,18 +909,23 @@ function fromUserRow(r) {
 
   const row = {
     id: r.id, email: r.email, passwordHash: r.password_hash,
-    qumsQid: r.qums_qid || '',
+    qumsQid: r.qums_qid || r.geu_id || '',
+    geuId: r.geu_id || r.qums_qid || '',
     qumsSessionPath: resolvedSessionPath,
-    qumsSessionData: r.qums_session_data || '',
+    geuSessionPath: r.geu_session_path || resolvedSessionPath,
+    qumsSessionData: r.qums_session_data || r.geu_session_data || '',
+    geuSessionData: r.geu_session_data || r.qums_session_data || '',
     telegramLinkCode: r.telegram_link_code || '',
     telegramChatId: r.telegram_chat_id || '',
     firebaseUid: r.firebase_uid || '',
     studentName: r.student_name || '',
-    qumsYearSem: r.qums_year_sem || '',
+    qumsYearSem: r.qums_year_sem || r.geu_year_sem || '',
+    geuYearSem: r.geu_year_sem || r.qums_year_sem || '',
     isAdmin: r.is_admin === true,
     emailVerified: r.email_verified === true,
     isSuspended: r.is_suspended === true,
-    qumsSessionStatus: r.qums_session_status || 'active',
+    qumsSessionStatus: r.qums_session_status || r.geu_session_status || 'active',
+    geuSessionStatus: r.geu_session_status || r.qums_session_status || 'active',
     activeErpType: r.active_erp_type || 'OLD',
     newErpEmail: r.new_erp_email || '',
     newErpPasswordEncrypted: r.new_erp_password_encrypted || '',
@@ -941,8 +952,11 @@ function fromUserRow(r) {
     reconnectCountWeb: Number(r.reconnect_count_web || 0),
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : '',
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : '',
-    qumsPasswordEncrypted: r.qums_password_encrypted || '',
   };
+  if (r.qums_password_encrypted || r.geu_password_encrypted) {
+    row.qumsPasswordEncrypted = r.qums_password_encrypted || r.geu_password_encrypted;
+    row.geuPasswordEncrypted = r.geu_password_encrypted || r.qums_password_encrypted;
+  }
   return row;
 }
 
@@ -954,16 +968,21 @@ function blankUser({ email, passwordHash, firebaseUid, emailVerified, isSuspende
     passwordHash,
     firebaseUid: String(firebaseUid || ''),
     qumsQid: '',
+    geuId: '',
     qumsSessionPath: '',
+    geuSessionPath: '',
     qumsSessionData: '',
+    geuSessionData: '',
     telegramLinkCode: '',
     telegramChatId: '',
     studentName: '', // QUMS profile name CACHE (source of truth = QUMS session)
     qumsYearSem: '', // QUMS Year/Sem CACHE (fetched from the portal, never hardcoded)
+    geuYearSem: '',
     isAdmin: false,
     emailVerified: Boolean(emailVerified || false),
     isSuspended: Boolean(isSuspended || false),
     qumsSessionStatus: 'active',
+    geuSessionStatus: 'active',
     activeErpType: 'OLD',
     newErpEmail: '',
     newErpPasswordEncrypted: '',
@@ -1027,18 +1046,24 @@ const WRITABLE_USER_COLUMNS = {
   email: 'email',
   passwordHash: 'password_hash',
   qumsQid: 'qums_qid',
+  geuId: 'geu_id',
   qumsPasswordEncrypted: 'qums_password_encrypted',
+  geuPasswordEncrypted: 'geu_password_encrypted',
   qumsSessionPath: 'qums_session_path',
+  geuSessionPath: 'geu_session_path',
   qumsSessionData: 'qums_session_data',
+  geuSessionData: 'geu_session_data',
   telegramLinkCode: 'telegram_link_code',
   telegramChatId: 'telegram_chat_id',
   firebaseUid: 'firebase_uid',
   studentName: 'student_name',
   qumsYearSem: 'qums_year_sem',
+  geuYearSem: 'geu_year_sem',
   isAdmin: 'is_admin',
   emailVerified: 'email_verified',
   isSuspended: 'is_suspended',
   qumsSessionStatus: 'qums_session_status',
+  geuSessionStatus: 'geu_session_status',
   activeErpType: 'active_erp_type',
   newErpEmail: 'new_erp_email',
   newErpPasswordEncrypted: 'new_erp_password_encrypted',
@@ -1067,16 +1092,32 @@ async function updateUser(id, patch) {
   const user = await getUserById(id);
   if (!user) return null;
 
+  // Bi-directional sync between GEU and legacy QUMS fields
+  if ('qumsQid' in patch && !('geuId' in patch)) patch.geuId = patch.qumsQid;
+  if ('geuId' in patch && !('qumsQid' in patch)) patch.qumsQid = patch.geuId;
+  if ('qumsPasswordEncrypted' in patch && !('geuPasswordEncrypted' in patch)) patch.geuPasswordEncrypted = patch.qumsPasswordEncrypted;
+  if ('geuPasswordEncrypted' in patch && !('qumsPasswordEncrypted' in patch)) patch.qumsPasswordEncrypted = patch.geuPasswordEncrypted;
+  if ('qumsSessionStatus' in patch && !('geuSessionStatus' in patch)) patch.geuSessionStatus = patch.qumsSessionStatus;
+  if ('geuSessionStatus' in patch && !('qumsSessionStatus' in patch)) patch.qumsSessionStatus = patch.geuSessionStatus;
+  if ('qumsSessionPath' in patch && !('geuSessionPath' in patch)) patch.geuSessionPath = patch.qumsSessionPath;
+  if ('geuSessionPath' in patch && !('qumsSessionPath' in patch)) patch.qumsSessionPath = patch.geuSessionPath;
+  if ('qumsSessionData' in patch && !('geuSessionData' in patch)) patch.geuSessionData = patch.qumsSessionData;
+  if ('geuSessionData' in patch && !('qumsSessionData' in patch)) patch.qumsSessionData = patch.geuSessionData;
+  if ('qumsYearSem' in patch && !('geuYearSem' in patch)) patch.geuYearSem = patch.qumsYearSem;
+  if ('geuYearSem' in patch && !('qumsYearSem' in patch)) patch.qumsYearSem = patch.geuYearSem;
+
   // Never overwrite an existing saved encrypted password with an empty string
   // unless explicitly requested with forceClearPassword: true (e.g. user deleted connection)
   if (
-    user.qumsPasswordEncrypted &&
-    'qumsPasswordEncrypted' in patch &&
+    (user.qumsPasswordEncrypted || user.geuPasswordEncrypted) &&
+    ('qumsPasswordEncrypted' in patch || 'geuPasswordEncrypted' in patch) &&
     !patch.qumsPasswordEncrypted &&
+    !patch.geuPasswordEncrypted &&
     !patch.forceClearPassword &&
     !patch.allowEmptyPassword
   ) {
     delete patch.qumsPasswordEncrypted;
+    delete patch.geuPasswordEncrypted;
   }
   if (
     user.newErpPasswordEncrypted &&
@@ -2566,9 +2607,10 @@ async function acquireErpSession({ qumsIdentity, userId, erpType, sessionId = ne
   } else {
     await init();
     await pool.query(
-      `INSERT INTO active_erp_sessions (qums_identity, user_id, erp_type, session_id, status, created_at, updated_at, last_active_at)
-       VALUES ($1, $2, $3, $4, 'active', NOW(), NOW(), NOW())
+      `INSERT INTO active_erp_sessions (qums_identity, geu_identity, user_id, erp_type, session_id, status, created_at, updated_at, last_active_at)
+       VALUES ($1, $1, $2, $3, $4, 'active', NOW(), NOW(), NOW())
        ON CONFLICT (qums_identity) DO UPDATE SET
+         geu_identity = EXCLUDED.geu_identity,
          user_id = EXCLUDED.user_id,
          erp_type = EXCLUDED.erp_type,
          session_id = EXCLUDED.session_id,

@@ -450,7 +450,10 @@ async function maintainActiveSessions(log = console) {
           if (jwtCookie && jwtCookie.value) {
             const exp = getJwtExp(jwtCookie.value);
             const nowSec = Math.floor(Date.now() / 1000);
-            if (!exp || (exp - nowSec < 360)) {
+            // ONLY refresh if token genuinely has an expiration timestamp AND expires within 2 minutes.
+            // NEVER refresh if exp is null or missing, because rapid RefreshToken calls trigger GEU
+            // security rule Flag: -8 ("Suspicious activity detected on your account. All active sessions have been terminated").
+            if (typeof exp === 'number' && exp > nowSec && (exp - nowSec < 120)) {
               const res = await refreshQumsToken(sp, log).catch(() => null);
               if (res && res.ok) refreshed += 1;
             }

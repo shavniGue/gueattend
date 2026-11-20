@@ -135,23 +135,53 @@ async function locateCaptchaInput(frame) {
  * Click the login/submit button: submit input/button, or one labelled Login.
  */
 async function clickLoginButton(frame) {
-  const candidates = [
-    frame.locator('button[type="submit"]').first(),
-    frame.getByRole('button', { name: /login|sign in/i }).first(),
-    frame.locator('button.btnSubmit').first(),
-    frame.locator('input[type="submit"]').first(),
-    frame.locator('a', { hasText: /login|sign in/i }).first(),
+  const candidateSelectors = [
+    'button.login-btn-plain',
+    'button[type="submit"]',
+    'button:has-text("Login")',
+    'button:has-text("Sign In")',
+    'button.btnSubmit',
+    'input[type="submit"]',
+    'button.btn-primary',
+    'a:has-text("Login")',
+    'a:has-text("Sign In")',
   ];
-  for (const c of candidates) {
+
+  for (const sel of candidateSelectors) {
     try {
-      if ((await c.count()) > 0 && (await c.isVisible())) {
-        await c.click();
+      const loc = frame.locator(sel).first();
+      if ((await loc.count().catch(() => 0)) > 0) {
+        await loc.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+        await loc.scrollIntoViewIfNeeded().catch(() => {});
+        await loc.click({ timeout: 4000 });
         return;
       }
     } catch {
       /* try next candidate */
     }
   }
+
+  // Fallback: evaluate directly in page DOM to click the login button or trigger form submit
+  try {
+    const clicked = await frame.evaluate(() => {
+      const btn = document.querySelector(
+        'button.login-btn-plain, button[type="submit"], button.btnSubmit, input[type="submit"], button.btn-primary, [role="button"]'
+      ) || Array.from(document.querySelectorAll('button')).find((b) => /login|sign in/i.test(b.innerText || ''));
+      if (btn) {
+        btn.removeAttribute('disabled');
+        btn.click();
+        return true;
+      }
+      const form = document.querySelector('form');
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        return true;
+      }
+      return false;
+    });
+    if (clicked) return;
+  } catch {}
+
   throw new Error('Login button not found on the login form.');
 }
 

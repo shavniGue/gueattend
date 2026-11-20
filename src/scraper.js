@@ -580,8 +580,8 @@ async function newApiContext(sessionPath = SESSION_FILE) {
         if (jwt && jwt.value) {
           const exp = getJwtExp(jwt.value);
           const nowSec = Math.floor(Date.now() / 1000);
-          if (exp && (exp - nowSec < 180)) {
-            // Token is expiring soon or expired — auto-refresh proactively
+          if (typeof exp === 'number' && exp > nowSec && (exp - nowSec < 120)) {
+            // Token is expiring soon — auto-refresh proactively
             const refreshed = await refreshQumsToken(sessionPath).catch(() => null);
             if (refreshed && refreshed.ok && fs.existsSync(sessionPath)) {
               raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));

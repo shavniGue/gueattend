@@ -357,6 +357,46 @@ const MIGRATIONS = [
       `ALTER TABLE scheduled_message_deletions ADD COLUMN IF NOT EXISTS delete_at BIGINT DEFAULT 0`,
     ],
   },
+  {
+    id: '024_geu_erp_migration',
+    statements: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_id TEXT DEFAULT ''`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_password_encrypted TEXT DEFAULT ''`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_session_path TEXT DEFAULT ''`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_session_data TEXT DEFAULT ''`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_session_status TEXT DEFAULT 'active'`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS geu_year_sem TEXT DEFAULT ''`,
+      `UPDATE users SET geu_id = qums_qid WHERE (geu_id IS NULL OR geu_id = '') AND qums_qid IS NOT NULL AND qums_qid <> ''`,
+      `UPDATE users SET geu_password_encrypted = qums_password_encrypted WHERE (geu_password_encrypted IS NULL OR geu_password_encrypted = '') AND qums_password_encrypted IS NOT NULL AND qums_password_encrypted <> ''`,
+      `UPDATE users SET geu_session_path = qums_session_path WHERE (geu_session_path IS NULL OR geu_session_path = '') AND qums_session_path IS NOT NULL AND qums_session_path <> ''`,
+      `UPDATE users SET geu_session_data = qums_session_data WHERE (geu_session_data IS NULL OR geu_session_data = '') AND qums_session_data IS NOT NULL AND qums_session_data <> ''`,
+      `UPDATE users SET geu_session_status = qums_session_status WHERE (geu_session_status IS NULL OR geu_session_status = '') AND qums_session_status IS NOT NULL`,
+      `UPDATE users SET geu_year_sem = qums_year_sem WHERE (geu_year_sem IS NULL OR geu_year_sem = '') AND qums_year_sem IS NOT NULL AND qums_year_sem <> ''`,
+      `CREATE INDEX IF NOT EXISTS idx_users_geu_id ON users(geu_id)`,
+      `ALTER TABLE active_erp_sessions ADD COLUMN IF NOT EXISTS geu_identity TEXT DEFAULT ''`,
+      `UPDATE active_erp_sessions SET geu_identity = qums_identity WHERE (geu_identity IS NULL OR geu_identity = '') AND qums_identity IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_active_erp_geu_identity ON active_erp_sessions(geu_identity)`,
+      `CREATE TABLE IF NOT EXISTS geu_identities (
+         id TEXT PRIMARY KEY,
+         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         geu_id TEXT NOT NULL,
+         student_name TEXT DEFAULT '',
+         year_sem TEXT DEFAULT '',
+         monitoring_started_date DATE,
+         monitoring_started_at TIMESTAMPTZ DEFAULT NOW(),
+         is_active BOOLEAN NOT NULL DEFAULT TRUE,
+         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         UNIQUE(user_id, geu_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_geu_identities_user ON geu_identities(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_geu_identities_geu_id ON geu_identities(geu_id)`,
+      `INSERT INTO geu_identities (id, user_id, geu_id, student_name, year_sem, monitoring_started_date, monitoring_started_at, is_active, created_at, updated_at)
+       SELECT id, user_id, qid, student_name, year_sem, monitoring_started_date, monitoring_started_at, is_active, created_at, updated_at
+       FROM qums_identities
+       ON CONFLICT (user_id, geu_id) DO NOTHING`,
+    ],
+  },
 ];
 
 /**
