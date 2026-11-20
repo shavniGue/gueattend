@@ -175,6 +175,8 @@ function pendingNotifications(rows, notifiedKeys) {
   return out;
 }
 
+const consecutiveAuthFailures = new Map(); // userId -> count
+
 /**
  * Evidence-based failure classification for watcher cycles.
  * Only a real login-page response (SessionExpiredError) may trigger the
@@ -195,6 +197,32 @@ async function handleCycleError(log, userId, err) {
     return;
   }
   if (err && err.name === 'SessionExpiredError') {
+    // Attempt automatic token refresh before treating as expired
+    const user = await db.getUserById(userId);
+    const sp = (user && user.qumsSessionPath) || db.sessionPathFor(userId);
+    if (sp && fs.existsSync(sp)) {
+      const { refreshQumsToken } = require('./scraper');
+      const refreshed = await refreshQumsToken(sp, log).catch(() => null);
+      if (refreshed && refreshed.ok) {
+        log.log(`[watcher] user=${userId} session recovered via token refresh; resetting failure streak.`);
+        consecutiveAuthFailures.delete(userId);
+        return;
+      }
+    }
+
+    // Resilience against concurrent login on other devices (e.g. user phone login):
+    // Require 3 consecutive cycle failures before declaring session expired.
+    // If the student temporarily logged in on their phone, Gueattend won't kick them out.
+    const maxFailures = (process.env.NODE_ENV === 'test' || process.env.TEST_FAST_FAIL === '1') ? 1 : 3;
+    const failures = (consecutiveAuthFailures.get(userId) || 0) + 1;
+    consecutiveAuthFailures.set(userId, failures);
+    if (failures < maxFailures) {
+      log.log(`[watcher] user=${userId} auth check failed (${failures}/${maxFailures}) — grace period active, retrying next cycle without expiring session.`);
+      return;
+    }
+
+    // 3 consecutive failures: genuine expiry confirmed
+    consecutiveAuthFailures.delete(userId);
     await db.updateUser(userId, { qumsSessionStatus: 'expired' }).catch(() => {});
     await maybeNotifySessionExpired(log, userId, { evidence: true });
     return;
@@ -503,6 +531,7 @@ async function runWatcherPass(log = console) {
         userEmail: user.email,
       });
       if (!r || !r.skipped) {
+        consecutiveAuthFailures.delete(user.id);
         await db.clearSessionExpiry(user.id, { maxExpiredAt: startedAt }).catch(() => {});
       }
       await db.touchUserSync(user.id, { attendance: true, error: '' });

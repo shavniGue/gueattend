@@ -909,6 +909,21 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
     res.json(analysis);
   } catch (err) {
     if (err.name === 'SessionExpiredError') {
+      const sp = req.appUser.qumsSessionPath || db.sessionPathFor(req.appUser.id);
+      const { refreshQumsToken } = require('./scraper');
+      const refreshed = sp ? await refreshQumsToken(sp, console).catch(() => null) : null;
+      if (refreshed && refreshed.ok) {
+        try {
+          const retryAnalysis = await scrapeAttendance(
+            req.query.month ? { month: Number(req.query.month), sessionPath: sp } : { sessionPath: sp }
+          );
+          return res.json(retryAnalysis);
+        } catch {}
+      }
+      const cached = attendanceCache.get(userId);
+      if (cached && cached.data) {
+        return res.json({ ...cached.data, isStale: true });
+      }
       await db.updateUser(req.appUser.id, { qumsSessionStatus: 'expired' }).catch(() => {});
       await maybeNotifySessionExpired(console, req.appUser.id, { evidence: true }).catch(() => {});
     }
@@ -1017,6 +1032,20 @@ app.get('/api/today', requireAuth, async (req, res) => {
     res.json(payload);
   } catch (err) {
     if (err.name === 'SessionExpiredError') {
+      const sp = req.appUser.qumsSessionPath || db.sessionPathFor(req.appUser.id);
+      const { refreshQumsToken } = require('./scraper');
+      const refreshed = sp ? await refreshQumsToken(sp, console).catch(() => null) : null;
+      if (refreshed && refreshed.ok) {
+        try {
+          const retryPeriods = await scrapeTodaysAttendance({ sessionPath: sp });
+          const payload = { date: new Date().toISOString(), periods: retryPeriods };
+          return res.json(payload);
+        } catch {}
+      }
+      const cached = todayCache.get(userId);
+      if (cached && cached.data) {
+        return res.json({ ...cached.data, isStale: true });
+      }
       await db.updateUser(req.appUser.id, { qumsSessionStatus: 'expired' }).catch(() => {});
       await maybeNotifySessionExpired(console, req.appUser.id, { evidence: true }).catch(() => {});
     }

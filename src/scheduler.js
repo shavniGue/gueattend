@@ -411,11 +411,66 @@ function startScheduler(log = console) {
     log.log(`[scheduler] armed — "${MORNING_PREWARM_CRON}" (pre-warm cache so the 8:30 message is on time), ${TIMEZONE}`);
     tasks.push(prewarmTask);
   }
+
+  // 24/7 session keep-alive: runs every 10 minutes all day and night to keep GEU tokens perpetually fresh
+  const keepAliveTask = cron.schedule('*/10 * * * *', () => {
+    maintainActiveSessions(log).catch((e) => log.error(`[scheduler] keep-alive crashed: ${e.message}`));
+  }, { timezone: TIMEZONE, recoverMissedExecutions: true });
+  log.log(`[scheduler] armed — "*/10 * * * *" (24/7 session keep-alive every 10 min), ${TIMEZONE}`);
+  tasks.push(keepAliveTask);
+
   return tasks;
+}
+
+/**
+ * 24/7 Session Keep-Alive:
+ * Proactively refreshes GEU portal tokens every 10 minutes so sessions
+ * never reach the 15-minute expiration cliff, even outside college hours.
+ */
+async function maintainActiveSessions(log = console) {
+  try {
+    const allUsers = await db.allUsers();
+    const activeUsers = allUsers.filter((u) => {
+      if (u.isSuspended || u.status === 'suspended') return false;
+      if (u.activeErpType === 'NEW') return false;
+      return Boolean(u.qumsSessionPath || u.qumsSessionData);
+    });
+
+    if (!activeUsers.length) return { refreshed: 0, checked: 0 };
+
+    const { getJwtExp, refreshQumsToken } = require('./scraper');
+    let refreshed = 0;
+    for (const user of activeUsers) {
+      try {
+        await db.ensureSessionOnDisk(user).catch(() => {});
+        const sp = user.qumsSessionPath || db.sessionPathFor(user.id);
+        if (sp && fs.existsSync(sp)) {
+          const raw = JSON.parse(fs.readFileSync(sp, 'utf8'));
+          const jwtCookie = (raw.cookies || []).find((c) => c && c.name === 'jwt');
+          if (jwtCookie && jwtCookie.value) {
+            const exp = getJwtExp(jwtCookie.value);
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (!exp || (exp - nowSec < 360)) {
+              const res = await refreshQumsToken(sp, log).catch(() => null);
+              if (res && res.ok) refreshed += 1;
+            }
+          }
+        }
+      } catch {}
+    }
+    if (refreshed > 0) {
+      log.log(`[scheduler] 24/7 keep-alive: refreshed ${refreshed}/${activeUsers.length} active session(s).`);
+    }
+    return { refreshed, checked: activeUsers.length };
+  } catch (err) {
+    log.error(`[scheduler] maintainActiveSessions error: ${err.message}`);
+    return { refreshed: 0, error: err.message };
+  }
 }
 
 module.exports = {
   startScheduler,
+  maintainActiveSessions,
   getSchedulerStatus,
   runMorningScheduleJob,
   activeUsers,
