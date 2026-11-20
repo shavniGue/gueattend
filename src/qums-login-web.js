@@ -562,7 +562,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
   const sessionPath = db.sessionPathFor(userId);
   await p.context.storageState({ path: sessionPath });
-  const pendingPassword = p.password;
+  const pendingPassword = (opts && opts.password) || p.password;
   await disposePending(userId); // also wipes the in-memory password
 
   const user = await db.getUserById(userId);
@@ -660,6 +660,9 @@ async function completeQumsSetup(userId, qid, { password, confirmSwitch = false 
     }
   } else if (user && user.qumsPasswordEncrypted) {
     patch.qumsPasswordEncrypted = user.qumsPasswordEncrypted;
+  } else {
+    const existingEnc = await db.getQumsEncryptedPassword(userId).catch(() => null);
+    if (existingEnc) patch.qumsPasswordEncrypted = existingEnc;
   }
 
   if (isFirstTime) {

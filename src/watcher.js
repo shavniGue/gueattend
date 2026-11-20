@@ -473,13 +473,30 @@ async function runWatcherPass(log = console) {
 
     try {
       const startedAt = Date.now();
+      // Ensure session exists on disk
+      await db.ensureSessionOnDisk(user.id).catch(() => {});
+      const sp = user.qumsSessionPath || db.sessionPathFor(user.id);
+      if (sp && fs.existsSync(sp)) {
+        try {
+          const raw = JSON.parse(fs.readFileSync(sp, 'utf8'));
+          const jwtCookie = (raw.cookies || []).find((c) => c && c.name === 'jwt');
+          if (jwtCookie && jwtCookie.value) {
+            const { getJwtExp, refreshQumsToken } = require('./scraper');
+            const exp = getJwtExp(jwtCookie.value);
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (exp && (exp - nowSec < 300)) {
+              await refreshQumsToken(sp, log).catch(() => {});
+            }
+          }
+        } catch {}
+      }
       // eslint-disable-next-line no-await-in-loop
-      const timetable = await getTimetableCached(user.id, user.qumsSessionPath, log);
+      const timetable = await getTimetableCached(user.id, sp, log);
       const roomByCode = timetable ? roomMapFromPeriods(getTimetableForDate(timetable, new Date())) : null;
       const r = await runWatcherCycle({
         log,
         userId: user.id,
-        fetchFn: () => scrapeTodaysAttendance({ sessionPath: user.qumsSessionPath }),
+        fetchFn: () => scrapeTodaysAttendance({ sessionPath: sp }),
         sendFn: (text) => sendMessage(user.id, text, log, { category: 'ATTENDANCE' }),
         stateFile: stateFileFor(user.id),
         roomByCode,

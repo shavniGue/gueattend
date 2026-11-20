@@ -1162,9 +1162,27 @@ app.post(['/api/user/save-geu-credentials', '/api/user/qums-credentials'], requi
 
 async function submitQumsCaptchaHandler(req, res) {
   try {
-    const { captchaText, captcha } = req.body || {};
+    const { captchaText, captcha, password, qid } = req.body || {};
     const text = String(captchaText || captcha || '').trim().toUpperCase();
-    const result = await qumsLogin.submitQumsCaptcha(req.session.userId, text, console, { source: 'web' });
+    const finalPassword = password != null && String(password).trim() !== '' ? String(password).trim() : undefined;
+    const finalQid = qid != null && String(qid).trim() !== '' ? String(qid).trim() : undefined;
+
+    if (finalPassword && req.session && req.session.userId) {
+      try {
+        const { encryptSecret } = require('./crypto');
+        await db.updateUser(req.session.userId, {
+          ...(finalQid ? { qumsQid: finalQid } : {}),
+          qumsPasswordEncrypted: encryptSecret(finalPassword),
+        });
+      } catch (saveErr) {
+        console.error('[server] Pre-saving GEU credentials in submit-captcha failed:', saveErr.message);
+      }
+    }
+
+    const result = await qumsLogin.submitQumsCaptcha(req.session.userId, text, console, {
+      source: 'web',
+      password: finalPassword,
+    });
     if (result && result.ok) {
       invalidateUserDataCaches(req.session.userId);
       // Seed baseline marked periods for today (background)
@@ -1199,6 +1217,7 @@ async function handleErpReset(req, res) {
       studentName: '',
       qumsYearSem: '',
       qumsSessionStatus: 'disconnected',
+      forceClearPassword: true,
     });
     if (db.USE_PG && db.pool) {
       await db.pool.query('UPDATE qums_identities SET is_active=FALSE, updated_at=NOW() WHERE user_id=$1', [req.session.userId]).catch(() => {});

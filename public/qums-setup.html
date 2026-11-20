@@ -172,7 +172,7 @@
           $('msg').classList.add('hidden');
           if (data.code === 'QumsCredsRequired' || (data.error && data.error.toLowerCase().includes('password'))) {
             setMode('first-time');
-            $('error').textContent = 'Please enter your GEU ERP password. It will be saved securely for all future reconnects.';
+            $('error').textContent = 'Please enter your GEU ERP ID and password.';
             $('error').classList.remove('hidden');
             $('qumsPassword').focus();
             return;
@@ -315,16 +315,22 @@
       $('error').classList.add('hidden'); $('msg').classList.add('hidden');
       $('msg').textContent = 'Verifying credentials and logging in…'; $('msg').classList.remove('hidden');
       try {
+        const qidVal = ($('qid').value || '').trim() || savedQid;
+        const pwVal = ($('qumsPassword').value || '').trim();
         const res = await fetch('/api/qums-login/submit-captcha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ captchaText: captchaVal }),
+          body: JSON.stringify({
+            captchaText: captchaVal,
+            password: pwVal,
+            qid: qidVal,
+          }),
         });
         const data = await res.json();
         if (data.ok) {
           hasSavedCredentials = true;
           $('msg').textContent = mode === 'first-time'
-            ? '✅ GEU ERP Connected! Your credentials are now saved securely. Next: open dashboard and connect Telegram.'
+            ? '✅ GEU ERP Connected! Next: open dashboard and connect Telegram.'
             : '✅ GEU ERP Reconnected! Monitoring has resumed.';
           setTimeout(() => { location.href = '/dashboard'; }, 1500);
         } else {

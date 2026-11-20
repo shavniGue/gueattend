@@ -736,7 +736,20 @@ function decodeSessionData(raw) {
 
 async function ensureSessionOnDisk(userOrId) {
   if (!userOrId) return null;
-  let user = typeof userOrId === 'string' ? await getUserById(userOrId) : userOrId;
+  let user = null;
+  if (typeof userOrId === 'object' && userOrId !== null && userOrId.id) {
+    user = userOrId;
+  } else if (typeof userOrId === 'string') {
+    const rawStr = userOrId.trim();
+    if (rawStr.endsWith('.json') || rawStr.includes('/') || rawStr.includes('\\')) {
+      const base = path.basename(rawStr, '.json');
+      const cleanId = base.startsWith('user_') ? base.slice(5) : base;
+      user = (await getUserById(cleanId)) || (await getUserById(base)) || null;
+    }
+    if (!user) {
+      user = await getUserById(rawStr);
+    }
+  }
   if (!user || !user.id) return null;
 
   const canonical = sessionPathFor(user.id);
@@ -1055,6 +1068,28 @@ const WRITABLE_USER_COLUMNS = {
 async function updateUser(id, patch) {
   const user = await getUserById(id);
   if (!user) return null;
+
+  // Never overwrite an existing saved encrypted password with an empty string
+  // unless explicitly requested with forceClearPassword: true (e.g. user deleted connection)
+  if (
+    user.qumsPasswordEncrypted &&
+    'qumsPasswordEncrypted' in patch &&
+    !patch.qumsPasswordEncrypted &&
+    !patch.forceClearPassword &&
+    !patch.allowEmptyPassword
+  ) {
+    delete patch.qumsPasswordEncrypted;
+  }
+  if (
+    user.newErpPasswordEncrypted &&
+    'newErpPasswordEncrypted' in patch &&
+    !patch.newErpPasswordEncrypted &&
+    !patch.forceClearPassword &&
+    !patch.allowEmptyPassword
+  ) {
+    delete patch.newErpPasswordEncrypted;
+  }
+
   const merged = { ...user, ...patch, updatedAt: new Date().toISOString() };
   if (!USE_PG) { Object.assign(user, patch); user.updatedAt = merged.updatedAt; persistJson(); return user; }
 

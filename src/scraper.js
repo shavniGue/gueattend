@@ -158,6 +158,28 @@ async function getStudentContext(apiContext, opts = {}) {
 
     if (geuResp) {
       if (geuResp.status() === 401) {
+        if (sessionPath) {
+          const refreshed = await refreshQumsToken(sessionPath).catch(() => null);
+          if (refreshed && refreshed.ok) {
+            const retryCtx = await newApiContext(sessionPath).catch(() => null);
+            if (retryCtx) {
+              try {
+                const retryResp = await apiPost(retryCtx, GEU_ATTENDANCE_API, {
+                  data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: 0, SYID: 0 },
+                  headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                  timeout: 10000,
+                }).catch(() => null);
+                if (retryResp && retryResp.ok()) {
+                  geuResp = retryResp;
+                }
+              } finally {
+                await retryCtx.dispose().catch(() => {});
+              }
+            }
+          }
+        }
+      }
+      if (geuResp.status() === 401) {
         if (sessionPath) clearCachedRegId(sessionPath);
         throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
       }
@@ -395,6 +417,148 @@ function mapAttendanceRow(raw) {
   return row;
 }
 
+/** Extract expiration timestamp (seconds) from JWT token without secret verification. */
+function getJwtExp(jwtToken) {
+  try {
+    const parts = String(jwtToken || '').split('.');
+    if (parts.length >= 2) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      return typeof payload.exp === 'number' ? payload.exp : null;
+    }
+  } catch {}
+  return null;
+}
+
+/** Parse a Set-Cookie header into a Playwright/storageState cookie object. */
+function parseSetCookie(cookieStr, domain = 'student.geu.ac.in') {
+  if (!cookieStr || typeof cookieStr !== 'string') return null;
+  const parts = cookieStr.split(';').map((s) => s.trim());
+  const [name, ...valParts] = parts[0].split('=');
+  if (!name) return null;
+  const value = valParts.join('=');
+  const cookie = {
+    name: name.trim(),
+    value: value.trim(),
+    domain,
+    path: '/',
+    httpOnly: false,
+    secure: true,
+    sameSite: 'None',
+  };
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts[i];
+    const [k, ...v] = p.split('=');
+    const key = k.trim().toLowerCase();
+    const val = v.join('=').trim();
+    if (key === 'path') cookie.path = val || '/';
+    else if (key === 'domain') cookie.domain = val.replace(/^\./, '');
+    else if (key === 'expires') {
+      const expDate = new Date(val);
+      if (!isNaN(expDate.getTime())) cookie.expires = expDate.getTime() / 1000;
+    } else if (key === 'max-age') {
+      const maxAge = Number(val);
+      if (Number.isFinite(maxAge)) cookie.expires = Math.floor(Date.now() / 1000) + maxAge;
+    } else if (key === 'httponly') cookie.httpOnly = true;
+    else if (key === 'secure') cookie.secure = true;
+    else if (key === 'samesite') {
+      const s = val.toLowerCase();
+      cookie.sameSite = s === 'lax' ? 'Lax' : s === 'strict' ? 'Strict' : 'None';
+    }
+  }
+  return cookie;
+}
+
+/**
+ * Automatically refresh GEU portal tokens using the 7-day refreshToken cookie.
+ * Updates session file on disk and syncs with PostgreSQL.
+ */
+async function refreshQumsToken(sessionPath = SESSION_FILE, log = console) {
+  if (!sessionPath) return { ok: false, error: 'no-session-path' };
+  try {
+    if (!fs.existsSync(sessionPath) && db.ensureSessionOnDisk) {
+      await db.ensureSessionOnDisk(sessionPath).catch(() => {});
+    }
+    if (!fs.existsSync(sessionPath)) return { ok: false, error: 'file-not-found' };
+
+    const raw = fs.readFileSync(sessionPath, 'utf8');
+    const storageState = JSON.parse(raw);
+    const cookies = Array.isArray(storageState.cookies) ? storageState.cookies : [];
+    const refreshCookie = cookies.find((c) => c && c.name === 'refreshToken');
+    if (!refreshCookie || !refreshCookie.value) {
+      return { ok: false, error: 'no-refresh-token' };
+    }
+
+    const origin = new URL(DASHBOARD_URL).origin;
+    const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    const extraHeaders = {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: DASHBOARD_URL,
+      Origin: origin,
+      Accept: 'application/json, text/plain, */*',
+      Cookie: cookieHeader,
+    };
+    const xsrf = cookies.find((c) => c && (c.name === 'XSRF-TOKEN' || c.name === 'cyborg.xsrf.v1'));
+    if (xsrf && xsrf.value) extraHeaders['X-XSRF-TOKEN'] = xsrf.value;
+    const jwt = cookies.find((c) => c && c.name === 'jwt');
+    if (jwt && jwt.value) extraHeaders['Authorization'] = 'Bearer ' + jwt.value;
+
+    const res = await fetch(`${origin}/api/Auth/RefreshToken`, {
+      method: 'POST',
+      headers: extraHeaders,
+      body: JSON.stringify({}),
+    }).catch(() => null);
+
+    if (!res) return { ok: false, error: 'network-failed' };
+
+    const setCookies = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers.get('set-cookie') ? [res.headers.get('set-cookie')] : []);
+
+    let bodyJson = null;
+    try {
+      bodyJson = await res.json().catch(() => null);
+    } catch {}
+
+    const isSuccess = res.ok && (!bodyJson || bodyJson.Flag === 1 || bodyJson.Status === 1 || bodyJson.Success === true);
+
+    if (isSuccess && setCookies.length > 0) {
+      const hostDomain = new URL(DASHBOARD_URL).hostname;
+      for (const rawCookie of setCookies) {
+        const parsed = parseSetCookie(rawCookie, hostDomain);
+        if (!parsed || !parsed.name || !parsed.value) continue;
+        const idx = storageState.cookies.findIndex((c) => c.name === parsed.name);
+        if (idx >= 0) {
+          storageState.cookies[idx] = { ...storageState.cookies[idx], ...parsed };
+        } else {
+          storageState.cookies.push(parsed);
+        }
+      }
+      fs.writeFileSync(sessionPath, JSON.stringify(storageState, null, 2), 'utf8');
+
+      const base = path.basename(sessionPath, '.json');
+      const cleanId = base.startsWith('user_') ? base.slice(5) : base;
+      if (cleanId && db.saveUserSessionData) {
+        await db.saveUserSessionData(cleanId, JSON.stringify(storageState)).catch(() => {});
+        await db.clearSessionExpiry(cleanId).catch(() => {});
+      }
+
+      log.log(`[GEU-Auth] ✅ Token refreshed successfully for session: ${path.basename(sessionPath)}`);
+      return { ok: true, refreshed: true };
+    }
+
+    if (res.status === 401 || (bodyJson && (bodyJson.Flag === 0 || bodyJson.Flag === -8 || bodyJson.Flag === -9))) {
+      log.log(`[GEU-Auth] RefreshToken rejected HTTP ${res.status}: ${JSON.stringify(bodyJson || {})}`);
+      return { ok: false, error: 'refresh-rejected', status: res.status, body: bodyJson };
+    }
+
+    return { ok: false, error: `http-${res.status}` };
+  } catch (err) {
+    log.log(`[GEU-Auth] Token refresh error: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+}
+
 /** Shared API context: session cookies + AJAX-ish headers, no browser needed. */
 async function newApiContext(sessionPath = SESSION_FILE) {
   try {
@@ -410,15 +574,28 @@ async function newApiContext(sessionPath = SESSION_FILE) {
         await db.ensureSessionOnDisk(sessionPath).catch(() => {});
       }
       if (fs.existsSync(sessionPath)) {
-        const raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
-        const cookies = Array.isArray(raw.cookies) ? raw.cookies : [];
+        let raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
+        let cookies = Array.isArray(raw.cookies) ? raw.cookies : [];
+        const jwt = cookies.find((c) => c && c.name === 'jwt');
+        if (jwt && jwt.value) {
+          const exp = getJwtExp(jwt.value);
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (exp && (exp - nowSec < 180)) {
+            // Token is expiring soon or expired — auto-refresh proactively
+            const refreshed = await refreshQumsToken(sessionPath).catch(() => null);
+            if (refreshed && refreshed.ok && fs.existsSync(sessionPath)) {
+              raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
+              cookies = Array.isArray(raw.cookies) ? raw.cookies : [];
+            }
+          }
+        }
         const xsrf = cookies.find((c) => c && (c.name === 'XSRF-TOKEN' || c.name === 'cyborg.xsrf.v1'));
         if (xsrf && xsrf.value) {
           extraHTTPHeaders['X-XSRF-TOKEN'] = xsrf.value;
         }
-        const jwt = cookies.find((c) => c && c.name === 'jwt');
-        if (jwt && jwt.value) {
-          extraHTTPHeaders['Authorization'] = 'Bearer ' + jwt.value;
+        const activeJwt = cookies.find((c) => c && c.name === 'jwt');
+        if (activeJwt && activeJwt.value) {
+          extraHTTPHeaders['Authorization'] = 'Bearer ' + activeJwt.value;
         }
       }
     } catch {}
@@ -2270,6 +2447,8 @@ module.exports = {
   ScrapeError,
   SessionExpiredError,
   NoSessionError,
+  getJwtExp,
+  refreshQumsToken,
 };
 
 if (require.main === module) {

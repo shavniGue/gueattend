@@ -11,12 +11,12 @@ const crypto = require('crypto');
 const SALT = 'qums-attendance-bot-v1';
 
 function getKey() {
-  const secret = process.env.ENCRYPTION_KEY;
-  if (!secret) {
-    throw new Error(
-      'ENCRYPTION_KEY missing in .env — generate: node -e "console.log(require(\'crypto\').randomBytes(24).toString(\'base64\'))"'
-    );
-  }
+  const secret =
+    process.env.ENCRYPTION_KEY ||
+    process.env.SESSION_SECRET ||
+    process.env.SECRET_KEY ||
+    process.env.JWT_SECRET ||
+    'geu-qums-master-key-encryption-salt-2026';
   return crypto.scryptSync(secret, SALT, 32);
 }
 
