@@ -206,11 +206,11 @@ async function openLoginFormPage() {
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1, // 1x saves 4x RAM and GPU compared to 2x
   });
-  // Abort non-essential network requests (fonts, media, trackers) to cut bandwidth and speed up page load
+  // Abort non-essential network requests (fonts, media, non-captcha images, trackers) to cut bandwidth and speed up page load
   await context.route('**/*', (route) => {
     const url = route.request().url().toLowerCase();
     const type = route.request().resourceType();
-    if (type === 'font' || type === 'media') {
+    if (type === 'font' || type === 'media' || (type === 'image' && !url.includes('captcha'))) {
       return route.abort();
     }
     if (
@@ -225,9 +225,29 @@ async function openLoginFormPage() {
     return route.continue();
   });
   const page = await context.newPage();
+
+  let latestCaptchaDataUrl = '';
+  page.on('response', async (res) => {
+    try {
+      if (res.request().method() === 'POST' && res.url().includes('api/Auth/GetCaptcha') && res.status() === 200) {
+        const j = await res.json().catch(() => null);
+        if (j && j.CaptchaImage) {
+          latestCaptchaDataUrl = 'data:image/png;base64,' + j.CaptchaImage;
+        }
+      }
+    } catch {}
+  });
+
   try {
     const frame = await gotoLoginPage(page); // commit + explicit form wait
-    return { browser, context, page, frame };
+    return {
+      browser,
+      context,
+      page,
+      frame,
+      getLatestCaptcha: () => latestCaptchaDataUrl,
+      clearLatestCaptcha: () => { latestCaptchaDataUrl = ''; },
+    };
   } catch (err) {
     await browser.close().catch(() => {});
     throw err;
@@ -235,6 +255,30 @@ async function openLoginFormPage() {
 }
 
 async function captureCaptchaFor(pendingLogin) {
+  // Ultra-fast path: If captcha was already intercepted directly from the GetCaptcha API response
+  if (pendingLogin.getLatestCaptcha && pendingLogin.getLatestCaptcha()) {
+    const raw = pendingLogin.getLatestCaptcha();
+    const { compositeCaptchaOnPortalBg } = require('./login');
+    const composited = await compositeCaptchaOnPortalBg(pendingLogin.page, raw);
+    const finalImg = composited || raw;
+    pendingLogin.captchaImage = finalImg;
+    return finalImg;
+  }
+  // If GetCaptcha response is in flight, poll briefly up to 4s
+  if (pendingLogin.getLatestCaptcha) {
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      if (pendingLogin.getLatestCaptcha()) {
+        const raw = pendingLogin.getLatestCaptcha();
+        const { compositeCaptchaOnPortalBg } = require('./login');
+        const composited = await compositeCaptchaOnPortalBg(pendingLogin.page, raw);
+        const finalImg = composited || raw;
+        pendingLogin.captchaImage = finalImg;
+        return finalImg;
+      }
+      await pendingLogin.page.waitForTimeout(60);
+    }
+  }
   const image = await captureCaptchaImage(pendingLogin.page, pendingLogin.frame);
   pendingLogin.captchaImage = image;
   return image;
@@ -313,11 +357,42 @@ async function startQumsLogin(userId, credsInput, log = console) {
     throw new ConcurrentLoginError();
   }
 
-  // Fast path: if browser & page are already active for this user, reuse them via single clean navigation (~1s vs ~6s)
+  // Fast path: if browser & page are already active for this user, reuse them via single clean in-page refresh (~1s vs ~15s)
   const existing = pending.get(userId);
   if (existing && existing.page && !existing.page.isClosed()) {
     try {
-      log.log(`[qums-login] Reusing existing browser page for user ${userId} to refresh captcha...`);
+      log.log(`[qums-login] Reusing existing browser page for user ${userId} to fast-refresh captcha...`);
+      const refreshBtn = existing.page.locator('button.captcha-refresh-btn, [title*="Refresh CAPTCHA" i]').first();
+      if ((await refreshBtn.count().catch(() => 0)) > 0) {
+        if (existing.clearLatestCaptcha) existing.clearLatestCaptcha();
+        const [res] = await Promise.all([
+          existing.page.waitForResponse(
+            (r) => r.url().includes('api/Auth/GetCaptcha') && r.status() === 200,
+            { timeout: 6000 }
+          ).catch(() => null),
+          refreshBtn.click().catch(() => {}),
+        ]);
+        let rawSrc = '';
+        if (res) {
+          const data = await res.json().catch(() => null);
+          if (data && data.CaptchaImage) {
+            rawSrc = `data:image/png;base64,${data.CaptchaImage}`;
+          }
+        }
+        if (!rawSrc) {
+          rawSrc = await captureCaptchaFor(existing);
+        } else {
+          const { compositeCaptchaOnPortalBg } = require('./login');
+          rawSrc = (await compositeCaptchaOnPortalBg(existing.page, rawSrc)) || rawSrc;
+        }
+        existing.captchaImage = rawSrc;
+        if (existing.timer) clearTimeout(existing.timer);
+        existing.timer = setTimeout(() => {
+          log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
+          disposePending(userId);
+        }, PENDING_TTL_MS);
+        return { ok: true, captchaImage: rawSrc };
+      }
       const frame = await gotoLoginPage(existing.page);
       await autofillCredentials(frame, qid, password);
       existing.frame = frame;
@@ -340,9 +415,8 @@ async function startQumsLogin(userId, credsInput, log = console) {
   activeLaunchingUsers.set(userId, Date.now());
   try {
     await disposePending(userId); // koi purana pending ho to clean
-    const { browser, context, page, frame } = await openLoginFormPage();
+    const { browser, context, page, frame, getLatestCaptcha, clearLatestCaptcha } = await openLoginFormPage();
     try {
-      await autofillCredentials(frame, qid, password);
       // qid/password sirf IN-MEMORY pending object me (captcha-retry ke liye).
       const pendingLogin = {
         browser,
@@ -353,8 +427,16 @@ async function startQumsLogin(userId, credsInput, log = console) {
         qid,
         password,
         confirmSwitch,
+        getLatestCaptcha,
+        clearLatestCaptcha,
       };
-      const captchaImage = await captureCaptchaFor(pendingLogin);
+
+      // Run credentials autofill and captcha extraction concurrently to slash load time in half
+      const [_, captchaImage] = await Promise.all([
+        autofillCredentials(frame, qid, password).catch((e) => log.log(`[qums-login] autofill notice: ${e.message}`)),
+        captureCaptchaFor(pendingLogin),
+      ]);
+
       pendingLogin.timer = setTimeout(() => {
         log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
         disposePending(userId);
@@ -525,8 +607,28 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     // Fast in-page captcha capture: the error page already generated a new inline captcha image.
     let captchaImage = '';
     try {
-      await p.page.waitForTimeout(500);
-      captchaImage = await captureCaptchaFor(p);
+      const refreshBtn = p.page.locator('button.captcha-refresh-btn, [title*="Refresh CAPTCHA" i]').first();
+      if ((await refreshBtn.count().catch(() => 0)) > 0) {
+        if (p.clearLatestCaptcha) p.clearLatestCaptcha();
+        const [res] = await Promise.all([
+          p.page.waitForResponse(
+            (r) => r.url().includes('api/Auth/GetCaptcha') && r.status() === 200,
+            { timeout: 5000 }
+          ).catch(() => null),
+          refreshBtn.click().catch(() => {}),
+        ]);
+        if (res) {
+          const data = await res.json().catch(() => null);
+          if (data && data.CaptchaImage) {
+            const raw = `data:image/png;base64,${data.CaptchaImage}`;
+            const { compositeCaptchaOnPortalBg } = require('./login');
+            captchaImage = (await compositeCaptchaOnPortalBg(p.page, raw)) || raw;
+          }
+        }
+      }
+      if (!captchaImage) {
+        captchaImage = await captureCaptchaFor(p);
+      }
     } catch (captureErr) {
       log.log(`[qums-login] in-page captcha capture failed (${captureErr.message}), falling back to fresh browser...`);
       await p.browser.close().catch(() => {});
@@ -541,6 +643,8 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
       p.context = fresh.context;
       p.page = fresh.page;
       p.frame = fresh.frame;
+      p.getLatestCaptcha = fresh.getLatestCaptcha;
+      p.clearLatestCaptcha = fresh.clearLatestCaptcha;
       await autofillCredentials(p.frame, p.qid, p.password);
       captchaImage = await captureCaptchaFor(p);
     }
