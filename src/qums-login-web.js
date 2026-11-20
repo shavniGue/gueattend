@@ -449,6 +449,18 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     }
   }
 
+  // Strict verification: Verify authenticated cookies in the active browser context
+  if (outcome === 'navigated') {
+    const cookies = await p.context.cookies().catch(() => []);
+    const hasAuth = cookies.some((c) => c && c.name === 'jwt' && c.value && c.value.length > 20);
+    if (!hasAuth && isLoginLikeUrl(p.page.url())) {
+      outcome = 'validation_error';
+      if (!portalError) {
+        portalError = 'Captcha galat lagii ya login nahi hua — nayi captcha le lo, dobara try karo.';
+      }
+    }
+  }
+
   if (outcome !== 'navigated') {
     // Read the exact error rendered on the portal
     try {
@@ -640,12 +652,14 @@ async function completeQumsSetup(userId, qid, { password, confirmSwitch = false 
     }
   }
 
-  if (password) {
+  if (password && String(password).trim() !== '') {
     try {
-      patch.qumsPasswordEncrypted = encryptSecret(password);
+      patch.qumsPasswordEncrypted = encryptSecret(String(password).trim());
     } catch (err) {
       console.error('[qums-login] password encryption failed:', err.message);
     }
+  } else if (user && user.qumsPasswordEncrypted) {
+    patch.qumsPasswordEncrypted = user.qumsPasswordEncrypted;
   }
 
   if (isFirstTime) {

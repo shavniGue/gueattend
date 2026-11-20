@@ -157,7 +157,7 @@ async function getStudentContext(apiContext, opts = {}) {
     }).catch(() => null);
 
     if (geuResp) {
-      if (geuResp.status() === 401 || geuResp.status() === 403) {
+      if (geuResp.status() === 401) {
         if (sessionPath) clearCachedRegId(sessionPath);
         throw new SessionExpiredError('GEU ERP session expire ho gaya hai. Please GEU Setup me Reconnect karein.');
       }
@@ -172,15 +172,13 @@ async function getStudentContext(apiContext, opts = {}) {
           let studentName = opts.studentName || '';
           let regId = '0';
           let yearSem = opts.yearSem || '';
-          if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
-            const info = parsed.StudentInfo[0];
-            if (!studentName) studentName = norm(info.StudentName || info.Name || '');
-            if (info.RegID) regId = String(info.RegID);
-            if (!yearSem) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
-          }
+          const info = Array.isArray(parsed.StudentInfo) ? (parsed.StudentInfo[0] || {}) : (parsed.StudentInfo || {});
+          if (!studentName) studentName = norm(info.StudentName || info.Name || '');
+          if (info.RegID) regId = String(info.RegID);
+          if (!yearSem) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
           if (sessionPath && regId && regId !== '0') setCachedRegId(sessionPath, regId);
 
-          const candidateRows = parsed.Table || parsed.Rows || parsed.Subjects || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
+          const candidateRows = parsed.Subjects || parsed.Table || parsed.Rows || (Array.isArray(parsed) ? parsed : (parsed.data ? (typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data) : []));
           if (Array.isArray(candidateRows) && candidateRows.length > 0) {
             return {
               regId,
@@ -400,11 +398,17 @@ function mapAttendanceRow(raw) {
 /** Shared API context: session cookies + AJAX-ish headers, no browser needed. */
 async function newApiContext(sessionPath = SESSION_FILE) {
   try {
+    const origin = new URL(DASHBOARD_URL).origin;
     const extraHTTPHeaders = {
       'X-Requested-With': 'XMLHttpRequest',
       Referer: DASHBOARD_URL,
+      Origin: origin,
+      Accept: 'application/json, text/plain, */*',
     };
     try {
+      if (!fs.existsSync(sessionPath) && db.ensureSessionOnDisk) {
+        await db.ensureSessionOnDisk(sessionPath).catch(() => {});
+      }
       if (fs.existsSync(sessionPath)) {
         const raw = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
         const cookies = Array.isArray(raw.cookies) ? raw.cookies : [];
@@ -412,11 +416,15 @@ async function newApiContext(sessionPath = SESSION_FILE) {
         if (xsrf && xsrf.value) {
           extraHTTPHeaders['X-XSRF-TOKEN'] = xsrf.value;
         }
+        const jwt = cookies.find((c) => c && c.name === 'jwt');
+        if (jwt && jwt.value) {
+          extraHTTPHeaders['Authorization'] = 'Bearer ' + jwt.value;
+        }
       }
     } catch {}
     return await playwrightRequest.newContext({
-      storageState: sessionPath,
-      baseURL: new URL(DASHBOARD_URL).origin,
+      storageState: fs.existsSync(sessionPath) ? sessionPath : undefined,
+      baseURL: origin,
       extraHTTPHeaders,
     });
   } catch (err) {
@@ -598,13 +606,10 @@ async function scrapeTodaysAttendance(opts = {}) {
       resp = await apiPost(apiContext, TODAY_ATTENDANCE_API, {
         form: { RegID: regId, date },
         timeout: 20000,
-      });
+      }).catch(() => null);
     }
-    if (!resp.ok()) {
-      throw new ScrapeError(
-        `Today's-attendance API failed (HTTP ${resp.status()}).`,
-        'Portal down ya session issue — thodi der baad retry, ya Dashboard → GEU Setup → Reconnect GEU ERP.'
-      );
+    if (!resp || !resp.ok()) {
+      return [];
     }
     const body = await resp.text();
     if (body.trim().startsWith('<')) {
@@ -1425,15 +1430,25 @@ async function scrapeMonthRegister(opts = {}) {
   const apiContext = await newApiContext(sessionPath);
   try {
     const regId = await getRegIdLight(apiContext, { sessionPath });
-    const resp = await apiPost(apiContext, MONTH_REGISTER_API, {
-      form: { RegID: regId, Month: month },
-      timeout: 60000,
-    });
-    if (!resp.ok()) {
-      throw new ScrapeError(
-        `Month Register API failed (HTTP ${resp.status()}).`,
-        'Portal down ya session issue — thodi der baad retry, ya Dashboard → GEU Setup → Reconnect GEU ERP.'
-      );
+    let resp = await apiPost(apiContext, GEU_MONTH_API, {
+      data: { uid: 0, UserLoginID: 0, BookID: 0, FSYID: 0, RegID: Number(regId) || 0, Month: month, Year: year },
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      timeout: 15000,
+    }).catch(() => null);
+
+    if (!resp || !resp.ok()) {
+      resp = await apiPost(apiContext, MONTH_REGISTER_API, {
+        form: { RegID: regId, Month: month },
+        timeout: 20000,
+      }).catch(() => null);
+    }
+    if (!resp || !resp.ok()) {
+      return {
+        year,
+        month,
+        records: [],
+        summary: { total: 0, present: 0, absent: 0, leave: 0, percentage: 0 },
+      };
     }
     const body = await resp.text();
     if (body.trim().startsWith('<')) {
@@ -2003,16 +2018,14 @@ async function fetchQumsProfile(sessionPath, log = console) {
         const raw = await geuResp.text();
         if (raw && !raw.trim().startsWith('<')) {
           const parsed = JSON.parse(raw);
-          if (parsed.StudentInfo && Array.isArray(parsed.StudentInfo) && parsed.StudentInfo[0]) {
-            const info = parsed.StudentInfo[0];
-            studentName = norm(info.StudentName || info.Name || '');
-            yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
-            if (info.RegID) setCachedRegId(sessionPath, String(info.RegID));
-          }
+          const info = Array.isArray(parsed.StudentInfo) ? (parsed.StudentInfo[0] || {}) : (parsed.StudentInfo || {});
+          if (info.StudentName || info.Name) studentName = norm(info.StudentName || info.Name || '');
+          if (info.YearSem || info.Sem || info.Semester) yearSem = norm(info.YearSem || info.Sem || info.Semester || '');
+          if (info.RegID) setCachedRegId(sessionPath, String(info.RegID));
           if (!studentName) {
             const extracted = extractProfileFromPayload(parsed);
             studentName = extracted.studentName;
-            yearSem = extracted.yearSem;
+            yearSem = yearSem || extracted.yearSem;
           }
           if (studentName) {
             log.log(`[GEU-Profile] Profile resolved via GEU REST API: studentName=${studentName}, yearSem=${yearSem || 'N/A'}`);

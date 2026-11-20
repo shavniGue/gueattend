@@ -1062,6 +1062,7 @@ async function updateUser(id, patch) {
   const values = [id];
   for (const [appKey, column] of Object.entries(WRITABLE_USER_COLUMNS)) {
     if (!(appKey in patch)) continue;
+    if (appKey === 'qumsPasswordEncrypted' && (patch[appKey] === undefined || patch[appKey] === null)) continue;
     let v = merged[appKey];
     if (v === undefined || v === null) v = (appKey === 'isAdmin' || appKey === 'emailVerified' || appKey === 'isSuspended') ? false : '';
     values.push(v);

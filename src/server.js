@@ -864,7 +864,7 @@ app.get(['/api/status', '/api/geu/status'], requireAuth, async (req, res) => {
         geuId: user.qumsQid || '',
         qumsSessionPath: user.qumsSessionPath || '',
         qumsSessionStatus: user.qumsSessionStatus || 'not_setup',
-        hasPassword: Boolean(user.qumsPasswordEncrypted),
+        hasPassword: hasSavedCreds,
       },
       hasSavedQumsCredentials: hasSavedCreds,
       hasSavedGeuCredentials: hasSavedCreds,
