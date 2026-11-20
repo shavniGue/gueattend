@@ -218,8 +218,7 @@ async function openLoginFormPage() {
       url.includes('googletagmanager') ||
       url.includes('facebook') ||
       url.includes('razorpay') ||
-      url.includes('cloudflareinsights') ||
-      url.includes('challenges.cloudflare.com')
+      url.includes('cloudflareinsights')
     ) {
       return route.abort();
     }
@@ -388,6 +387,8 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
   const captchaInput = await locateCaptchaInput(p.frame);
   await captchaInput.fill(captchaText);
+  await captchaInput.dispatchEvent('input').catch(() => {});
+  await captchaInput.dispatchEvent('change').catch(() => {});
 
   // Fast response detection: submit form and wait for POST response & DOM load.
   // This guarantees we evaluate only the response to THIS attempt, eliminating
@@ -398,14 +399,21 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
   try {
     const [res] = await Promise.all([
       p.page.waitForResponse(
-        (r) =>
-          r.request().method() === 'POST' &&
-          (r.url().includes('login') ||
-            r.url().includes('Login') ||
-            r.url().includes('api/Auth') ||
-            r.url().includes('N0j5Ha0') ||
-            r.url().includes('qums') ||
-            r.url().includes('/api/')),
+        (r) => {
+          if (r.request().method() !== 'POST') return false;
+          const url = r.url();
+          // Explicitly ignore challenge or captcha fetching calls
+          if (url.includes('PreLoginChallenge') || url.includes('GetCaptcha')) return false;
+          return (
+            url.includes('/api/Auth/Login') ||
+            url.includes('/api/Auth') ||
+            url.includes('Login') ||
+            url.includes('login') ||
+            url.includes('qums') ||
+            url.includes('N0j5Ha0') ||
+            url.includes('/api/')
+          );
+        },
         { timeout: 15000 }
       ).catch(() => null),
       clickLoginButton(p.frame),
@@ -451,8 +459,17 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
   // Strict verification: Verify authenticated cookies in the active browser context
   if (outcome === 'navigated') {
-    const cookies = await p.context.cookies().catch(() => []);
-    const hasAuth = cookies.some((c) => c && c.name === 'jwt' && c.value && c.value.length > 20);
+    let hasAuth = false;
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const cookies = await p.context.cookies().catch(() => []);
+      hasAuth = cookies.some((c) => c && c.name === 'jwt' && c.value && c.value.length > 20);
+      if (hasAuth || !isLoginLikeUrl(p.page.url())) {
+        hasAuth = true;
+        break;
+      }
+      await p.page.waitForTimeout(200);
+    }
     if (!hasAuth && isLoginLikeUrl(p.page.url())) {
       outcome = 'validation_error';
       if (!portalError) {

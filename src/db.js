@@ -941,10 +941,8 @@ function fromUserRow(r) {
     reconnectCountWeb: Number(r.reconnect_count_web || 0),
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : '',
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : '',
+    qumsPasswordEncrypted: r.qums_password_encrypted || '',
   };
-  if (r.qums_password_encrypted) {
-    row.qumsPasswordEncrypted = r.qums_password_encrypted;
-  }
   return row;
 }
 

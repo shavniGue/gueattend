@@ -901,12 +901,17 @@ async function handleUserMessage(msg, log = console) {
     }
   }
 
+  // Auto-uppercase and clean captcha text so user typing lowercase, uppercase,
+  // or mixed case (e.g. "ujgkel" -> "UJGKEL") is always seamlessly accepted.
+  const cleanCaptcha = String(text || '').trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!cleanCaptcha) return;
+
   rState.submitting = true;
   rState.attempts += 1;
 
   try {
     const qumsLogin = require('./qums-login-web');
-    const result = await qumsLogin.submitQumsCaptcha(user.id, text, log, { source: 'telegram' });
+    const result = await qumsLogin.submitQumsCaptcha(user.id, cleanCaptcha, log, { source: 'telegram' });
 
     if (result && result.ok) {
       log.log(`[telegram-reconnect] ✅ CAPTCHA validated successfully for user ${user.id}`);
