@@ -264,17 +264,17 @@ const sendPage = (name) => (req, res) => res.sendFile(path.join(PUBLIC_DIR, name
  * invented support address is never rendered.
  */
 function withContactEmail(html) {
-  const configured = String(process.env.CONTACT_EMAIL || 'karansin8672@gmail.com').trim();
+  const configured = String(process.env.CONTACT_EMAIL || 'shavnikumarigue@gmail.com').trim();
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configured);
   const escapeHtml = (s) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return html
-    .replace(/__CONTACT_EMAIL__/g, valid ? escapeHtml(configured) : 'karansin8672@gmail.com')
+    .replace(/__CONTACT_EMAIL__/g, valid ? escapeHtml(configured) : 'shavnikumarigue@gmail.com')
     .replace(
       /__CONTACT_EMAIL_NOTE__/g,
       valid
-        ? 'Direct support & developer email for QAttend assistance.'
-        : 'Direct support email for QAttend assistance.'
+        ? 'Direct support & developer email for GUEAttend assistance.'
+        : 'Direct support email for GUEAttend assistance.'
     );
 }
 
@@ -732,13 +732,13 @@ app.post('/api/contact', rateLimit('/api/contact'), async (req, res) => {
 
     console.log(`[contact] Message received from ${trimmedName} <${trimmedEmail}>: [${trimmedCategory}] ${trimmedSubject || '(No subject)'}`);
 
-    const toEmail = String(process.env.CONTACT_EMAIL || 'karansin8672@gmail.com').trim();
+    const toEmail = String(process.env.CONTACT_EMAIL || 'shavnikumarigue@gmail.com').trim();
     if (mailer.mailerProvider() === 'resend') {
       try {
         const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         await mailer.sendMail({
           to: toEmail,
-          subject: `[QAttend Contact] ${trimmedCategory}: ${trimmedSubject || 'Inquiry from ' + trimmedName}`,
+          subject: `[GUEAttend Contact] ${trimmedCategory}: ${trimmedSubject || 'Inquiry from ' + trimmedName}`,
           text: `Name: ${trimmedName}\nEmail: ${trimmedEmail}\nCategory: ${trimmedCategory}\nSubject: ${trimmedSubject}\n\nMessage:\n${trimmedMessage}`,
           html: `<p><strong>Name:</strong> ${esc(trimmedName)}</p><p><strong>Email:</strong> ${esc(trimmedEmail)}</p><p><strong>Category:</strong> ${esc(trimmedCategory)}</p><p><strong>Subject:</strong> ${esc(trimmedSubject)}</p><hr/><p style="white-space:pre-wrap;">${esc(trimmedMessage)}</p>`
         });

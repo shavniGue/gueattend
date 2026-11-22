@@ -379,6 +379,10 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
   const captchaInput = await locateCaptchaInput(p.frame);
   await captchaInput.fill(captchaText);
+  await captchaInput.dispatchEvent('input').catch(() => {});
+  await captchaInput.dispatchEvent('change').catch(() => {});
+  await captchaInput.dispatchEvent('blur').catch(() => {});
+  await captchaInput.dispatchEvent('keyup').catch(() => {});
 
   // Fast response detection: submit form and wait for POST response & DOM load.
   // This guarantees we evaluate only the response to THIS attempt, eliminating
@@ -399,7 +403,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
             r.url().includes('/api/')),
         { timeout: 15000 }
       ).catch(() => null),
-      clickLoginButton(p.frame),
+      clickLoginButton(p.frame || p.page),
     ]);
     postResponse = res;
     await p.page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});

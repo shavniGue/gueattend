@@ -136,15 +136,26 @@ async function locateCaptchaInput(frame) {
  */
 async function clickLoginButton(frame) {
   const candidateSelectors = [
+    'button.login-btn',
     'button.login-btn-plain',
     'button[type="submit"]',
+    'form#login-form button[type="submit"]',
+    'button#btnLogin',
+    'input#btnLogin',
+    'button.btnSubmit',
+    'button.btn-login',
+    'button.btn-primary',
+    'input[type="submit"]',
     'button:has-text("Login")',
     'button:has-text("Sign In")',
-    'button.btnSubmit',
-    'input[type="submit"]',
-    'button.btn-primary',
+    'button:has-text("Log In")',
+    'input[value*="Login" i]',
+    'input[value*="Sign In" i]',
+    'input[value*="Log In" i]',
     'a:has-text("Login")',
     'a:has-text("Sign In")',
+    'a.login-btn',
+    '[role="button"]:has-text("Login")',
   ];
 
   for (const sel of candidateSelectors) {
@@ -153,8 +164,13 @@ async function clickLoginButton(frame) {
       if ((await loc.count().catch(() => 0)) > 0) {
         await loc.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         await loc.scrollIntoViewIfNeeded().catch(() => {});
-        await loc.click({ timeout: 4000 });
-        return;
+        try {
+          await loc.click({ timeout: 2500 });
+          return;
+        } catch {
+          await loc.click({ timeout: 2500, force: true });
+          return;
+        }
       }
     } catch {
       /* try next candidate */
@@ -165,10 +181,13 @@ async function clickLoginButton(frame) {
   try {
     const clicked = await frame.evaluate(() => {
       const btn = document.querySelector(
-        'button.login-btn-plain, button[type="submit"], button.btnSubmit, input[type="submit"], button.btn-primary, [role="button"]'
-      ) || Array.from(document.querySelectorAll('button')).find((b) => /login|sign in/i.test(b.innerText || ''));
+        'button.login-btn, button.login-btn-plain, button[type="submit"], form#login-form button[type="submit"], button#btnLogin, input#btnLogin, button.btnSubmit, button.btn-login, button.btn-primary, input[type="submit"], [role="button"]'
+      ) || Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, [role="button"]')).find((b) =>
+        /login|sign in|log in/i.test(b.innerText || b.textContent || b.value || b.getAttribute('aria-label') || b.getAttribute('title') || '')
+      );
       if (btn) {
         btn.removeAttribute('disabled');
+        btn.disabled = false;
         btn.click();
         return true;
       }
@@ -181,6 +200,30 @@ async function clickLoginButton(frame) {
     });
     if (clicked) return;
   } catch {}
+
+  // If frame has parent page and wasn't page itself, attempt one last fallback on the main page
+  if (frame && typeof frame.page === 'function') {
+    try {
+      const parentPage = frame.page();
+      if (parentPage && parentPage !== frame) {
+        const pageClicked = await parentPage.evaluate(() => {
+          const btn = document.querySelector(
+            'button.login-btn, button.login-btn-plain, button[type="submit"], form#login-form button[type="submit"], button#btnLogin, input#btnLogin, button.btnSubmit, button.btn-login, button.btn-primary, input[type="submit"], [role="button"]'
+          ) || Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, [role="button"]')).find((b) =>
+            /login|sign in|log in/i.test(b.innerText || b.textContent || b.value || b.getAttribute('aria-label') || b.getAttribute('title') || '')
+          );
+          if (btn) {
+            btn.removeAttribute('disabled');
+            btn.disabled = false;
+            btn.click();
+            return true;
+          }
+          return false;
+        });
+        if (pageClicked) return;
+      }
+    } catch {}
+  }
 
   throw new Error('Login button not found on the login form.');
 }

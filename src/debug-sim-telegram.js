@@ -29,7 +29,7 @@ const telegram = require('./telegram');
 (async () => {
   await db.init();
   const user = await db.createUser({ email: 'sim@example.com', passwordHash: 'x' });
-  await db.updateUser(user.id, { studentName: 'KARAN KUMAR' });
+  await db.updateUser(user.id, { studentName: 'SHAVNI' });
   const code = await db.telegramLinkCodeFor(user.id);
   telegram.initTelegram();
 
@@ -42,8 +42,8 @@ const telegram = require('./telegram');
   sent.forEach((s, i) => console.log(`--- message ${i + 1} ---\n${s.text}\n`));
   const all = JSON.stringify(sent);
   console.log('VERDICT contains email:', all.includes('sim@example.com') ? 'FAIL' : 'PASS (no email)');
-  console.log('VERDICT fresh greeting:', sent[0].text === '✅ Connected!\nHello KARAN KUMAR 👋\nYou will now receive attendance updates here.' ? 'PASS' : 'FAIL');
-  console.log('VERDICT repeat greeting:', sent[1].text === '✅ Already Connected!\nHello KARAN KUMAR 👋\nYou will continue to receive attendance updates here.' ? 'PASS' : 'FAIL');
+  console.log('VERDICT fresh greeting:', sent[0].text === '✅ Connected!\nHello SHAVNI 👋\nYou will now receive attendance updates here.' ? 'PASS' : 'FAIL');
+  console.log('VERDICT repeat greeting:', sent[1].text === '✅ Already Connected!\nHello SHAVNI 👋\nYou will continue to receive attendance updates here.' ? 'PASS' : 'FAIL');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });
 
