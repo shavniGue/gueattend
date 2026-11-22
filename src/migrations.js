@@ -397,6 +397,27 @@ const MIGRATIONS = [
        ON CONFLICT (user_id, geu_id) DO NOTHING`,
     ],
   },
+  {
+    id: '025_morning_schedule_and_notification_log',
+    statements: [
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_morning_schedule_date TEXT DEFAULT ''`,
+      `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS class_date TEXT DEFAULT ''`,
+      `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT ''`,
+      `CREATE TABLE IF NOT EXISTS notification_log (
+         id BIGSERIAL PRIMARY KEY,
+         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         type TEXT NOT NULL,
+         reference_id TEXT DEFAULT '',
+         dedupe_key TEXT NOT NULL,
+         sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+         metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+         UNIQUE(user_id, dedupe_key)
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_notification_log_user_type ON notification_log(user_id, type)`,
+      `CREATE INDEX IF NOT EXISTS idx_notifications_user_kind_date ON notifications(user_id, kind, class_date)`,
+      `CREATE INDEX IF NOT EXISTS idx_users_last_morning_date ON users(last_morning_schedule_date)`,
+    ],
+  },
 ];
 
 /**

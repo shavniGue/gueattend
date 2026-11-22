@@ -248,6 +248,20 @@ if (process.argv[2] === '--phase2') {
     check('S11 concurrent runs -> exactly 2 sends for 2 users (not 4)', sends.length, 2);
     check('S11 one run succeeds and concurrent run skips', [c1.sent, c2.sent].sort(), [0, 2]);
 
+    // ---- S12: Render container restart (marker file wiped to {}) -> DB dedupe prevents duplicate send ----
+    const dayOct3 = '2026-10-03T03:00:00.000Z'; // 08:30 IST
+    sends.length = 0;
+    const initRun = await scheduler.runMorningScheduleJob(quiet, opts(dayOct3));
+    check('S12 initial 8:30 run -> 2 sends', [initRun.sent, sends.length], [2, 2]);
+    // Simulate Render container restart: ephemeral disk wipes MORNING_STATE_FILE to empty {}
+    fs.writeFileSync(process.env.MORNING_STATE_FILE, '{}');
+    check('S12 simulated container restart wiped local state file', Object.keys(readState()).length, 0);
+    // Boot catch-up fires at 09:20 AM IST on the fresh container
+    sends.length = 0;
+    const restartRun = await scheduler.catchUpMorningSchedule(quiet, opts('2026-10-03T03:50:00.000Z')); // 09:20 IST
+    check('S12 catch-up on fresh container after wipe -> 0 sends (DB dedupe)', [restartRun.sent, sends.length], [0, 0]);
+    check('S12 catch-up skipped all users already notified in DB', restartRun.skipped, 2);
+
     console.log(failures === 0 ? '\nALL MORNING SCHEDULE TESTS PASSED' : `\n${failures} MORNING SCHEDULE TEST(S) FAILED`);
     process.exit(failures === 0 ? 0 : 1);
   })().catch((err) => {

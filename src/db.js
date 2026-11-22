@@ -955,6 +955,7 @@ function fromUserRow(r) {
     lastReconnectedAt: r.last_reconnected_at ? new Date(r.last_reconnected_at).toISOString() : '',
     reconnectCountTelegram: Number(r.reconnect_count_telegram || 0),
     reconnectCountWeb: Number(r.reconnect_count_web || 0),
+    lastMorningScheduleDate: r.last_morning_schedule_date || '',
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : '',
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : '',
   };
@@ -1012,6 +1013,7 @@ function blankUser({ email, passwordHash, firebaseUid, emailVerified, isSuspende
     lastReconnectedAt: '',
     reconnectCountTelegram: 0,
     reconnectCountWeb: 0,
+    lastMorningScheduleDate: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -1095,6 +1097,7 @@ const WRITABLE_USER_COLUMNS = {
   lastReconnectedAt: 'last_reconnected_at',
   reconnectCountTelegram: 'reconnect_count_telegram',
   reconnectCountWeb: 'reconnect_count_web',
+  lastMorningScheduleDate: 'last_morning_schedule_date',
   updatedAt: 'updated_at',
   lastError: 'last_error',
 };
@@ -2368,6 +2371,50 @@ async function hasNotificationLog(userId, dedupeKey) {
   return (r.rowCount || 0) > 0;
 }
 
+/**
+ * Strict persistent deduplication check for morning schedule.
+ * Prevents duplicate morning notifications across server restarts, deploys, and cold starts.
+ * Checks:
+ *  1. users.last_morning_schedule_date
+ *  2. notifications table (kind='morning_schedule', class_date=ymd)
+ *  3. notification_log table (dedupe_key='morning_schedule:<userId>:<ymd>')
+ */
+async function hasMorningScheduleBeenSent(userId, ymd) {
+  if (!userId || !ymd) return false;
+  if (!USE_PG) {
+    const user = (data.users || []).find((u) => u.id === userId);
+    if (user && user.lastMorningScheduleDate === ymd) return true;
+    const notif = (data.notifications || []).some(
+      (n) => n.userId === userId && n.kind === 'morning_schedule' && n.classDate === ymd
+    );
+    if (notif) return true;
+    const dedupeKey = `morning_schedule:${userId}:${ymd}`;
+    const logHit = (data.notificationLogs || []).some((n) => n.userId === userId && n.dedupeKey === dedupeKey);
+    return logHit;
+  }
+  await init();
+  // 1. Check user column
+  const userRes = await pool.query('SELECT last_morning_schedule_date FROM users WHERE id=$1', [userId]).catch(() => ({ rows: [] }));
+  if (userRes.rows[0] && userRes.rows[0].last_morning_schedule_date === ymd) {
+    return true;
+  }
+  // 2. Check notifications table
+  const notifRes = await pool.query(
+    'SELECT 1 FROM notifications WHERE user_id=$1 AND kind=$2 AND class_date=$3 LIMIT 1',
+    [userId, 'morning_schedule', ymd]
+  ).catch(() => ({ rowCount: 0 }));
+  if ((notifRes.rowCount || 0) > 0) {
+    return true;
+  }
+  // 3. Check notification_log table
+  const dedupeKey = `morning_schedule:${userId}:${ymd}`;
+  const logRes = await pool.query(
+    'SELECT 1 FROM notification_log WHERE user_id=$1 AND dedupe_key=$2 LIMIT 1',
+    [userId, dedupeKey]
+  ).catch(() => ({ rowCount: 0 }));
+  return (logRes.rowCount || 0) > 0;
+}
+
 async function deleteNotificationLog(userId, dedupeKey) {
   if (!userId || !dedupeKey) return false;
   if (!USE_PG) {
@@ -2934,6 +2981,7 @@ module.exports={
   saveAttendanceRecord, listAttendanceRecords,
   saveAssignmentRecord, listAssignmentRecords,
   tryRecordNotificationLog, hasNotificationLog, deleteNotificationLog, hasAttendanceBeenNotified,
+  hasMorningScheduleBeenSent,
   getIstDateString,
   // migrations / schema
   runMigrations, schemaHealth, importLocalJsonData, sslConfig,

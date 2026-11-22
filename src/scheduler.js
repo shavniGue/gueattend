@@ -254,17 +254,20 @@ async function runMorningScheduleJob(log = console, opts = {}) {
     const all = await activeUsers();
     const users = opts.userEmail ? all.filter((u) => u.email === opts.userEmail) : all;
 
-    // Per-day dedupe: check both local state file and DB notification_log
+    // Per-day dedupe: check local state file, user DB record, notifications table, and notification_log
     const state = readMorningState(stateFile);
     const pending = [];
-    for (const u of (force ? users : users.filter((u) => state[u.id] !== at.ymd))) {
+    for (const u of (force ? users : users)) {
       if (force) {
         pending.push(u);
         continue;
       }
+      if (state[u.id] === at.ymd) {
+        continue;
+      }
       const dedupeKey = `morning_schedule:${u.id}:${at.ymd}`;
       // eslint-disable-next-line no-await-in-loop
-      const alreadyInDb = await db.hasNotificationLog(u.id, dedupeKey).catch(() => false);
+      const alreadyInDb = await db.hasMorningScheduleBeenSent(u.id, at.ymd).catch(() => false);
       if (alreadyInDb) {
         state[u.id] = at.ymd;
       } else {
@@ -296,11 +299,11 @@ async function runMorningScheduleJob(log = console, opts = {}) {
         const dedupeKey = `morning_schedule:${user.id}:${at.ymd}`;
         if (!force) {
           // eslint-disable-next-line no-await-in-loop
-          const alreadyInDb = await db.hasNotificationLog(user.id, dedupeKey).catch(() => false);
+          const alreadyInDb = await db.hasMorningScheduleBeenSent(user.id, at.ymd).catch(() => false);
           if (alreadyInDb) {
             state[user.id] = at.ymd;
             writeMorningState(pruneMorningState(state, at.ymd), stateFile);
-            log.log(`[scheduler] ${user.email}: morning schedule already sent in DB — skipping duplicate.`);
+            log.log(`[scheduler] ${user.email}: morning schedule already sent in DB for ${at.ymd} — skipping duplicate.`);
             continue;
           }
         }
@@ -312,6 +315,8 @@ async function runMorningScheduleJob(log = console, opts = {}) {
           state[user.id] = at.ymd;
           writeMorningState(pruneMorningState(state, at.ymd), stateFile);
           // Persistent audit/analytics row with persistent deduplication
+          // eslint-disable-next-line no-await-in-loop
+          await db.updateUser(user.id, { lastMorningScheduleDate: at.ymd }).catch(() => {});
           // eslint-disable-next-line no-await-in-loop
           await db.tryRecordNotificationLog(user.id, 'morning_schedule', dedupeKey, { date: at.ymd }).catch(() => {});
           // eslint-disable-next-line no-await-in-loop

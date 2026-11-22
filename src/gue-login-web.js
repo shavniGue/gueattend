@@ -353,7 +353,7 @@ async function startQumsLogin(userId, credsInput, log = console) {
   }
 
   if (isConcurrentBrowserActive(userId)) {
-    log.log(`[qums-login] Concurrent login limit reached for user ${userId} (${pending.size} active sessions).`);
+    log.log(`[gue-login] Concurrent login limit reached for user ${userId} (${pending.size} active sessions).`);
     throw new ConcurrentLoginError();
   }
 
@@ -361,7 +361,7 @@ async function startQumsLogin(userId, credsInput, log = console) {
   const existing = pending.get(userId);
   if (existing && existing.page && !existing.page.isClosed()) {
     try {
-      log.log(`[qums-login] Reusing existing browser page for user ${userId} to fast-refresh captcha...`);
+      log.log(`[gue-login] Reusing existing browser page for user ${userId} to fast-refresh captcha...`);
       const refreshBtn = existing.page.locator('button.captcha-refresh-btn, [title*="Refresh CAPTCHA" i]').first();
       if ((await refreshBtn.count().catch(() => 0)) > 0) {
         if (existing.clearLatestCaptcha) existing.clearLatestCaptcha();
@@ -388,7 +388,7 @@ async function startQumsLogin(userId, credsInput, log = console) {
         existing.captchaImage = rawSrc;
         if (existing.timer) clearTimeout(existing.timer);
         existing.timer = setTimeout(() => {
-          log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
+          log.log(`[gue-login] pending login timeout for user ${userId} — browser close.`);
           disposePending(userId);
         }, PENDING_TTL_MS);
         return { ok: true, captchaImage: rawSrc };
@@ -402,12 +402,12 @@ async function startQumsLogin(userId, credsInput, log = console) {
       const captchaImage = await captureCaptchaFor(existing);
       if (existing.timer) clearTimeout(existing.timer);
       existing.timer = setTimeout(() => {
-        log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
+        log.log(`[gue-login] pending login timeout for user ${userId} — browser close.`);
         disposePending(userId);
       }, PENDING_TTL_MS);
       return { ok: true, captchaImage };
     } catch (reloadErr) {
-      log.log(`[qums-login] page reload failed (${reloadErr.message}), falling back to fresh browser...`);
+      log.log(`[gue-login] page reload failed (${reloadErr.message}), falling back to fresh browser...`);
       await disposePending(userId);
     }
   }
@@ -433,12 +433,12 @@ async function startQumsLogin(userId, credsInput, log = console) {
 
       // Run credentials autofill and captcha extraction concurrently to slash load time in half
       const [_, captchaImage] = await Promise.all([
-        autofillCredentials(frame, qid, password).catch((e) => log.log(`[qums-login] autofill notice: ${e.message}`)),
+        autofillCredentials(frame, qid, password).catch((e) => log.log(`[gue-login] autofill notice: ${e.message}`)),
         captureCaptchaFor(pendingLogin),
       ]);
 
       pendingLogin.timer = setTimeout(() => {
-        log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
+        log.log(`[gue-login] pending login timeout for user ${userId} — browser close.`);
         disposePending(userId);
       }, PENDING_TTL_MS);
       pending.set(userId, pendingLogin);
@@ -505,7 +505,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     postResponse = res;
     await p.page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
   } catch (err) {
-    log.log(`[qums-login] POST submission error or timeout for user ${userId}: ${err.message}`);
+    log.log(`[gue-login] POST submission error or timeout for user ${userId}: ${err.message}`);
   }
 
   // Check JSON API response if present
@@ -594,7 +594,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
       userMessage = 'GEU portal did not respond in time (network timeout). Please try again in a moment.';
     }
 
-    log.log(`[qums-login] Login attempt failed for user ${userId}: [${errorCode}] ${userMessage} (portal: "${portalError}")`);
+    log.log(`[gue-login] Login attempt failed for user ${userId}: [${errorCode}] ${userMessage} (portal: "${portalError}")`);
 
     if (outcome === 'timeout') {
       await disposePending(userId);
@@ -632,7 +632,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
         captchaImage = await captureCaptchaFor(p);
       }
     } catch (captureErr) {
-      log.log(`[qums-login] in-page captcha capture failed (${captureErr.message}), falling back to fresh browser...`);
+      log.log(`[gue-login] in-page captcha capture failed (${captureErr.message}), falling back to fresh browser...`);
       await p.browser.close().catch(() => {});
       activeLaunchingUserId = userId;
       let fresh;
@@ -653,7 +653,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
 
     if (p.timer) clearTimeout(p.timer);
     p.timer = setTimeout(() => {
-      log.log(`[qums-login] pending login timeout for user ${userId} — browser close.`);
+      log.log(`[gue-login] pending login timeout for user ${userId} — browser close.`);
       disposePending(userId);
     }, PENDING_TTL_MS);
 
@@ -702,7 +702,7 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
   }
   // Centralized session registry: record active Old ERP session
   await acquireSession({ identity: p.qid, userId, targetErp: 'OLD' }).catch(() => {});
-  log.log(`[qums-login] QUMS session saved for user ${userId} -> ${sessionPath}`);
+  log.log(`[gue-login] QUMS session saved for user ${userId} -> ${sessionPath}`);
 
   // Track reconnect channel (Telegram vs Webpage)
   const reconnectSource = (opts && opts.source === 'telegram') ? 'telegram' : 'web';
@@ -719,28 +719,28 @@ async function submitQumsCaptcha(userId, rawCaptchaText, log = console, opts = {
     if (Object.keys(patch).length) await db.updateUser(userId, patch);
     await db.touchUserSync(userId, { profile: true, error: '' });
     await db.clearSessionExpiry(userId);
-    log.log(`[qums-login] profile synced from QUMS (user ${userId}, yearSem=${profile.yearSem || 'unknown'}).`);
+    log.log(`[gue-login] profile synced from QUMS (user ${userId}, yearSem=${profile.yearSem || 'unknown'}).`);
   } catch (err) {
     // Name/YearSem are a cache: a lookup failure must never fail the login.
-    log.log(`[qums-login] profile fetch skipped: ${err.name || 'Error'}: ${err.message}`);
+    log.log(`[gue-login] profile fetch skipped: ${err.name || 'Error'}: ${err.message}`);
   }
 
   // Baseline vs Reconnect catch-up (run asynchronously in background so response returns immediately):
   try {
     const catchup = require('./catchup');
     if (isFirstTime) {
-      log.log(`[qums-login] initializing silent baseline for user ${userId} (QID ${p.qid})...`);
+      log.log(`[gue-login] initializing silent baseline for user ${userId} (QID ${p.qid})...`);
       catchup.initializeSilentBaseline(userId, sessionPath, log).catch((e) => {
-        log.log(`[qums-login] background baseline error: ${e.message}`);
+        log.log(`[gue-login] background baseline error: ${e.message}`);
       });
     } else {
-      log.log(`[qums-login] running reconnect catch-up for user ${userId} (QID ${p.qid})...`);
+      log.log(`[gue-login] running reconnect catch-up for user ${userId} (QID ${p.qid})...`);
       catchup.runReconnectCatchup(userId, sessionPath, log).catch((e) => {
-        log.log(`[qums-login] background reconnect catch-up error: ${e.message}`);
+        log.log(`[gue-login] background reconnect catch-up error: ${e.message}`);
       });
     }
   } catch (err) {
-    log.log(`[qums-login] baseline/catch-up deferred: ${err.message}`);
+    log.log(`[gue-login] baseline/catch-up deferred: ${err.message}`);
   }
 
   return { ok: true, sessionPath, studentName: profile.studentName || '', yearSem: profile.yearSem || '' };
@@ -779,7 +779,7 @@ async function completeQumsSetup(userId, qid, { password, confirmSwitch = false 
     try {
       patch.qumsPasswordEncrypted = encryptSecret(String(password).trim());
     } catch (err) {
-      console.error('[qums-login] password encryption failed:', err.message);
+      console.error('[gue-login] password encryption failed:', err.message);
     }
   } else if (user && user.qumsPasswordEncrypted) {
     patch.qumsPasswordEncrypted = user.qumsPasswordEncrypted;

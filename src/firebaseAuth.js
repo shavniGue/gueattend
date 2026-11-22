@@ -214,6 +214,7 @@ function friendlyTokenError(err) {
 
 let adminApp = null;
 let cachedCredentials = null;
+let hasWarnedAdminNotConfigured = false;
 
 function setCachedServiceAccount(raw) {
   if (!raw) return null;
@@ -333,7 +334,10 @@ function getFirebaseAdminApp(forceReload = false) {
       return adminApp;
     }
 
-    console.warn('[firebase] Admin SDK credentials not configured. Set FIREBASE_SERVICE_ACCOUNT_KEY in .env / Render or save it in Admin Dashboard to enable Firebase user deletion.');
+    if (!hasWarnedAdminNotConfigured) {
+      console.warn('[firebase] Admin SDK credentials not configured. Set FIREBASE_SERVICE_ACCOUNT_KEY in .env / Render or save it in Admin Dashboard to enable Firebase user deletion.');
+      hasWarnedAdminNotConfigured = true;
+    }
   } catch (err) {
     console.warn('[firebase] Could not initialize Firebase Admin SDK:', err.message);
   }
