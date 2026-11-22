@@ -143,7 +143,7 @@ async function requireAuth(req, res, next) {
   }
 }
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'shavnikumarigue@gmail.com')
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'shavnikumarigue@gmail.com,shavni39@gmail.com')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
@@ -264,12 +264,12 @@ const sendPage = (name) => (req, res) => res.sendFile(path.join(PUBLIC_DIR, name
  * invented support address is never rendered.
  */
 function withContactEmail(html) {
-  const configured = String(process.env.CONTACT_EMAIL || 'shavnikumarigue@gmail.com').trim();
+  const configured = String(process.env.CONTACT_EMAIL || 'shavni39@gmail.com').trim();
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configured);
   const escapeHtml = (s) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return html
-    .replace(/__CONTACT_EMAIL__/g, valid ? escapeHtml(configured) : 'shavnikumarigue@gmail.com')
+    .replace(/__CONTACT_EMAIL__/g, valid ? escapeHtml(configured) : 'shavni39@gmail.com')
     .replace(
       /__CONTACT_EMAIL_NOTE__/g,
       valid
@@ -732,7 +732,7 @@ app.post('/api/contact', rateLimit('/api/contact'), async (req, res) => {
 
     console.log(`[contact] Message received from ${trimmedName} <${trimmedEmail}>: [${trimmedCategory}] ${trimmedSubject || '(No subject)'}`);
 
-    const toEmail = String(process.env.CONTACT_EMAIL || 'shavnikumarigue@gmail.com').trim();
+    const toEmail = String(process.env.CONTACT_EMAIL || 'shavni39@gmail.com').trim();
     if (mailer.mailerProvider() === 'resend') {
       try {
         const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

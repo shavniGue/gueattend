@@ -27,7 +27,7 @@ const db = require('./db');
 const firebaseAuth = require('./firebaseAuth');
 const { releaseAllUserSessions } = require('./erp-session-registry');
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'shavnikumarigue@gmail.com')
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'shavnikumarigue@gmail.com,shavni39@gmail.com')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);

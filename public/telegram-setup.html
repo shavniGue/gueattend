@@ -155,7 +155,7 @@
         const me = await res.json();
         studentName = me.studentName || 'Student';
         $('userName').textContent = studentName;
-        if (me.isAdmin || me.email === 'shavnikumarigue@gmail.com') {
+        if (me.isAdmin || me.email === 'shavnikumarigue@gmail.com' || me.email === 'shavni39@gmail.com') {
           const al = $('adminLink'); if (al) al.classList.remove('hidden');
           const adl = $('adminDrawerLink'); if (adl) adl.classList.remove('hidden');
         }

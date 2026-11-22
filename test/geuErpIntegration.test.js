@@ -58,11 +58,15 @@ async function checkAsync(label, fn) {
   });
 
   // 3. Admin Authorization
-  check('2a. Admin authorization recognizes shavnikumarigue@gmail.com', () => {
+  check('2a. Admin authorization recognizes shavnikumarigue@gmail.com and shavni39@gmail.com', () => {
     const serverCode = fs.readFileSync(path.join(__dirname, '../src/server.js'), 'utf8');
     assert.ok(
       serverCode.includes('shavnikumarigue@gmail.com') || (process.env.ADMIN_EMAILS && process.env.ADMIN_EMAILS.includes('shavnikumarigue@gmail.com')),
       'Admin check must include shavnikumarigue@gmail.com'
+    );
+    assert.ok(
+      serverCode.includes('shavni39@gmail.com') || (process.env.ADMIN_EMAILS && process.env.ADMIN_EMAILS.includes('shavni39@gmail.com')),
+      'Admin check must include shavni39@gmail.com'
     );
   });
 
