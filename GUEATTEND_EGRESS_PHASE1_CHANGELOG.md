@@ -1,4 +1,4 @@
-# QAttend — Supabase Egress Optimization: Phase 1 Implementation & Changelog
+# GUEAttend — Supabase Egress Optimization: Phase 1 Implementation & Changelog
 
 **Date:** 16 November 2026  
 **Status:** Completed & Verified  
@@ -8,12 +8,12 @@
 
 ## 1. Executive Summary
 
-Based on the verified audit findings in `QATTEND_EGRESS_AUDIT_VERIFICATION.md`, three high-impact, non-breaking Phase 1 egress optimizations have been implemented and verified.
+Based on the verified audit findings in `GUEATTEND_EGRESS_AUDIT_VERIFICATION.md`, three high-impact, non-breaking Phase 1 egress optimizations have been implemented and verified.
 
 These optimizations target the three most frequent database queries identified in `pg_stat_statements`:
 1. **Redundant `listKnownAttendance` call in `watcher.js`:** The duplicate fetch within `runMonthRegisterCycle()` was removed, reusing the already-fetched `known` array and patching it in memory.
 2. **Redundant `getUserById` in `touchUserSync()`:** `db.touchUserSync()` previously fetched the complete user row via `getUserById(userId)` on every sync (~170,000 calls), even though all 13 callers discard the return value. This was replaced with `{ ok: true, touched: true }`.
-3. **Session blob exclusion in `allUsers()`:** `allUsers()` previously fetched large Playwright storage state JSONs (`qums_session_data` and `new_erp_session_data`) for all 185 users on every cycle (~740 KB per call, 184 calls/day = ~136 MB/day). It now selects explicit columns with a lightweight `__HAS_SESSION__` indicator, leaving full session restoration to on-demand single-user queries when needed.
+3. **Session blob exclusion in `allUsers()`:** `allUsers()` previously fetched large Playwright storage state JSONs (`gue_session_data` and `new_erp_session_data`) for all 185 users on every cycle (~740 KB per call, 184 calls/day = ~136 MB/day). It now selects explicit columns with a lightweight `__HAS_SESSION__` indicator, leaving full session restoration to on-demand single-user queries when needed.
 
 ---
 
@@ -106,7 +106,7 @@ These optimizations target the three most frequent database queries identified i
     return { ok: true, touched: (r.rowCount || 0) > 0 };
   }
   ```
-- **Rationale:** All 13 call sites across `catchup.js`, `scraper.js`, `alerts.js`, `qums-login-web.js`, `watcher.js`, and `assignments.js` discard the return value of `touchUserSync()`. Calling `getUserById(userId)` after every single touch resulted in ~170,825 redundant `SELECT * FROM users WHERE id=$1 LIMIT 1` queries. Returning `{ ok: true, touched: true }` eliminates this query completely while maintaining a clear and truthy return contract.
+- **Rationale:** All 13 call sites across `catchup.js`, `scraper.js`, `alerts.js`, `gue-login-web.js`, `watcher.js`, and `assignments.js` discard the return value of `touchUserSync()`. Calling `getUserById(userId)` after every single touch resulted in ~170,825 redundant `SELECT * FROM users WHERE id=$1 LIMIT 1` queries. Returning `{ ok: true, touched: true }` eliminates this query completely while maintaining a clear and truthy return contract.
 - **Estimated Egress Savings:** ~150–200 MB/day (~4.5–6.0 GB/month).
 
 ---
@@ -117,15 +117,15 @@ These optimizations target the three most frequent database queries identified i
 - **Changes:**
   1. **Column Projection:** Defined `ALL_USERS_COLUMNS` selecting explicit columns and replacing heavy session JSON blobs with lightweight indicator strings:
      ```sql
-     CASE WHEN (qums_session_data IS NOT NULL AND qums_session_data != '') THEN '__HAS_SESSION__' ELSE '' END AS qums_session_data,
+     CASE WHEN (gue_session_data IS NOT NULL AND gue_session_data != '') THEN '__HAS_SESSION__' ELSE '' END AS gue_session_data,
      CASE WHEN (new_erp_session_data IS NOT NULL AND new_erp_session_data != '') THEN '__HAS_SESSION__' ELSE '' END AS new_erp_session_data
      ```
-  2. **Row Mapper (`fromUserRow`):** Preserves `u.qumsSessionData` as a truthy string (`'__HAS_SESSION__'`), preserving `Boolean(u.qumsSessionData)` across admin cards, stats, and watcher loops. Skips unnecessary JSON decode attempts when `r.qums_session_data === '__HAS_SESSION__'`.
+  2. **Row Mapper (`fromUserRow`):** Preserves `u.gueSessionData` as a truthy string (`'__HAS_SESSION__'`), preserving `Boolean(u.gueSessionData)` across admin cards, stats, and watcher loops. Skips unnecessary JSON decode attempts when `r.gue_session_data === '__HAS_SESSION__'`.
   3. **On-Demand Single-User Session Hydration:** In `ensureSessionOnDisk(user)` and `ensureNewErpSessionOnDisk(user)`, checks:
      ```javascript
      if ((!sessionData || sessionData === '__HAS_SESSION__') && USE_PG) { ... }
      ```
-     If the container does not yet have `/tmp/qattend_sessions/user_${id}.json` on disk, it fetches the single user's session blob once (`SELECT qums_session_data FROM users WHERE id=$1`), writes it to disk with mode 0600, and caches it locally. Subsequent cycles use the local disk file with zero database traffic.
+     If the container does not yet have `/tmp/gueattend_sessions/user_${id}.json` on disk, it fetches the single user's session blob once (`SELECT gue_session_data FROM users WHERE id=$1`), writes it to disk with mode 0600, and caches it locally. Subsequent cycles use the local disk file with zero database traffic.
   4. **Helper Exported:** Added and exported `getUserSessionData(userId, erpType = 'OLD')` for any single-user session extraction needs.
 - **Estimated Egress Savings:** Payload per `allUsers()` call reduced from ~740 KB to ~40 KB (~95% reduction). Across 184 executions/day, saves ~128 MB/day (~3.8 GB/month).
 
@@ -154,4 +154,4 @@ A dedicated test suite was added to verify:
 | 3. Exclude session blobs from `allUsers()` | 184 heavy payload transfers | ~128 MB | ~3.8 GB |
 | **Total Phase 1 Impact** | **~9,500+ queries/day** | **~330 – 408 MB/day** | **~10 – 12 GB/month** |
 
-This immediately brings daily Supabase egress down from ~600–900 MB/day to well under **150 MB/day**, ensuring QAttend operates safely within Supabase's 5 GB free tier without overages.
+This immediately brings daily Supabase egress down from ~600–900 MB/day to well under **150 MB/day**, ensuring GUEAttend operates safely within Supabase's 5 GB free tier without overages.

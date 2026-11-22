@@ -1,4 +1,4 @@
-# QAttend Phase 1 — Final Pre-Deployment Verification Review
+# GUEAttend Phase 1 — Final Pre-Deployment Verification Review
 
 **Date:** 16 November 2026  
 **Status:** Verification Complete & Ready for Review  
@@ -19,7 +19,7 @@ All 10 verification criteria have been confirmed through static code auditing, t
 ### 1. `allUsers()` Column & Property Contract Integrity
 - **Audit:** Checked `ALL_USERS_COLUMNS` against `fromUserRow(r)` in `src/db.js`.
 - **Finding:** Every single one of the **41 properties** on the user model is populated exactly as before:
-  `id`, `email`, `passwordHash`, `qumsQid`, `qumsSessionPath`, `qumsSessionData`, `telegramLinkCode`, `telegramChatId`, `firebaseUid`, `studentName`, `qumsYearSem`, `isAdmin`, `emailVerified`, `isSuspended`, `qumsSessionStatus`, `activeErpType`, `newErpEmail`, `newErpPasswordEncrypted`, `newErpSessionPath`, `newErpSessionData`, `newErpSessionStatus`, `newErpStudentName`, `newErpQid`, `newErpAcademicYear`, `newErpSemester`, `newErpCourse`, `newErpLastSyncedAt`, `monitoringStartedDate`, `monitoringStartedAt`, `lastAttendanceSyncAt`, `lastAssignmentSyncAt`, `attendanceLastCheckedAt`, `assignmentLastCheckedAt`, `profileSyncedAt`, `lastError`, `lastReconnectSource`, `lastReconnectedAt`, `reconnectCountTelegram`, `reconnectCountWeb`, `createdAt`, `updatedAt`.
+  `id`, `email`, `passwordHash`, `gueQid`, `gueSessionPath`, `gueSessionData`, `telegramLinkCode`, `telegramChatId`, `firebaseUid`, `studentName`, `gueYearSem`, `isAdmin`, `emailVerified`, `isSuspended`, `gueSessionStatus`, `activeErpType`, `newErpEmail`, `newErpPasswordEncrypted`, `newErpSessionPath`, `newErpSessionData`, `newErpSessionStatus`, `newErpStudentName`, `newErpQid`, `newErpAcademicYear`, `newErpSemester`, `newErpCourse`, `newErpLastSyncedAt`, `monitoringStartedDate`, `monitoringStartedAt`, `lastAttendanceSyncAt`, `lastAssignmentSyncAt`, `attendanceLastCheckedAt`, `assignmentLastCheckedAt`, `profileSyncedAt`, `lastError`, `lastReconnectSource`, `lastReconnectedAt`, `reconnectCountTelegram`, `reconnectCountWeb`, `createdAt`, `updatedAt`.
 - **Verification:** All consumers (`server.js` admin routes, `watcher.js` fast/month loops, `assignments.js`, and `scheduler.js`) receive complete, valid objects with zero missing fields.
 
 ### 2. OLD & NEW ERP Session Restoration Matrix
@@ -33,11 +33,11 @@ Both `ensureSessionOnDisk(userOrId)` and `ensureNewErpSessionOnDisk(userOrId)` w
 
 ### 3. `__HAS_SESSION__` Placeholder Safety
 - **Audit:** Audited all 19 `fs.writeFileSync` calls across `src/`.
-- **Finding:** `decodeSessionData('__HAS_SESSION__')` returns `null` because the string does not begin with `{` and fails AES-256-GCM authentication tag verification. Furthermore, `fromUserRow(r)` explicitly guards with `r.qums_session_data !== '__HAS_SESSION__'`.
+- **Finding:** `decodeSessionData('__HAS_SESSION__')` returns `null` because the string does not begin with `{` and fails AES-256-GCM authentication tag verification. Furthermore, `fromUserRow(r)` explicitly guards with `r.gue_session_data !== '__HAS_SESSION__'`.
 - **Confirmed Result:** Under no circumstance can `'__HAS_SESSION__'` ever be written into a session file on disk.
 
 ### 4. `touchUserSync()` Caller Safety
-- **Audit:** Audited all 13 call sites in `catchup.js`, `scraper.js`, `alerts.js`, `qums-login-web.js`, `watcher.js`, and `assignments.js`.
+- **Audit:** Audited all 13 call sites in `catchup.js`, `scraper.js`, `alerts.js`, `gue-login-web.js`, `watcher.js`, and `assignments.js`.
 - **Finding:** 100% of callers invoke `await db.touchUserSync(...)` purely for side-effect timestamp updates without assigning or reading the returned value.
 - **Confirmed Result:** Replacing `return getUserById(userId)` with `return { ok: true, touched: true }` eliminates ~8,541 daily `SELECT * FROM users WHERE id=$1` queries with zero caller friction.
 
@@ -106,7 +106,7 @@ All previous theoretical estimates (e.g. 150–200 MB/day or 50–80 MB/day) hav
 - Audited test suite for external network and database connections.
 - Most tests explicitly set `process.env.DATABASE_URL = ''` to run against local in-memory fixtures.
 - `test/egressPhase1.test.js` was updated to explicitly set `process.env.DATABASE_URL = ''` to guarantee strict local isolation.
-- Identified that `test/qums-credentials.test.js` and `test/newErpAndExclusivity.test.js` connect to `DATABASE_URL` if not overridden; for safe CI/local runs, execute with `DATABASE_URL="" npm test`.
+- Identified that `test/gue-credentials.test.js` and `test/newErpAndExclusivity.test.js` connect to `DATABASE_URL` if not overridden; for safe CI/local runs, execute with `DATABASE_URL="" npm test`.
 
 ### Test Execution Summary:
 1. **Isolated Invariant Suite (`test/test_phase1_isolated_invariants.js`):**
@@ -121,7 +121,7 @@ All previous theoretical estimates (e.g. 150–200 MB/day or 50–80 MB/day) hav
 ## 5. Remaining Risks & Considerations
 
 1. **Render Container Cold Starts:**
-   When a new container starts on Render, the local `/tmp/` filesystem is empty. Active users will have their session restored once via a single `SELECT qums_session_data FROM users WHERE id=$1` query (~4.8 KB). For 134 users, this is a one-time transfer of ~640 KB spread across initial scraper runs, after which all subsequent runs use disk cache.
+   When a new container starts on Render, the local `/tmp/` filesystem is empty. Active users will have their session restored once via a single `SELECT gue_session_data FROM users WHERE id=$1` query (~4.8 KB). For 134 users, this is a one-time transfer of ~640 KB spread across initial scraper runs, after which all subsequent runs use disk cache.
 2. **Phase 2 Follow-Up for Further Headroom:**
    The remaining ~158 MB/day is dominated by `session_expiry_state` (492,380 calls, ~24,600 calls/day). Phase 2 can batch or memory-cache this table to drop daily egress below 70 MB/day.
 

@@ -911,21 +911,26 @@ function fromUserRow(r) {
     id: r.id, email: r.email, passwordHash: r.password_hash,
     qumsQid: r.qums_qid || r.geu_id || '',
     geuId: r.geu_id || r.qums_qid || '',
+    gueQid: r.geu_id || r.qums_qid || '',
     qumsSessionPath: resolvedSessionPath,
     geuSessionPath: r.geu_session_path || resolvedSessionPath,
+    gueSessionPath: r.geu_session_path || resolvedSessionPath,
     qumsSessionData: r.qums_session_data || r.geu_session_data || '',
     geuSessionData: r.geu_session_data || r.qums_session_data || '',
+    gueSessionData: r.geu_session_data || r.qums_session_data || '',
     telegramLinkCode: r.telegram_link_code || '',
     telegramChatId: r.telegram_chat_id || '',
     firebaseUid: r.firebase_uid || '',
     studentName: r.student_name || '',
     qumsYearSem: r.qums_year_sem || r.geu_year_sem || '',
     geuYearSem: r.geu_year_sem || r.qums_year_sem || '',
+    gueYearSem: r.geu_year_sem || r.qums_year_sem || '',
     isAdmin: r.is_admin === true,
     emailVerified: r.email_verified === true,
     isSuspended: r.is_suspended === true,
     qumsSessionStatus: r.qums_session_status || r.geu_session_status || 'active',
     geuSessionStatus: r.geu_session_status || r.qums_session_status || 'active',
+    gueSessionStatus: r.geu_session_status || r.qums_session_status || 'active',
     activeErpType: r.active_erp_type || 'OLD',
     newErpEmail: r.new_erp_email || '',
     newErpPasswordEncrypted: r.new_erp_password_encrypted || '',
@@ -1047,23 +1052,29 @@ const WRITABLE_USER_COLUMNS = {
   passwordHash: 'password_hash',
   qumsQid: 'qums_qid',
   geuId: 'geu_id',
+  gueQid: 'geu_id',
   qumsPasswordEncrypted: 'qums_password_encrypted',
   geuPasswordEncrypted: 'geu_password_encrypted',
+  guePasswordEncrypted: 'geu_password_encrypted',
   qumsSessionPath: 'qums_session_path',
   geuSessionPath: 'geu_session_path',
+  gueSessionPath: 'geu_session_path',
   qumsSessionData: 'qums_session_data',
   geuSessionData: 'geu_session_data',
+  gueSessionData: 'geu_session_data',
   telegramLinkCode: 'telegram_link_code',
   telegramChatId: 'telegram_chat_id',
   firebaseUid: 'firebase_uid',
   studentName: 'student_name',
   qumsYearSem: 'qums_year_sem',
   geuYearSem: 'geu_year_sem',
+  gueYearSem: 'geu_year_sem',
   isAdmin: 'is_admin',
   emailVerified: 'email_verified',
   isSuspended: 'is_suspended',
   qumsSessionStatus: 'qums_session_status',
   geuSessionStatus: 'geu_session_status',
+  gueSessionStatus: 'geu_session_status',
   activeErpType: 'active_erp_type',
   newErpEmail: 'new_erp_email',
   newErpPasswordEncrypted: 'new_erp_password_encrypted',
@@ -1092,29 +1103,32 @@ async function updateUser(id, patch) {
   const user = await getUserById(id);
   if (!user) return null;
 
-  // Bi-directional sync between GEU and legacy QUMS fields
-  if ('qumsQid' in patch && !('geuId' in patch)) patch.geuId = patch.qumsQid;
-  if ('geuId' in patch && !('qumsQid' in patch)) patch.qumsQid = patch.geuId;
-  if ('qumsPasswordEncrypted' in patch && !('geuPasswordEncrypted' in patch)) patch.geuPasswordEncrypted = patch.qumsPasswordEncrypted;
-  if ('geuPasswordEncrypted' in patch && !('qumsPasswordEncrypted' in patch)) patch.qumsPasswordEncrypted = patch.geuPasswordEncrypted;
-  if ('qumsSessionStatus' in patch && !('geuSessionStatus' in patch)) patch.geuSessionStatus = patch.qumsSessionStatus;
-  if ('geuSessionStatus' in patch && !('qumsSessionStatus' in patch)) patch.qumsSessionStatus = patch.geuSessionStatus;
-  if ('qumsSessionPath' in patch && !('geuSessionPath' in patch)) patch.geuSessionPath = patch.qumsSessionPath;
-  if ('geuSessionPath' in patch && !('qumsSessionPath' in patch)) patch.qumsSessionPath = patch.geuSessionPath;
-  if ('qumsSessionData' in patch && !('geuSessionData' in patch)) patch.geuSessionData = patch.qumsSessionData;
-  if ('geuSessionData' in patch && !('qumsSessionData' in patch)) patch.qumsSessionData = patch.geuSessionData;
-  if ('qumsYearSem' in patch && !('geuYearSem' in patch)) patch.geuYearSem = patch.qumsYearSem;
-  if ('geuYearSem' in patch && !('qumsYearSem' in patch)) patch.qumsYearSem = patch.geuYearSem;
+  // Tri-directional sync between GEU, GUE, and legacy QUMS fields
+  const qidVal = patch.gueQid || patch.geuId || patch.qumsQid;
+  if (qidVal !== undefined) { patch.qumsQid = qidVal; patch.geuId = qidVal; patch.gueQid = qidVal; }
+  const passVal = patch.guePasswordEncrypted || patch.geuPasswordEncrypted || patch.qumsPasswordEncrypted;
+  if (passVal !== undefined) { patch.qumsPasswordEncrypted = passVal; patch.geuPasswordEncrypted = passVal; patch.guePasswordEncrypted = passVal; }
+  const statusVal = patch.gueSessionStatus || patch.geuSessionStatus || patch.qumsSessionStatus;
+  if (statusVal !== undefined) { patch.qumsSessionStatus = statusVal; patch.geuSessionStatus = statusVal; patch.gueSessionStatus = statusVal; }
+  const pathVal = patch.gueSessionPath || patch.geuSessionPath || patch.qumsSessionPath;
+  if (pathVal !== undefined) { patch.qumsSessionPath = pathVal; patch.geuSessionPath = pathVal; patch.gueSessionPath = pathVal; }
+  const dataVal = patch.gueSessionData || patch.geuSessionData || patch.qumsSessionData;
+  if (dataVal !== undefined) { patch.qumsSessionData = dataVal; patch.geuSessionData = dataVal; patch.gueSessionData = dataVal; }
+  const semVal = patch.gueYearSem || patch.geuYearSem || patch.qumsYearSem;
+  if (semVal !== undefined) { patch.qumsYearSem = semVal; patch.geuYearSem = semVal; patch.gueYearSem = semVal; }
 
   // Never overwrite an existing saved encrypted password with an empty string
   // unless explicitly requested with forceClearPassword: true (e.g. user deleted connection)
+  // or when explicitly resetting the connection (qumsQid / geuId set to empty string)
   if (
     (user.qumsPasswordEncrypted || user.geuPasswordEncrypted) &&
     ('qumsPasswordEncrypted' in patch || 'geuPasswordEncrypted' in patch) &&
     !patch.qumsPasswordEncrypted &&
     !patch.geuPasswordEncrypted &&
     !patch.forceClearPassword &&
-    !patch.allowEmptyPassword
+    !patch.allowEmptyPassword &&
+    patch.qumsQid !== '' &&
+    patch.geuId !== ''
   ) {
     delete patch.qumsPasswordEncrypted;
     delete patch.geuPasswordEncrypted;
@@ -1134,13 +1148,16 @@ async function updateUser(id, patch) {
 
   const cols = [];
   const values = [id];
+  const seenCols = new Set();
   for (const [appKey, column] of Object.entries(WRITABLE_USER_COLUMNS)) {
     if (!(appKey in patch)) continue;
+    if (seenCols.has(column)) continue;
     if (appKey === 'qumsPasswordEncrypted' && (patch[appKey] === undefined || patch[appKey] === null)) continue;
     let v = merged[appKey];
     if (v === undefined || v === null) v = (appKey === 'isAdmin' || appKey === 'emailVerified' || appKey === 'isSuspended') ? false : '';
     values.push(v);
     cols.push(`${column}=$${values.length}`);
+    seenCols.add(column);
   }
   // always touch updated_at
   if (!('updatedAt' in patch)) {
@@ -2905,13 +2922,15 @@ async function recordUserReconnect(userId, source = 'web', log = console) {
 }
 
 module.exports={
-  DB_FILE,QUMS_SESSION_DIR,NEW_ERP_SESSION_DIR,USE_PG,init,hasUsers,allUsers,ALL_USERS_COLUMNS,getUserByEmail,getUserById,getUserByFirebaseUid,createUser,updateUser,deleteUser,sessionPathFor,sessionPathForNewErp,
+  DB_FILE,QUMS_SESSION_DIR,NEW_ERP_SESSION_DIR,GUE_SESSION_DIR: QUMS_SESSION_DIR,GEU_SESSION_DIR: QUMS_SESSION_DIR,USE_PG,init,hasUsers,allUsers,ALL_USERS_COLUMNS,getUserByEmail,getUserById,getUserByFirebaseUid,createUser,updateUser,deleteUser,sessionPathFor,sessionPathForNewErp,
+  sessionPathForGue: sessionPathFor,sessionPathForGeu: sessionPathFor,
   ensureSessionOnDisk,saveUserSessionData,ensureNewErpSessionOnDisk,saveNewErpSessionData,decodeSessionData,getUserSessionData,
   storeResetToken,consumeResetToken,listKnownAttendance,addKnownAttendance,upsertKnownAttendance,removeKnownAttendance,upsertWeeklySchedule,getWeeklySchedule,clearWeeklySchedule,
   telegramLinkCodeFor,getUserByTelegramLinkCode,getUserByTelegramChatId,setTelegramChatId,clearTelegramChatForChat,clearTelegramChatId,
   listKnownAssignments,addKnownAssignments,removeKnownAssignment,updateKnownAssignmentMessageId,
   // structured identity & monitoring (Migration 011/012)
   getQumsIdentities, getActiveQumsIdentity, switchQumsIdentity,
+  getGueIdentities: getQumsIdentities, getActiveGueIdentity: getActiveQumsIdentity, switchGueIdentity: switchQumsIdentity,
   saveAttendanceRecord, listAttendanceRecords,
   saveAssignmentRecord, listAssignmentRecords,
   tryRecordNotificationLog, hasNotificationLog, deleteNotificationLog, hasAttendanceBeenNotified,
@@ -2920,6 +2939,7 @@ module.exports={
   runMigrations, schemaHealth, importLocalJsonData, sslConfig,
   // per-user sync bookkeeping
   touchUserSync, setUserAdmin, setUserSuspended, getQumsEncryptedPassword,
+  getGueEncryptedPassword: getQumsEncryptedPassword, getGeuEncryptedPassword: getQumsEncryptedPassword,
   // session-expiry state (PostgreSQL-backed)
   SESSION_ALERT_COOLDOWN_MS, getSessionExpiryState, markSessionExpired, recordSessionExpiryAlert, getSessionExpiryMessageIds, clearSessionExpiry, clearSessionExpiryTelegramMessage, listSessionExpiredUsers,
   // scheduled message auto-deletions

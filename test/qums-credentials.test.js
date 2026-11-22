@@ -61,7 +61,9 @@ async function runTests() {
   console.log('\nALL QUMS CREDENTIALS TESTS PASSED!\n');
 }
 
-runTests().catch((err) => {
+runTests().then(() => {
+  process.exit(0);
+}).catch((err) => {
   console.error('Test error:', err);
   process.exit(1);
 });

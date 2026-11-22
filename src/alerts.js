@@ -474,6 +474,8 @@ async function notifySessionConflict(userId, log = console) {
 module.exports = {
   maybeNotifySessionExpired,
   notifyQumsReconnected,
+  notifyGueReconnected: notifyQumsReconnected,
+  notifyGeuReconnected: notifyQumsReconnected,
   notifyNewErpReconnected,
   deleteSessionExpiredAlert,
   scheduleMessageDeletion,
