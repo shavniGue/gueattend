@@ -132,8 +132,11 @@
       <div id="substitutionsAlertBox" style="display: none; margin-bottom: 18px; padding: 14px 16px; border-radius: var(--radius); background: #fffbeb; border: 1px solid #fde68a; font-size: 13px;"></div>
 
       <!-- Today's Classes Section -->
-      <div class="today-classes-box" id="todayClassesSection">
-        <div class="today-classes-title">Today's classes</div>
+      <div class="today-classes-box" id="todayClassesSection" style="display: none;">
+        <div class="today-classes-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div class="today-classes-title" style="margin-bottom: 0;">Today's classes</div>
+          <button id="closeTodayClassesBtn" type="button" style="display: inline-flex; align-items: center; justify-content: center; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted); padding: 2px 6px; line-height: 1; border-radius: 4px; transition: color 0.15s ease;" title="Close today's classes" aria-label="Close">✕</button>
+        </div>
         <div class="today-classes-list" id="todayClassesList">
           <p style="color: var(--text-muted); font-size: 13px;">Loading schedule...</p>
         </div>

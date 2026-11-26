@@ -53,7 +53,12 @@ async function scrapeSubjectWiseAttendance(userId) {
         if (dashResp.ok()) {
           const html = await dashResp.text();
           if (html.includes('N0j5Ha0') || (html.includes('password') && !html.includes('RegID'))) {
-            await db.query(`UPDATE users SET qums_session_status = 'expired' WHERE id = $1`, [userId]).catch(() => {});
+            try {
+              const sessionLifecycle = require('./services/session-lifecycle');
+              await sessionLifecycle.markSessionExpired(userId, 'College portal session expired or redirected to login.');
+            } catch (slErr) {
+              await db.query(`UPDATE users SET qums_session_status = 'expired' WHERE id = $1`, [userId]).catch(() => {});
+            }
             console.warn(`[scraper] Portal session expired for user ${userId}`);
           } else {
             const regMatch = html.match(/var\s+RegID\s*=\s*['"](\d+)['"]/i) || html.match(/\bRegID\s*[:=]\s*['"]?(\d+)['"]?/i);

@@ -219,8 +219,8 @@ async function persistVerifiedPortalSession({ userId, qid, password, cookies, is
     [userId, isReconnect ? 'reconnect' : 'initial_setup']
   ).catch(() => {});
 
-  const alerts = require('./alerts');
-  await alerts.resolveSessionExpiry(userId);
+  const sessionLifecycle = require('./services/session-lifecycle');
+  await sessionLifecycle.markSessionReconnected(userId, isReconnect ? 'reconnect' : 'initial_setup').catch(() => {});
 
   await db.recordAuditLog({
     userId,

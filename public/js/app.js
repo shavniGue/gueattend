@@ -66,9 +66,19 @@ function initCalendarDefaults() {
   }
 }
 
-async function loadDashboardData() {
+async function loadDashboardData(opts = {}) {
   try {
-    const resp = await fetch('/api/dashboard/student');
+    const isFresh = Boolean(opts && (opts.fresh || opts === true));
+    const url = isFresh
+      ? `/api/dashboard/student?fresh=1&_t=${Date.now()}`
+      : `/api/dashboard/student?_t=${Date.now()}`;
+    const resp = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    });
     const data = await resp.json();
     if (!data.success) return;
 
@@ -207,6 +217,21 @@ function renderLiveTiming(rightNow, upNext, substitutions) {
   }
 }
 
+function getTodayStatusBadge(rawStatus) {
+  const s = String(rawStatus || '').toLowerCase().trim();
+  if (s === 'present') {
+    return `<span class="today-class-badge present">✅ Present</span>`;
+  }
+  if (s === 'absent') {
+    return `<span class="today-class-badge absent">❌ Absent</span>`;
+  }
+  if (s === 'approved_leave' || s === 'leave') {
+    return `<span class="today-class-badge leave">🔷 Leave</span>`;
+  }
+  // Not Marked / N.M. / not_marked / unrecorded
+  return `<span class="today-class-badge not-marked">⏳ Not Marked</span>`;
+}
+
 function renderTodayClasses(classes) {
   const container = document.getElementById('todayClassesList');
   if (!container) return;
@@ -221,10 +246,18 @@ function renderTodayClasses(classes) {
     const periodLabel = c.period_label && c.period_label.startsWith('P') && c.period_label.length <= 3 ? c.period_label : `P${c.period_number}`;
     const timeStr = `${String(c.start_time || '09:00').slice(0, 5)} - ${String(c.end_time || '09:55').slice(0, 5)}`;
     const roomStr = c.classroom ? `Room ${esc(c.classroom)}` : 'Room TBD';
+    const subjName = c.subject_name || c.subject || 'Class';
+    const badgeHtml = getTodayStatusBadge(c.status);
+
     html += `
       <div class="today-class-line">
-        <span class="today-class-title">${esc(periodLabel)} - ${esc(c.subject_name)}</span>
-        <span class="today-class-meta">${esc(timeStr)} - ${roomStr}</span>
+        <div class="today-class-info">
+          <span class="today-class-title">${esc(periodLabel)} - ${esc(subjName)}</span>
+          <span class="today-class-meta">${esc(timeStr)} - ${roomStr}</span>
+        </div>
+        <div class="today-class-status">
+          ${badgeHtml}
+        </div>
       </div>
     `;
   });
@@ -884,13 +917,27 @@ function setupEventListeners() {
 
   const toggleBtn = document.getElementById('toggleTodayClassesBtn');
   const section = document.getElementById('todayClassesSection');
+  const closeBtn = document.getElementById('closeTodayClassesBtn');
+
   if (toggleBtn && section) {
-    toggleBtn.addEventListener('click', () => {
-      if (section.style.display === 'none') {
+    toggleBtn.addEventListener('click', async () => {
+      const isHidden = section.style.display === 'none' || getComputedStyle(section).display === 'none';
+      if (isHidden) {
         section.style.display = 'block';
         toggleBtn.textContent = "Hide today's classes";
+        // Fresh data load to bypass browser cache and load live portal status
+        await loadDashboardData({ fresh: true });
       } else {
         section.style.display = 'none';
+        toggleBtn.textContent = "Load today's classes";
+      }
+    });
+  }
+
+  if (closeBtn && section) {
+    closeBtn.addEventListener('click', () => {
+      section.style.display = 'none';
+      if (toggleBtn) {
         toggleBtn.textContent = "Load today's classes";
       }
     });

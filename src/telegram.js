@@ -74,20 +74,281 @@ async function formatAttendanceMessage(account) {
   return text;
 }
 
-async function formatTodayMessage(account) {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayAtt = await db.getTodayAttendance(account.student_id, todayStr);
-  let text = `📅 *Today's Schedule & Attendance (${todayStr})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+function getISTDate(offsetDays = 0) {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  // IST offset is +5 hours 30 mins
+  const ist = new Date(utc + 5.5 * 3600000 + offsetDays * 86400000);
+  const year = ist.getFullYear();
+  const month = String(ist.getMonth() + 1).padStart(2, '0');
+  const date = String(ist.getDate()).padStart(2, '0');
+  const dayOfWeek = ist.getDay() === 0 ? 7 : ist.getDay(); // 1=Mon ... 7=Sun
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = days[ist.getDay()];
+  return {
+    dateStr: `${year}-${month}-${date}`,
+    displayDate: `${date}/${month}/${year}`,
+    dayOfWeek,
+    dayName,
+    isSunday: ist.getDay() === 0,
+  };
+}
 
-  if (todayAtt.length === 0) {
-    text += `No classes scheduled for today.`;
-  } else {
-    for (const c of todayAtt) {
-      const statusIcon =
-        c.status === 'present' ? '✅' : c.status === 'absent' ? '❌' : c.status === 'approved_leave' ? '🔷' : '⚪';
-      text += `${statusIcon} *${c.period_label || `Period ${c.period_number}`}* (${String(c.duration || '').slice(0, 13)})\n   📖 ${c.subject} (${c.subject_code})\n   👨‍🏫 ${c.faculty_name}\n   Status: *${String(c.status).toUpperCase()}*\n\n`;
+function parseDateInput(raw) {
+  if (!raw) return null;
+  const clean = String(raw).trim();
+  let day, month, year;
+
+  if (clean.includes('/')) {
+    const parts = clean.split('/');
+    if (parts.length === 3) {
+      day = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      let y = parseInt(parts[2], 10);
+      if (parts[2].length === 2) y = 2000 + y;
+      year = y;
+    }
+  } else if (clean.includes('-')) {
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        day = parseInt(parts[2], 10);
+      } else {
+        day = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        let y = parseInt(parts[2], 10);
+        if (parts[2].length === 2) y = 2000 + y;
+        year = y;
+      }
     }
   }
+
+  if (!day || !month || !year || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const dObj = new Date(year, month - 1, day);
+  if (isNaN(dObj.getTime())) return null;
+
+  const yStr = String(year);
+  const mStr = String(month).padStart(2, '0');
+  const dStr = String(day).padStart(2, '0');
+  const dayOfWeek = dObj.getDay() === 0 ? 7 : dObj.getDay();
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  return {
+    dateStr: `${yStr}-${mStr}-${dStr}`,
+    displayDate: `${dStr}/${mStr}/${yStr}`,
+    dayOfWeek,
+    dayName: days[dObj.getDay()],
+    isSunday: dObj.getDay() === 0,
+  };
+}
+
+async function formatTodayMessage(account) {
+  const istToday = getISTDate(0);
+  const todayAtt = await db.getTodayAttendance(account.student_id, istToday.dateStr);
+  let text = `📅 *Today's Schedule & Attendance (${istToday.displayDate} - ${istToday.dayName})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  // Filter out dummy non-classes
+  const validAtt = todayAtt.filter(
+    (c) => c.subject && c.subject !== 'No Scheduled Class' && c.subject_code !== '-'
+  );
+
+  if (validAtt.length === 0) {
+    if (istToday.isSunday) {
+      text += `🏖️ *Sunday (Off-Day)*\nNo classes scheduled for today. Enjoy your day! 🎉`;
+    } else {
+      text += `No classes scheduled for today.`;
+    }
+  } else {
+    for (const c of validAtt) {
+      const st = String(c.status || '').toLowerCase();
+      const statusIcon =
+        st === 'present' ? '✅' : st === 'absent' ? '❌' : st === 'approved_leave' || st === 'leave' ? '🔷' : '⏳';
+      const statusLabel =
+        st === 'present' ? 'PRESENT' : st === 'absent' ? 'ABSENT' : st === 'approved_leave' || st === 'leave' ? 'LEAVE' : 'NOT MARKED';
+      const duration = c.duration || `${String(c.start_time || '').slice(0, 5)} - ${String(c.end_time || '').slice(0, 5)}`;
+      text += `${statusIcon} *${c.period_label || `Period ${c.period_number}`}* (${duration})\n   📖 ${c.subject} (${c.subject_code || '-'})\n   👨‍🏫 Faculty: ${c.faculty_name || '-'}\n   📊 Status: *${statusLabel}*\n\n`;
+    }
+  }
+  return text;
+}
+
+async function formatTomorrowMessage(account) {
+  const tomorrow = getISTDate(1);
+  let text = `📅 *Tomorrow's Schedule (${tomorrow.displayDate} - ${tomorrow.dayName})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (tomorrow.isSunday) {
+    text += `🏖️ *Sunday (Off-Day)*\nNo classes scheduled for tomorrow. Enjoy your weekend! 🎉`;
+    return text;
+  }
+
+  const weekly = await db.getStudentWeeklyTimetable(account.student_id);
+  const tomorrowClasses = weekly.filter((w) => w.day_of_week === tomorrow.dayOfWeek);
+
+  if (tomorrowClasses.length === 0) {
+    text += `🏖️ No classes scheduled for tomorrow (Off-Day).`;
+    return text;
+  }
+
+  for (const c of tomorrowClasses) {
+    const periodLabel = c.period_label || `Period ${c.period_number}`;
+    const startTime = String(c.start_time || '09:00').slice(0, 5);
+    const endTime = String(c.end_time || '09:55').slice(0, 5);
+    const duration = `${startTime} - ${endTime}`;
+    const faculty = c.substitute_faculty_name || c.faculty_name || 'Faculty';
+    const room = c.classroom ? `Room ${c.classroom}` : 'Room TBD';
+
+    text += `• *${periodLabel}* (${duration})\n` +
+            `   📖 *Subject:* ${c.subject_name || c.subject_code} (${c.subject_code || '-'})\n` +
+            `   👨‍🏫 *Faculty:* ${faculty}\n` +
+            `   🏛️ *Room:* ${room}\n\n`;
+  }
+
+  return text;
+}
+
+async function formatYesterdayMessage(account) {
+  const yesterday = getISTDate(-1);
+  const records = await db.getTodayAttendance(account.student_id, yesterday.dateStr);
+
+  let text = `📅 *Yesterday's Attendance (${yesterday.displayDate} - ${yesterday.dayName})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  const validRecords = records.filter(
+    (r) => r.subject && r.subject !== 'No Scheduled Class' && r.subject_code !== '-'
+  );
+
+  if (validRecords.length === 0) {
+    if (yesterday.isSunday) {
+      text += `🏖️ Yesterday was Sunday (Off-Day). No classes were held.`;
+    } else {
+      text += `No classes or attendance records found for yesterday.`;
+    }
+    return text;
+  }
+
+  let presentCount = 0;
+  let absentCount = 0;
+  let unmarkedCount = 0;
+
+  for (const c of validRecords) {
+    const st = String(c.status || '').toLowerCase();
+    let statusIcon = '⏳';
+    let statusLabel = 'NOT MARKED';
+    if (st === 'present') {
+      statusIcon = '✅';
+      statusLabel = 'PRESENT';
+      presentCount++;
+    } else if (st === 'absent') {
+      statusIcon = '❌';
+      statusLabel = 'ABSENT';
+      absentCount++;
+    } else if (st === 'approved_leave' || st === 'leave') {
+      statusIcon = '🔷';
+      statusLabel = 'LEAVE';
+    } else {
+      unmarkedCount++;
+    }
+
+    const periodLabel = c.period_label || `Period ${c.period_number}`;
+    const duration = c.duration || `${String(c.start_time || '').slice(0, 5)} - ${String(c.end_time || '').slice(0, 5)}`;
+    text += `${statusIcon} *${periodLabel}* (${duration})\n` +
+            `   📖 ${c.subject} (${c.subject_code || '-'})\n` +
+            `   👨‍🏫 Faculty: ${c.faculty_name || '-'}\n` +
+            `   📊 Status: *${statusLabel}*\n\n`;
+  }
+
+  text += `━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `📊 *Summary:* ✅ Present: *${presentCount}* | ❌ Absent: *${absentCount}* | ⏳ Not Marked: *${unmarkedCount}*`;
+  return text;
+}
+
+async function formatRoutineDateMessage(account, parsedDate) {
+  let text = `🗓️ *Routine for ${parsedDate.displayDate} (${parsedDate.dayName})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (parsedDate.isSunday) {
+    text += `🏖️ *Sunday (Off-Day)*\nNo classes scheduled on Sunday. Enjoy your off-day! 🎉`;
+    return text;
+  }
+
+  const weekly = await db.getStudentWeeklyTimetable(account.student_id);
+  const dayClasses = weekly.filter((w) => w.day_of_week === parsedDate.dayOfWeek);
+
+  if (dayClasses.length === 0) {
+    text += `🏖️ No classes scheduled for this date (Off-Day).`;
+    return text;
+  }
+
+  for (const c of dayClasses) {
+    const periodLabel = c.period_label || `Period ${c.period_number}`;
+    const startTime = String(c.start_time || '09:00').slice(0, 5);
+    const endTime = String(c.end_time || '09:55').slice(0, 5);
+    const duration = `${startTime} - ${endTime}`;
+    const faculty = c.substitute_faculty_name || c.faculty_name || 'Faculty';
+    const room = c.classroom ? `Room ${c.classroom}` : 'Room TBD';
+
+    text += `• *${periodLabel}* (${duration})\n` +
+            `   📖 *Subject:* ${c.subject_name || c.subject_code} (${c.subject_code || '-'})\n` +
+            `   👨‍🏫 *Faculty:* ${faculty}\n` +
+            `   🏛️ *Room:* ${room}\n\n`;
+  }
+
+  return text;
+}
+
+async function formatAttendanceDateMessage(account, parsedDate) {
+  const records = await db.getTodayAttendance(account.student_id, parsedDate.dateStr);
+  let text = `📅 *Attendance Records: ${parsedDate.displayDate} (${parsedDate.dayName})*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  const validRecords = records.filter(
+    (r) => r.subject && r.subject !== 'No Scheduled Class' && r.subject_code !== '-'
+  );
+
+  if (validRecords.length === 0) {
+    if (parsedDate.isSunday) {
+      text += `🏖️ Sunday (Off-Day). No classes were held.`;
+    } else {
+      text += `No attendance records marked on ${parsedDate.displayDate}.`;
+    }
+    return text;
+  }
+
+  let presentCount = 0;
+  let absentCount = 0;
+  let unmarkedCount = 0;
+
+  for (const c of validRecords) {
+    const st = String(c.status || '').toLowerCase();
+    let icon = '⏳';
+    let statusLabel = 'NOT MARKED';
+    if (st === 'present') {
+      icon = '✅';
+      statusLabel = 'PRESENT';
+      presentCount++;
+    } else if (st === 'absent') {
+      icon = '❌';
+      statusLabel = 'ABSENT';
+      absentCount++;
+    } else if (st === 'approved_leave' || st === 'leave') {
+      icon = '🔷';
+      statusLabel = 'LEAVE';
+    } else {
+      unmarkedCount++;
+    }
+
+    const periodLabel = c.period_label || `Period ${c.period_number}`;
+    const duration = c.duration || `${String(c.start_time || '').slice(0, 5)} - ${String(c.end_time || '').slice(0, 5)}`;
+    text += `${icon} *${periodLabel}* (${duration})\n` +
+            `   📖 ${c.subject} (${c.subject_code || '-'})\n` +
+            `   👨‍🏫 Faculty: ${c.faculty_name || '-'}\n` +
+            `   📊 Status: *${statusLabel}*\n\n`;
+  }
+
+  text += `━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `📊 *Summary:* ✅ Present: *${presentCount}* | ❌ Absent: *${absentCount}* | ⏳ Not Marked: *${unmarkedCount}*`;
   return text;
 }
 
@@ -126,9 +387,12 @@ async function handleLinkAccount(botInstance, chatId, token, from = {}) {
       `Welcome, *${user?.full_name || 'Student'}*!\n` +
       `Your gueattend account is now linked to this Telegram chat.\n\n` +
       `Available commands:\n` +
-      `• /attendance — Overall & subject attendance\n` +
-      `• /today — Today's schedule & status\n` +
-      `• /timetable — Mon–Sat schedule\n` +
+      `• /today — Today's schedule & live status\n` +
+      `• /tomorrow — Tomorrow's schedule & timetable\n` +
+      `• /yesterday — Yesterday's classes & attendance status\n` +
+      `• /attendance [DD/MM/YY] — Attendance summary or date lookup\n` +
+      `• /routine <DD/MM/YY> or /<DD/MM/YY> — Check routine for any date\n` +
+      `• /timetable — Mon–Sat weekly schedule\n` +
       `• /month — Monthly register\n` +
       `• /assignments — Upcoming deadlines\n` +
       `• /reconnect — Refresh GEU session with CAPTCHA`;
@@ -143,15 +407,18 @@ function buildHelpText() {
     `❓ *gueattend Bot Commands*\n\n` +
     `• /start — Welcome & deep link\n` +
     `• /login <code> — Link your student account\n` +
-    `• /attendance — Live attendance & bunk margin\n` +
-    `• /bunk — 75% criteria margin breakdown\n` +
     `• /today — Today's classes & marked periods\n` +
+    `• /tomorrow — Tomorrow's schedule & timetable (duration, faculty, room)\n` +
+    `• /yesterday — Yesterday's classes & attendance status (Present/Absent/Not Marked)\n` +
+    `• /routine <DD/MM/YY> or /<DD/MM/YY> — Check routine for any date (e.g. \`/routine 26/11/26\` or \`/26/11/26\`)\n` +
+    `• /attendance [DD/MM/YY] — Live overall attendance or specific date lookup (e.g. \`/attendance 21/11/26\`)\n` +
+    `• /bunk — 75% criteria margin breakdown\n` +
     `• /timetable — Full Mon–Sat weekly schedule\n` +
     `• /month — Current monthly attendance register\n` +
     `• /assignments — Upcoming assignments & deadlines\n` +
     `• /reconnect — Reconnect GEU portal using live CAPTCHA\n` +
     `• /admin — Administrator telemetry (admins only)\n` +
-    `• \`DD/MM/YYYY\` or \`YYYY-MM-DD\` — Date attendance lookup\n` +
+    `• \`DD/MM/YYYY\` or \`DD/MM/YY\` — Quick date attendance lookup\n` +
     `• /help — Show this command list`
   );
 }
@@ -177,11 +444,20 @@ async function handleBotCommand(botInstance, msg) {
       if (outcome.success || outcome.ok) {
         return botInstance.sendMessage(
           chatId,
-          `✅ *GEU Portal Reconnected!*\nGUeID \`${outcome.qid || ''}\` session refreshed via Telegram.`,
+          `✅ *GEU Portal Reconnected!*\nGUeID \`${outcome.qid || ''}\` session refreshed and monitoring safely resumed.`,
           { parse_mode: 'Markdown' }
         );
       }
-      return botInstance.sendMessage(chatId, `⚠️ Reconnect failed: ${outcome.error || 'Please run /reconnect again.'}`);
+      return botInstance.sendMessage(
+        chatId,
+        `⚠️ *Reconnect Failed:* ${outcome.error || 'Invalid CAPTCHA or expired challenge.'}\n\nTap below to try again with a fresh CAPTCHA:`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔄 Try Again (New CAPTCHA)', callback_data: 'tg_start_reconnect' }]],
+          },
+        }
+      );
     } catch (err) {
       return botInstance.sendMessage(chatId, `❌ Reconnect error: ${err.message}`);
     }
@@ -256,8 +532,35 @@ async function handleBotCommand(botInstance, msg) {
     return botInstance.sendMessage(chatId, 'ℹ️ No student profile linked to this account yet.');
   }
 
-  // /attendance
+  // /attendance [DD/MM/YY] or overall /attendance
   if (/^\/attendance\b/i.test(text)) {
+    const dateArgMatch = text.match(/^\/attendance\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})$/i);
+    if (dateArgMatch) {
+      const parsed = parseDateInput(dateArgMatch[1]);
+      if (!parsed) {
+        return botInstance.sendMessage(
+          chatId,
+          `⚠️ *Invalid Date Format*\nPlease use DD/MM/YY format (e.g., \`/attendance 21/11/26\`).`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+      const out = await formatAttendanceDateMessage(account, parsed);
+      const sent = await botInstance.sendMessage(chatId, out, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📊 Overall Attendance', callback_data: 'tg_refresh_attendance' },
+              { text: "📅 Today's Classes", callback_data: 'tg_refresh_today' },
+            ],
+          ],
+        },
+      });
+      if (sent?.message_id) await schedulePrune(botInstance, chatId, sent.message_id, 120);
+      return sent;
+    }
+
+    // Default: Overall Attendance Summary
     const out = await formatAttendanceMessage(account);
     const sent = await botInstance.sendMessage(chatId, out, {
       parse_mode: 'Markdown',
@@ -295,7 +598,77 @@ async function handleBotCommand(botInstance, msg) {
     return botInstance.sendMessage(chatId, out, {
       parse_mode: 'Markdown',
       reply_markup: {
-        inline_keyboard: [[{ text: '🔄 Refresh Today', callback_data: 'tg_refresh_today' }]],
+        inline_keyboard: [
+          [
+            { text: '⏮️ Yesterday', callback_data: 'tg_yesterday' },
+            { text: '⏭️ Tomorrow', callback_data: 'tg_tomorrow' },
+          ],
+          [
+            { text: '🔄 Refresh Today', callback_data: 'tg_refresh_today' },
+            { text: '📊 Attendance', callback_data: 'tg_refresh_attendance' },
+          ],
+        ],
+      },
+    });
+  }
+
+  // /tomorrow
+  if (/^\/tomorrow\b/i.test(text)) {
+    const out = await formatTomorrowMessage(account);
+    return botInstance.sendMessage(chatId, out, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📅 Today's Classes", callback_data: 'tg_refresh_today' },
+            { text: '🗓️ Timetable', callback_data: 'tg_timetable' },
+          ],
+        ],
+      },
+    });
+  }
+
+  // /yesterday
+  if (/^\/yesterday\b/i.test(text)) {
+    const out = await formatYesterdayMessage(account);
+    const sent = await botInstance.sendMessage(chatId, out, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📅 Today's Classes", callback_data: 'tg_refresh_today' },
+            { text: '⏭️ Tomorrow', callback_data: 'tg_tomorrow' },
+          ],
+        ],
+      },
+    });
+    if (sent?.message_id) await schedulePrune(botInstance, chatId, sent.message_id, 120);
+    return sent;
+  }
+
+  // Date-Based Timetable: /routine <date> OR direct /<date> (e.g. /routine 26/11/26 or /26/11/26)
+  const routineMatch = text.match(/^\/routine(?:\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}))$/i);
+  const directSlashDateMatch = text.match(/^\/(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})$/);
+  if (routineMatch || directSlashDateMatch) {
+    const rawDate = routineMatch ? routineMatch[1] : directSlashDateMatch[1];
+    const parsed = parseDateInput(rawDate);
+    if (!parsed) {
+      return botInstance.sendMessage(
+        chatId,
+        `⚠️ *Invalid Date Format*\nPlease use DD/MM/YY format (e.g., \`/routine 26/11/26\` or \`/26/11/26\`).`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    const out = await formatRoutineDateMessage(account, parsed);
+    return botInstance.sendMessage(chatId, out, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📅 Today's Classes", callback_data: 'tg_refresh_today' },
+            { text: '🗓️ Timetable', callback_data: 'tg_timetable' },
+          ],
+        ],
       },
     });
   }
@@ -378,7 +751,15 @@ async function handleBotCommand(botInstance, msg) {
         isReconnect: true,
       });
       if (!challenge || !challenge.success || !challenge.captchaImage) {
-        return botInstance.sendMessage(chatId, `⚠️ ${challenge?.error || 'Could not load CAPTCHA from student.geu.ac.in.'}`);
+        return botInstance.sendMessage(
+          chatId,
+          `⚠️ ${challenge?.error || 'Could not load CAPTCHA from student.geu.ac.in.'}\nTap below to retry:`,
+          {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🔄 Retry CAPTCHA', callback_data: 'tg_start_reconnect' }]],
+            },
+          }
+        );
       }
       pendingReconnectChats.set(String(chatId), account.user_id);
       const base64Body = challenge.captchaImage.replace(/^data:image\/[a-z+]+;base64,/, '');
@@ -394,32 +775,16 @@ async function handleBotCommand(botInstance, msg) {
     }
   }
 
-  // Date Lookup: DD/MM/YYYY or YYYY-MM-DD
-  const dateMatch = text.match(/^(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}-\d{2}-\d{2})$/);
-  if (dateMatch) {
-    let rawDate = dateMatch[1];
-    let normalizedDate = rawDate;
-    if (rawDate.includes('/')) {
-      const [d, m, y] = rawDate.split('/');
-      normalizedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    } else if (/^\d{2}-\d{2}-\d{4}$/.test(rawDate)) {
-      const [d, m, y] = rawDate.split('-');
-      normalizedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  // Bare Date Attendance Lookup: DD/MM/YYYY, DD/MM/YY, or YYYY-MM-DD
+  const bareDateMatch = text.match(/^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})$/);
+  if (bareDateMatch) {
+    const parsed = parseDateInput(bareDateMatch[1]);
+    if (parsed) {
+      const out = await formatAttendanceDateMessage(account, parsed);
+      const sent = await botInstance.sendMessage(chatId, out, { parse_mode: 'Markdown' });
+      if (sent?.message_id) await schedulePrune(botInstance, chatId, sent.message_id, 60);
+      return sent;
     }
-    const dayClasses = await db.getTodayAttendance(account.student_id, normalizedDate);
-    let out = `🗓 *Date Breakdown: ${normalizedDate}*\n👤 *Student:* ${account.full_name}\n━━━━━━━━━━━━━━━━━━━━\n`;
-    if (dayClasses.length === 0) {
-      out += `No attendance records marked on this date.`;
-    } else {
-      dayClasses.forEach((c) => {
-        const icon = c.status === 'present' ? '✅' : c.status === 'absent' ? '❌' : '⚪';
-        out += `${icon} *${c.period_label || `Period ${c.period_number}`}*: ${c.subject} (${String(c.status).toUpperCase()})\n`;
-      });
-    }
-    out += `\n⏱ _Auto-deletes in 60s._`;
-    const sent = await botInstance.sendMessage(chatId, out, { parse_mode: 'Markdown' });
-    if (sent?.message_id) await schedulePrune(botInstance, chatId, sent.message_id, 60);
-    return sent;
   }
 
   return null;
@@ -450,6 +815,17 @@ async function handleCallbackQuery(botInstance, query) {
   if (data === 'tg_refresh_today' && account.student_id) {
     const out = await formatTodayMessage(account);
     return botInstance.sendMessage(chatId, out, { parse_mode: 'Markdown' });
+  }
+  if (data === 'tg_tomorrow' && account.student_id) {
+    const out = await formatTomorrowMessage(account);
+    return botInstance.sendMessage(chatId, out, { parse_mode: 'Markdown' });
+  }
+  if (data === 'tg_yesterday' && account.student_id) {
+    const out = await formatYesterdayMessage(account);
+    return botInstance.sendMessage(chatId, out, { parse_mode: 'Markdown' });
+  }
+  if (data === 'tg_timetable' && account.student_id) {
+    return handleBotCommand(botInstance, { chat: { id: chatId }, text: '/timetable', from: query.from });
   }
   if (data === 'tg_start_reconnect') {
     return handleBotCommand(botInstance, { chat: { id: chatId }, text: '/reconnect', from: query.from });

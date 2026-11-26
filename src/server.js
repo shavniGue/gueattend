@@ -293,12 +293,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Initialize Session Table, Telegram Bot & Autonomous Schedulers
+// Initialize Session Table, Telegram Bot, Autonomous Schedulers & Smart Session Lifecycle
 if (process.env.NODE_ENV !== 'test') {
   sessionStore.ensureTable().catch((err) => {
     console.error('[server] Startup session-store initialization failed:', err.code || err.message);
   });
   initTelegram();
+  const sessionLifecycle = require('./services/session-lifecycle');
+  sessionLifecycle.init(sendTelegramAlert).catch((err) => {
+    console.warn('[server] Startup session-lifecycle initialization note:', err.message);
+  });
   initAutonomousSchedulers(sendTelegramAlert);
 }
 
