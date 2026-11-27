@@ -1732,8 +1732,7 @@ app.get('/tg-redirect', requireAuth, async (req, res) => {
     .btn:hover { background: #0077b5; }
     .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
-    .cmd-box { background: #0f172a; padding: 14px; border-radius: 10px; margin-top: 18px; text-align: left; font-size: 0.9rem; border: 1px solid #334155; }
-    code { color: #38bdf8; font-weight: 700; font-size: 1rem; display: block; margin: 8px 0; background: #1e293b; padding: 8px 12px; border-radius: 6px; }
+    .status-msg { margin-top: 16px; font-size: 0.92rem; color: #38bdf8; font-weight: 600; }
     .back-link { display: inline-block; margin-top: 16px; color: #94a3b8; text-decoration: none; font-size: 0.9rem; }
     .back-link:hover { color: #fff; }
   </style>
@@ -1741,15 +1740,11 @@ app.get('/tg-redirect', requireAuth, async (req, res) => {
 <body>
   <div class="box">
     <div style="font-size: 44px; margin-bottom: 12px;">📱</div>
-    <h2>Opening Telegram App...</h2>
-    <p>Agar browser ne Telegram app open karne ki permission mangi ho, to <b>"Open Telegram"</b> par click karein.</p>
+    <h2 id="headTitle">Opening Telegram App...</h2>
+    <p id="headDesc">Telegram app me jaakar <b>Start</b> dabayein. Connect hote hi aap automatically Dashboard par redirect ho jayenge.</p>
     <a href="${tgUrl}" class="btn">🚀 Open Telegram App</a>
     <a href="${webUrl}" target="_blank" rel="noopener" class="btn btn-secondary">🌐 Open via Web Link</a>
-    <div class="cmd-box">
-      <div style="color: #94a3b8;">Ya Telegram me search karein <b>@${botUsername}</b> aur ye send karein:</div>
-      <code id="cmdCode">/start ${code}</code>
-      <button type="button" onclick="navigator.clipboard.writeText('/start ${code}').then(()=>alert('Command copied! Telegram me paste karein.'))" class="btn btn-secondary" style="margin-top: 8px; padding: 8px 12px; font-size: 0.85rem;">📋 Copy Command</button>
-    </div>
+    <div id="statusMsg" class="status-msg">Waiting for connection in Telegram…</div>
     <a href="/dashboard" class="back-link">← Back to Dashboard</a>
   </div>
   <script>
@@ -1757,6 +1752,24 @@ app.get('/tg-redirect', requireAuth, async (req, res) => {
     setTimeout(function() {
       window.location.href = "${tgUrl}";
     }, 200);
+
+    // Poll status: automatically redirect to dashboard as soon as connected!
+    const checkTimer = setInterval(async function() {
+      try {
+        const res = await fetch('/api/telegram/status');
+        const data = await res.json();
+        if (data && data.connected) {
+          clearInterval(checkTimer);
+          document.getElementById('headTitle').textContent = '✅ Connected successfully!';
+          document.getElementById('headDesc').textContent = 'Telegram connect ho gaya! Dashboard par redirect kiya ja raha hai...';
+          document.getElementById('statusMsg').textContent = 'Redirecting to Dashboard...';
+          document.getElementById('statusMsg').style.color = '#4ade80';
+          setTimeout(function() {
+            window.location.href = '/dashboard';
+          }, 800);
+        }
+      } catch (e) {}
+    }, 2000);
   </script>
 </body>
 </html>`);
