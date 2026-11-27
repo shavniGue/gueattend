@@ -1505,24 +1505,26 @@ async function handleStatus(chatId, log = console) {
 async function handleHelp(chatId, log = console) {
   sendTyping(chatId);
   const text = [
-    'Welcome to the *GUEAttend Bot*! 🎓',
+    'Welcome to the *GUEAttend Bot*!',
     '',
     'Available commands:',
-    '📅 /today — Today\'s classes & live attendance status',
-    '⏭️ /tomorrow — Tomorrow\'s schedule & timetable (duration, faculty, room)',
-    '⏮️ /yesterday — Yesterday\'s classes & marked attendance status',
-    '🗓️ /routine <DD/MM/YY> or /<DD/MM/YY> — Check routine for any date',
-    '📊 /attendance — Full live attendance summary',
-    '📊 /attendance <DD/MM/YY> or /DD/MM/YY — Attendance for any specific past date',
+    '📊 /attendance — Full attendance summary (auto-deletes in 1 minute)',
+    '📅 /today — Today\'s attendance status & timetable routine (auto-deletes in 1 minute)',
+    '📅 /tomorrow — Tomorrow\'s class timetable routine (auto-deletes in 1 minute)',
+    '📅 /yesterday — Yesterday\'s historical attendance records (auto-deletes in 1 minute)',
+    '📅 /routine [DD/MM/YY] — View timetable routine for any date (e.g. /routine 24/11/26)',
+    '📅 /attendance [DD/MM/YY] — Attendance records for any past date',
+    '📅 /date DD/MM/YY or /DD/MM/YY — Check attendance or routine for any date (e.g. /24/11/26)',
     '📚 /assignments — View pending assignments & deadlines',
-    'ℹ️ /status — Check your account & session monitoring status',
-    '🔄 /reconnect — Reconnect your GEU session via 1-Click CAPTCHA',
+    'ℹ️ /status — Check your QUMS & Telegram account status',
+    '🔄 /reconnect — Reconnect your QUMS session via Telegram (CAPTCHA)',
     '❓ /help — Show this help message',
     '',
-    '💡 *Automatic Notifications:*',
+    '💡 Automatic Notifications:',
     '• Daily morning schedule is sent at 8:30 AM IST with room & teacher info.',
     '• Real-time alerts when teachers enter or change attendance marks during college hours.',
     '• New assignment alerts and deadline reminders.',
+    '⏳ This message will automatically delete in 1 minute.',
   ].join('\n');
   await reply(chatId, text, log);
 }
@@ -2200,17 +2202,25 @@ function parseDateCommand(text) {
       day,
       month,
       year,
+      mode: 'yesterday',
       rawText: trimmed,
       formattedDate: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`,
       ymd: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
     };
   }
 
-  // Matches /12/10/26, /12-10-2026, /2/11/26, /attendance 12/10/26, /routine 12/10/26
+  // Matches /12/10/26, /12-10-2026, /2/11/26, /attendance 12/10/26, /routine 12/10/26, /date 12/10/26
   let datePart = trimmed;
-  const hasPrefix = /^\/(?:attendance|routine)\s+/i.test(trimmed);
-  if (hasPrefix) {
-    datePart = trimmed.replace(/^\/(?:attendance|routine)\s+/i, '');
+  let mode = 'auto';
+  if (/^\/attendance\s+/i.test(trimmed)) {
+    mode = 'attendance';
+    datePart = trimmed.replace(/^\/attendance\s+/i, '');
+  } else if (/^\/routine\s+/i.test(trimmed)) {
+    mode = 'routine';
+    datePart = trimmed.replace(/^\/routine\s+/i, '');
+  } else if (/^\/date\s+/i.test(trimmed)) {
+    mode = 'auto';
+    datePart = trimmed.replace(/^\/date\s+/i, '');
   } else if (!trimmed.startsWith('/')) {
     return null;
   }
@@ -2225,6 +2235,7 @@ function parseDateCommand(text) {
     day,
     month,
     year,
+    mode,
     rawText: trimmed,
     formattedDate: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`,
     ymd: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
@@ -2292,11 +2303,14 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
     return;
   }
 
-  if (/^\/routine/i.test(dateInfo.rawText)) {
+  const isFuture = isFutureDate(dateInfo.day, dateInfo.month, dateInfo.year);
+
+  // If user requested routine, or if date command is in the future -> show routine!
+  if (dateInfo.mode === 'routine' || (dateInfo.mode === 'auto' && isFuture) || /^\/routine/i.test(dateInfo.rawText)) {
     return await handleRoutine(chatId, dateInfo.formattedDate, log);
   }
 
-  if (isFutureDate(dateInfo.day, dateInfo.month, dateInfo.year)) {
+  if (isFuture) {
     const sentMsg = await reply(
       chatId,
       `📅 *Future Date*\n\nCannot lookup attendance for future date ${dateInfo.formattedDate}.\nPlease request today's or a past date.${AUTO_DELETE_FOOTNOTE}`,

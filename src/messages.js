@@ -368,8 +368,11 @@ function formatDateAttendanceReport(dateInfo, rows, options = {}) {
   const dStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
   const fullDate = fullDateLabelFromYMD(ymd || `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
 
+  const heading = dateInfo.mode === 'yesterday'
+    ? `📅 *Yesterday's Historical Attendance* (${fullDate})`
+    : `📅 *Attendance for ${fullDate}* (${dStr})`;
   const lines = [
-    `📅 *Attendance for ${fullDate}* (${dStr})`,
+    heading,
     '',
   ];
 

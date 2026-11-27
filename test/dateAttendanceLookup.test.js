@@ -339,7 +339,7 @@ async function run() {
   sentMessages.length = 0;
   await telegram.handleUserMessage({
     chat: { id: 710001 },
-    text: '/25/12/26',
+    text: '/attendance 25/12/26',
     message_id: 8004,
   });
   assert.strictEqual(sentMessages.length, 1);
