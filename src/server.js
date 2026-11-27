@@ -1719,13 +1719,17 @@ app.get('/api/telegram/status', requireAuth, async (req, res) => {
     await telegram.checkTokenValidity().catch(() => {});
   }
   const tokenInvalid = Boolean(telegram.isTokenInvalid && telegram.isTokenInvalid());
+  const botUsername = telegram.getBotUsername();
+  const linkCode = code || '';
 
   res.json({
     configured: telegram.isConfigured(),
     tokenInvalid,
     connected: Boolean(user?.telegramChatId),
-    botUsername: telegram.getBotUsername(),
-    linkUrl: telegram.deepLink(code),
+    botUsername,
+    linkCode,
+    linkUrl: telegram.deepLink(linkCode),
+    tgProtocolUrl: `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(linkCode)}`,
     tokenError: tokenInvalid ? 'Telegram bot token is invalid or revoked (401). Please update TELEGRAM_BOT_TOKEN with active token from @BotFather.' : null,
   });
 });

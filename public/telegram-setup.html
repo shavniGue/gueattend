@@ -69,14 +69,36 @@
       <div id="connectBox" class="hidden">
         <div class="section-title">How to connect</div>
         <ol class="steps">
-          <li>Press <b>Connect Telegram</b> — the GUEAttend bot opens in Telegram.</li>
-          <li>Press <b>Start</b> in that chat (this is what links the chat to your account).</li>
+          <li>Press <b>Open in Telegram App</b> (or use the web link).</li>
+          <li>Press <b>Start</b> in that chat (this links the chat to your account).</li>
           <li>Come back here — the status updates automatically.</li>
         </ol>
-        <div class="row" style="margin-top:14px;">
-          <a id="connectBtn" class="btn btn-lg" href="#" target="_blank" rel="noopener">Connect Telegram</a>
+        <div class="row" style="margin-top:14px; gap: 10px; flex-wrap: wrap;">
+          <a id="connectAppBtn" class="btn btn-lg" href="#" style="background: #0088cc; color: white;">🚀 Open in Telegram App</a>
+          <a id="connectBtn" class="btn btn-lg btn-outline" href="#" target="_blank" rel="noopener">🌐 Open via Web (t.me)</a>
         </div>
-        <p class="form-hint" id="waitingNote">Waiting for the chat to be linked… you can leave this page open.</p>
+
+        <div style="margin-top: 20px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 16px;">
+          <div style="font-weight: 700; color: #1e293b; margin-bottom: 6px; font-size: 0.95rem;">
+            📱 Agar browser me t.me link open na ho / load na ho:
+          </div>
+          <p style="font-size: 0.88rem; color: #475569; margin: 0 0 10px 0;">
+            Kayi Indian ISPs (Jio, Airtel etc.) <code>t.me</code> web links ko block ya slow kar dete hain. Aap seedhe Telegram app me bhi 1 second me connect kar sakte hain:
+          </p>
+          <ol style="margin: 0; padding-left: 20px; font-size: 0.88rem; color: #334155; line-height: 1.6;">
+            <li>Apne phone ya computer par <b>Telegram App</b> open karein.</li>
+            <li>Search bar me <b style="color: #0284c7;">@<span id="manualBotUsername">gue_attendance_bot</span></b> search karke chat open karein.</li>
+            <li>Ye command copy karke bot me send karein:
+              <div style="display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap;">
+                <code id="manualCommand" style="background: #e2e8f0; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.95rem;">/start</code>
+                <button type="button" id="copyCommandBtn" class="btn btn-outline" style="cursor: pointer; padding: 6px 12px; font-size: 0.85rem;">📋 Copy Command</button>
+                <span id="copyFeedback" style="color: #16a34a; font-size: 0.85rem; font-weight: 600; display: none;">✅ Copied!</span>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <p class="form-hint" id="waitingNote" style="margin-top: 14px;">Waiting for the chat to be linked… you can leave this page open.</p>
       </div>
 
       <!-- CONNECTED -->
@@ -177,13 +199,39 @@
       $('tgBadge').textContent = 'Telegram connected';
     }
 
-    function showNotConnected(linkUrl) {
+    function showNotConnected(st) {
       $('connectedBox').classList.add('hidden');
       $('notConfiguredBox').classList.add('hidden');
       $('connectBox').classList.remove('hidden');
       $('tgBadge').className = 'badge-soft off';
       $('tgBadge').textContent = 'Not connected';
-      if (linkUrl) $('connectBtn').href = linkUrl;
+
+      const linkCode = st?.linkCode || '';
+      const botUsername = st?.botUsername || 'gue_attendance_bot';
+      const linkUrl = st?.linkUrl || `https://t.me/${botUsername}?start=${linkCode}`;
+      const tgProtocol = st?.tgProtocolUrl || `tg://resolve?domain=${botUsername}&start=${linkCode}`;
+
+      if ($('connectBtn')) $('connectBtn').href = linkUrl;
+      if ($('connectAppBtn')) $('connectAppBtn').href = tgProtocol;
+      if ($('manualBotUsername')) $('manualBotUsername').textContent = botUsername;
+      if ($('manualCommand')) $('manualCommand').textContent = `/start ${linkCode}`;
+    }
+
+    const copyBtn = $('copyCommandBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const cmd = ($('manualCommand')?.textContent || '').trim();
+        if (!cmd) return;
+        navigator.clipboard.writeText(cmd).then(() => {
+          const fb = $('copyFeedback');
+          if (fb) {
+            fb.style.display = 'inline';
+            setTimeout(() => { fb.style.display = 'none'; }, 2500);
+          }
+        }).catch(() => {
+          prompt('Copy this command and send in Telegram:', cmd);
+        });
+      });
     }
 
     async function loadStatus() {
@@ -225,7 +273,7 @@
             $('msg').textContent = 'Telegram disconnected. No further messages will be sent to that chat.';
             $('msg').classList.remove('hidden');
           }
-          showNotConnected(st.linkUrl);
+          showNotConnected(st);
           startPoll();
         }
 
