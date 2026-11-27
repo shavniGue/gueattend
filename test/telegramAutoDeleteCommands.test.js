@@ -318,7 +318,7 @@ async function run() {
   console.log('PASS  9. /status command message and bot response delete after 120 seconds');
 
   // ----------------------------------------------------
-  // TEST 10: /help temporary response deletes after 1 minute
+  // TEST 10: /help welcome response stays permanently ("bs ye Welcome to the GUEAttend Bot! ... hmesa rhe")
   // ----------------------------------------------------
   sentMessages.length = 0;
   await telegram.handleUserMessage({ chat: { id: 100001 }, text: '/help', message_id: 3002 });
@@ -326,8 +326,8 @@ async function run() {
   assert(helpMsg && helpMsg.text.includes('Available commands'), 'Help response must be sent');
   const pendingAfterHelp = await db.listPendingDeletions();
   const helpEntry = pendingAfterHelp.find((p) => p.messageId === helpMsg.message_id);
-  assert(helpEntry, '/help response MUST be scheduled for deletion in DB');
-  console.log('PASS  10. /help temporary response deletes after 1 minute');
+  assert(!helpEntry, '/help welcome response MUST NOT be scheduled for deletion (stays permanently)');
+  console.log('PASS  10. /help welcome response stays permanently without auto-deletion');
 
   // ----------------------------------------------------
   // TEST 11: /attendance command response deletes after 1 minute
