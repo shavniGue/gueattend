@@ -1711,6 +1711,57 @@ app.post('/api/new-erp/reconnect', requireAuth, async (req, res) => {
 });
 
 
+// ---- Telegram smart redirect (triggers tg:// app protocol, completely bypassing ISP t.me blocks) ----
+app.get('/tg-redirect', requireAuth, async (req, res) => {
+  const code = await db.telegramLinkCodeFor(req.appUser.id);
+  const botUsername = telegram.getBotUsername();
+  const tgUrl = `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(code || '')}`;
+  const webUrl = telegram.deepLink(code || '');
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Opening Telegram — GUEAttend</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #fff; text-align: center; padding: 20px; box-sizing: border-box; }
+    .box { max-width: 440px; width: 100%; background: #1e293b; padding: 32px 24px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #334155; }
+    h2 { margin: 0 0 12px; font-size: 1.35rem; }
+    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin: 0 0 20px; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #0088cc; color: white; text-decoration: none; font-weight: 600; padding: 13px 18px; border-radius: 10px; margin-bottom: 12px; font-size: 1rem; border: none; cursor: pointer; }
+    .btn:hover { background: #0077b5; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .cmd-box { background: #0f172a; padding: 14px; border-radius: 10px; margin-top: 18px; text-align: left; font-size: 0.9rem; border: 1px solid #334155; }
+    code { color: #38bdf8; font-weight: 700; font-size: 1rem; display: block; margin: 8px 0; background: #1e293b; padding: 8px 12px; border-radius: 6px; }
+    .back-link { display: inline-block; margin-top: 16px; color: #94a3b8; text-decoration: none; font-size: 0.9rem; }
+    .back-link:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div style="font-size: 44px; margin-bottom: 12px;">📱</div>
+    <h2>Opening Telegram App...</h2>
+    <p>Agar browser ne Telegram app open karne ki permission mangi ho, to <b>"Open Telegram"</b> par click karein.</p>
+    <a href="${tgUrl}" class="btn">🚀 Open Telegram App</a>
+    <a href="${webUrl}" target="_blank" rel="noopener" class="btn btn-secondary">🌐 Open via Web Link</a>
+    <div class="cmd-box">
+      <div style="color: #94a3b8;">Ya Telegram me search karein <b>@${botUsername}</b> aur ye send karein:</div>
+      <code id="cmdCode">/start ${code}</code>
+      <button type="button" onclick="navigator.clipboard.writeText('/start ${code}').then(()=>alert('Command copied! Telegram me paste karein.'))" class="btn btn-secondary" style="margin-top: 8px; padding: 8px 12px; font-size: 0.85rem;">📋 Copy Command</button>
+    </div>
+    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+  </div>
+  <script>
+    // Direct app trigger
+    setTimeout(function() {
+      window.location.href = "${tgUrl}";
+    }, 200);
+  </script>
+</body>
+</html>`);
+});
+
 // ---- Telegram linking (deep-link flow — koi QR nahi) ----
 app.get('/api/telegram/status', requireAuth, async (req, res) => {
   const user = await db.getUserById(req.appUser.id);
@@ -1728,8 +1779,9 @@ app.get('/api/telegram/status', requireAuth, async (req, res) => {
     connected: Boolean(user?.telegramChatId),
     botUsername,
     linkCode,
-    linkUrl: telegram.deepLink(linkCode),
+    linkUrl: `/tg-redirect`,
     tgProtocolUrl: `tg://resolve?domain=${botUsername}&start=${encodeURIComponent(linkCode)}`,
+    tMeUrl: telegram.deepLink(linkCode),
     tokenError: tokenInvalid ? 'Telegram bot token is invalid or revoked (401). Please update TELEGRAM_BOT_TOKEN with active token from @BotFather.' : null,
   });
 });

@@ -79,7 +79,7 @@
     </div>
     <div id="tgBanner" class="banner info hidden">
       <span id="tgBannerText">💬 Telegram is not connected — press the button and start the bot chat.</span>
-      <a id="tgConnectBtn" class="btn accent hidden" href="#" target="_blank" rel="noopener">💬 Connect Telegram</a>
+      <a id="tgConnectBtn" class="btn accent hidden" href="/tg-redirect">💬 Connect Telegram</a>
     </div>
 
     <div class="card">
@@ -437,7 +437,7 @@
         } else {
           $('tgBannerText').textContent = '💬 Telegram is not connected — press the button, Telegram opens, press "Start" — done.';
           $('tgBanner').classList.remove('hidden');
-          $('tgConnectBtn').href = st.linkUrl;
+          $('tgConnectBtn').href = st.linkUrl || '/tg-redirect';
           $('tgConnectBtn').classList.remove('hidden');
           $('tgDot').className = 'status-dot off';
           $('tgState').textContent = 'Not connected';

@@ -217,6 +217,17 @@
       if ($('manualCommand')) $('manualCommand').textContent = `/start ${linkCode}`;
     }
 
+    const appBtn = $('connectAppBtn');
+    if (appBtn) {
+      appBtn.addEventListener('click', (e) => {
+        const href = appBtn.getAttribute('href');
+        if (href && href.startsWith('tg://')) {
+          e.preventDefault();
+          window.location.href = href;
+        }
+      });
+    }
+
     const copyBtn = $('copyCommandBtn');
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
