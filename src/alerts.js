@@ -198,29 +198,8 @@ const RECONNECT_DELETE_DELAY_MS = Number(process.env.RECONNECT_DELETE_DELAY_MS |
  * Schedule a Telegram message to be deleted after a specified delay (default: 1 min / 60,000 ms).
  */
 function scheduleMessageDeletion(userId, messageId, delayMs = RECONNECT_DELETE_DELAY_MS, log = console) {
-  if (!userId || !messageId) return null;
-  if (typeof scheduleAutoDelete === 'function') {
-    db.getUserById(userId).then((user) => {
-      if (user && user.telegramChatId) {
-        scheduleAutoDelete(user.telegramChatId, messageId, delayMs, log);
-      }
-    }).catch(() => {});
-  }
-  const timer = setTimeout(async () => {
-    try {
-      if (typeof deleteMessage === 'function') {
-        await deleteMessage(userId, messageId, log).catch(() => {});
-        log.log(`[alerts] 🗑️ Reconnect confirmation message ${messageId} auto-deleted after 1 min for user=${userId}.`);
-      }
-    } catch (err) {
-      log.log(`[alerts] auto-delete reconnect message warning: ${err.message}`);
-    }
-  }, Math.max(0, delayMs));
-
-  if (timer && typeof timer.unref === 'function') {
-    timer.unref();
-  }
-  return timer;
+  // Messages remain permanently in chat
+  return null;
 }
 
 /**

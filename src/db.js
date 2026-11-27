@@ -2523,6 +2523,16 @@ async function removeScheduledDeletion(chatId, messageId) {
   return res.rowCount || 0;
 }
 
+async function clearAllScheduledDeletions() {
+  if (!USE_PG) {
+    if (data.scheduledDeletions) data.scheduledDeletions = [];
+    persistJson();
+    return;
+  }
+  await init();
+  await pool.query(`DELETE FROM scheduled_message_deletions`);
+}
+
 // ---------------------------------------------------------------------------
 // Centralized ERP Session Registry (One QUMS Account = One Active Session)
 // ---------------------------------------------------------------------------
@@ -2943,7 +2953,7 @@ module.exports={
   // session-expiry state (PostgreSQL-backed)
   SESSION_ALERT_COOLDOWN_MS, getSessionExpiryState, markSessionExpired, recordSessionExpiryAlert, getSessionExpiryMessageIds, clearSessionExpiry, clearSessionExpiryTelegramMessage, listSessionExpiredUsers,
   // scheduled message auto-deletions
-  addScheduledDeletion, listPendingDeletions, removeScheduledDeletion,
+  addScheduledDeletion, listPendingDeletions, removeScheduledDeletion, clearAllScheduledDeletions,
   // notification log / analytics
   NOTIFICATION_KINDS, recordNotification, notificationStats, recentNotifications,
   // admin
