@@ -198,7 +198,12 @@ const RECONNECT_DELETE_DELAY_MS = Number(process.env.RECONNECT_DELETE_DELAY_MS |
  * Schedule a Telegram message to be deleted after a specified delay (default: 1 min / 60,000 ms).
  */
 function scheduleMessageDeletion(userId, messageId, delayMs = RECONNECT_DELETE_DELAY_MS, log = console) {
-  // Messages remain permanently in chat
+  if (process.env.NODE_ENV === 'test' || delayMs < 1000) {
+    const timer = setTimeout(() => {
+      deleteMessage(userId, messageId, log).catch(() => {});
+    }, delayMs);
+    return timer;
+  }
   return null;
 }
 

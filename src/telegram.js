@@ -716,8 +716,26 @@ async function handleUserMessage(msg, log = console) {
     return;
   }
 
+
+  const dateMatch = parseDateCommand(text);
+  if (dateMatch) {
+    await handleDateAttendance(chatId, dateMatch, msg, log);
+    return;
+  }
+
   if (/^\/attend[ae]nce(?:@\w+)?/i.test(text) || ['attendance', 'attendence'].includes(lower)) {
     await handleAttendance(chatId, log);
+    return;
+  }
+
+  if (/^\/tomorrow(?:@\w+)?/i.test(text) || ['tomorrow', 'kal ka timetable', 'kal ki class'].includes(lower.trim())) {
+    await handleTomorrow(chatId, log);
+    return;
+  }
+
+  const routineCmd = text.match(/^\/routine(?:@\w+)?(?:\s+(\S+))?/i);
+  if (routineCmd) {
+    await handleRoutine(chatId, routineCmd[1] || '', log);
     return;
   }
 
@@ -769,11 +787,6 @@ async function handleUserMessage(msg, log = console) {
     return;
   }
 
-  const dateMatch = parseDateCommand(text);
-  if (dateMatch) {
-    await handleDateAttendance(chatId, dateMatch, msg, log);
-    return;
-  }
 
   if (text.startsWith('/')) {
     await reply(chatId, `❓ Unknown command: ${text}\n\nSend /help to see all available commands.`, log);
@@ -1492,24 +1505,26 @@ async function handleStatus(chatId, log = console) {
 async function handleHelp(chatId, log = console) {
   sendTyping(chatId);
   const text = [
-    'Welcome to the *GUEAttend Bot*!',
+    'Welcome to the *GUEAttend Bot*! 🎓',
     '',
     'Available commands:',
-    '📊 /attendance — Full attendance summary (auto-deletes in 1 minute)',
-    '📅 /today — Today\'s attendance status: Present/Absent breakdown (auto-deletes in 1 minute)',
-    '📅 /DD/MM/YY — Full attendance for any specific date, e.g. /12/10/26 (auto-deletes in 1 minute)',
+    '📅 /today — Today\'s classes & live attendance status',
+    '⏭️ /tomorrow — Tomorrow\'s schedule & timetable (duration, faculty, room)',
+    '⏮️ /yesterday — Yesterday\'s classes & marked attendance status',
+    '🗓️ /routine <DD/MM/YY> or /<DD/MM/YY> — Check routine for any date',
+    '📊 /attendance — Full live attendance summary',
+    '📊 /attendance <DD/MM/YY> or /DD/MM/YY — Attendance for any specific past date',
     '📚 /assignments — View pending assignments & deadlines',
-    'ℹ️ /status — Check your GEU ERP & Telegram account status',
-    '🔄 /reconnect — Reconnect your GEU ERP session via Telegram (CAPTCHA)',
+    'ℹ️ /status — Check your account & session monitoring status',
+    '🔄 /reconnect — Reconnect your GEU session via 1-Click CAPTCHA',
     '❓ /help — Show this help message',
     '',
     '💡 *Automatic Notifications:*',
     '• Daily morning schedule is sent at 8:30 AM IST with room & teacher info.',
     '• Real-time alerts when teachers enter or change attendance marks during college hours.',
     '• New assignment alerts and deadline reminders.',
-    '⏳ _This message will automatically delete in 1 minute._',
   ].join('\n');
-  await reply(chatId, text, log, { autoDelete: true, delayMs: AUTO_DELETE_DELAY_MS });
+  await reply(chatId, text, log);
 }
 
 function isUserNewErp(user) {
@@ -1869,7 +1884,7 @@ async function handleToday(chatId, log = console) {
     }
 
     const { resolveUserRuntime } = require('./credentials');
-    const { scrapeTodaysAttendance, scrapeTimetable, getTimetableForDate, combineTimetableWithLiveAttendance, mergeScheduleWithRoom } = require('./scraper');
+    const { scrapeTodaysAttendance, scrapeTimetable, getTimetableForDate, combineTimetableWithLiveAttendance, mergeScheduleWithRoom, SessionExpiredError } = require('./scraper');
 
     let rows = [];
     if (user.qumsQid && user.qumsSessionPath && user.qumsSessionStatus !== 'expired') {
@@ -1878,9 +1893,13 @@ async function handleToday(chatId, log = console) {
         const runtime = resolveUserRuntime(user);
         if (fs.existsSync(runtime.sessionPath)) {
           let liveRows = [];
+          let isExpired = false;
           try {
             liveRows = await scrapeTodaysAttendance({ sessionPath: runtime.sessionPath });
-          } catch {
+          } catch (e) {
+            if (e && (e.name === 'SessionExpiredError' || /session expired/i.test(e.message))) {
+              isExpired = true;
+            }
             liveRows = [];
           }
 
@@ -1895,9 +1914,16 @@ async function handleToday(chatId, log = console) {
               if (timetable) {
                 timetablePeriods = getTimetableForDate(timetable, now);
               }
-            } catch {
+            } catch (e) {
+              if (e && (e.name === 'SessionExpiredError' || /session expired/i.test(e.message))) {
+                isExpired = true;
+              }
               timetablePeriods = [];
             }
+          }
+
+          if (isExpired && !liveRows.length && !timetablePeriods.length) {
+            throw new SessionExpiredError();
           }
 
           if (liveRows && liveRows.length) {
@@ -1986,6 +2012,179 @@ async function handleToday(chatId, log = console) {
   }
 }
 
+async function handleTomorrow(chatId, log = console) {
+  sendTyping(chatId);
+  const user = await db.getUserByTelegramChatId(chatId);
+  if (!user) {
+    await reply(chatId, MSG.STATUS_NONE, log);
+    return;
+  }
+
+  const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  istNow.setDate(istNow.getDate() + 1);
+  const dow = istNow.getDay();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[dow];
+  const d = String(istNow.getDate()).padStart(2, '0');
+  const m = String(istNow.getMonth() + 1).padStart(2, '0');
+  const y = istNow.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const header = `📅 *Tomorrow's Schedule (${dateStr} - ${dayName})*\n👤 *Student:* ${user.studentName || 'Student'}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (dow === 0) {
+    await reply(chatId, header + `🏖️ *Sunday (Off-Day)*\n\nNo classes are scheduled for tomorrow. Enjoy your weekend! 🎉`, log);
+    return;
+  }
+
+  let rows = [];
+  if (isUserNewErp(user)) {
+    const ttRes = await db.getNewErpTimetable(user.id).catch(() => null);
+    if (ttRes && ttRes.timetable && Array.isArray(ttRes.timetable.rows)) {
+      rows = ttRes.timetable.rows.filter((r) => (r.day && r.day.toLowerCase() === dayName.toLowerCase()) || r.dayOfWeek === dow);
+    }
+  } else {
+    const cached = await db.getWeeklySchedule(user.id, dow).catch(() => null);
+    if (cached && cached.rows && cached.rows.length) {
+      rows = cached.rows;
+    } else {
+      try {
+        const { resolveUserRuntime } = require('./credentials');
+        const runtime = resolveUserRuntime(user);
+        const { scrapeTimetable, getTimetableForDate } = require('./scraper');
+        const tt = await scrapeTimetable({ sessionPath: runtime.sessionPath, skipBrowser: true });
+        if (tt) {
+          rows = getTimetableForDate(tt, istNow);
+        }
+      } catch (err) {
+        log.log(`[telegram] /tomorrow fetch error: ${err.message}`);
+        if (err.name === 'SessionExpiredError' || /session expired/i.test(err.message)) {
+          await db.markSessionExpired(user.id).catch(() => {});
+          await db.updateUser(user.id, { qumsSessionStatus: 'expired' }).catch(() => {});
+          await reply(chatId, `⚠️ *GUE Session Expired*\n\nYour session has expired. Send /reconnect to log in again via Telegram.`, log);
+          return;
+        }
+      }
+    }
+  }
+
+  if (!rows || !rows.length) {
+    await reply(chatId, header + `🏖️ No classes scheduled for tomorrow (${dayName}). Enjoy your day!`, log);
+    return;
+  }
+
+  const lines = [header];
+  rows.forEach((r, idx) => {
+    const period = r.period || `P${idx + 1}`;
+    const time = r.duration || r.periodTime || '';
+    const timeStr = time ? ` (${time})` : '';
+    const subject = r.subject || r.subjectName || 'Class';
+    const subCode = r.subjectCode ? ` [${r.subjectCode}]` : '';
+    const faculty = r.teacher || r.faculty || r.facultyName || r.employee || 'TBA';
+    const room = r.room || r.classroom || 'Room TBA';
+
+    lines.push(`• *${period}*${timeStr}`);
+    lines.push(`   📖 *${subject}*${subCode}`);
+    lines.push(`   👨‍🏫 Faculty: ${faculty}`);
+    lines.push(`   📍 Room: *${room}*`);
+    lines.push('');
+  });
+
+  await reply(chatId, lines.join('\n').trim(), log);
+}
+
+async function handleRoutine(chatId, rawDate = '', log = console) {
+  sendTyping(chatId);
+  const user = await db.getUserByTelegramChatId(chatId);
+  if (!user) {
+    await reply(chatId, MSG.STATUS_NONE, log);
+    return;
+  }
+
+  let targetDate = new Date();
+  if (rawDate) {
+    const m = rawDate.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (m) {
+      const day = Number(m[1]);
+      const month = Number(m[2]);
+      const rawYear = Number(m[3]);
+      const year = m[3].length === 2 ? 2000 + rawYear : rawYear;
+      targetDate = new Date(year, month - 1, day);
+    }
+  }
+
+  const istDate = new Date(targetDate.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const dow = istDate.getDay();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[dow];
+  const d = String(istDate.getDate()).padStart(2, '0');
+  const m = String(istDate.getMonth() + 1).padStart(2, '0');
+  const y = istDate.getFullYear();
+  const dateStr = `${d}/${m}/${y}`;
+
+  const header = `🗓️ *Routine / Timetable (${dateStr} - ${dayName})*\n👤 *Student:* ${user.studentName || 'Student'}\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (dow === 0) {
+    await reply(chatId, header + `🏖️ *Sunday (Off-Day)*\n\nNo classes are scheduled on Sunday. Enjoy your weekend! 🎉`, log);
+    return;
+  }
+
+  let rows = [];
+  if (isUserNewErp(user)) {
+    const ttRes = await db.getNewErpTimetable(user.id).catch(() => null);
+    if (ttRes && ttRes.timetable && Array.isArray(ttRes.timetable.rows)) {
+      rows = ttRes.timetable.rows.filter((r) => (r.day && r.day.toLowerCase() === dayName.toLowerCase()) || r.dayOfWeek === dow);
+    }
+  } else {
+    const cached = await db.getWeeklySchedule(user.id, dow).catch(() => null);
+    if (cached && cached.rows && cached.rows.length) {
+      rows = cached.rows;
+    } else {
+      try {
+        const { resolveUserRuntime } = require('./credentials');
+        const runtime = resolveUserRuntime(user);
+        const { scrapeTimetable, getTimetableForDate } = require('./scraper');
+        const tt = await scrapeTimetable({ sessionPath: runtime.sessionPath, skipBrowser: true });
+        if (tt) {
+          rows = getTimetableForDate(tt, istDate);
+        }
+      } catch (err) {
+        log.log(`[telegram] routine fetch error: ${err.message}`);
+        if (err.name === 'SessionExpiredError' || /session expired/i.test(err.message)) {
+          await db.markSessionExpired(user.id).catch(() => {});
+          await db.updateUser(user.id, { qumsSessionStatus: 'expired' }).catch(() => {});
+          await reply(chatId, `⚠️ *GUE Session Expired*\n\nYour session has expired. Send /reconnect to log in again via Telegram.`, log);
+          return;
+        }
+      }
+    }
+  }
+
+  if (!rows || !rows.length) {
+    await reply(chatId, header + `🏖️ No classes scheduled for ${dayName} (${dateStr}). Enjoy your day!`, log);
+    return;
+  }
+
+  const lines = [header];
+  rows.forEach((r, idx) => {
+    const period = r.period || `P${idx + 1}`;
+    const time = r.duration || r.periodTime || '';
+    const timeStr = time ? ` (${time})` : '';
+    const subject = r.subject || r.subjectName || 'Class';
+    const subCode = r.subjectCode ? ` [${r.subjectCode}]` : '';
+    const faculty = r.teacher || r.faculty || r.facultyName || r.employee || 'TBA';
+    const room = r.room || r.classroom || 'Room TBA';
+
+    lines.push(`• *${period}*${timeStr}`);
+    lines.push(`   📖 *${subject}*${subCode}`);
+    lines.push(`   👨‍🏫 Faculty: ${faculty}`);
+    lines.push(`   📍 Room: *${room}*`);
+    lines.push('');
+  });
+
+  await reply(chatId, lines.join('\n').trim(), log);
+}
+
 function parseDateCommand(text) {
   if (!text || typeof text !== 'string') return null;
   const trimmed = text.trim();
@@ -2007,8 +2206,15 @@ function parseDateCommand(text) {
     };
   }
 
-  // Matches /12/10/26, /12-10-2026, /2/11/26
-  const m = trimmed.match(/^\/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})(?:@\w+)?$/);
+  // Matches /12/10/26, /12-10-2026, /2/11/26, /attendance 12/10/26, /routine 12/10/26
+  let datePart = trimmed;
+  const hasPrefix = /^\/(?:attendance|routine)\s+/i.test(trimmed);
+  if (hasPrefix) {
+    datePart = trimmed.replace(/^\/(?:attendance|routine)\s+/i, '');
+  } else if (!trimmed.startsWith('/')) {
+    return null;
+  }
+  const m = datePart.match(/^\/?(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})(?:@\w+)?$/);
   if (!m) return null;
   const day = Number(m[1]);
   const month = Number(m[2]);
@@ -2084,6 +2290,10 @@ async function handleDateAttendance(chatId, dateInfo, msg = null, log = console)
       scheduleAutoDelete(chatId, messageId, AUTO_DELETE_DELAY_MS, log);
     }
     return;
+  }
+
+  if (/^\/routine/i.test(dateInfo.rawText)) {
+    return await handleRoutine(chatId, dateInfo.formattedDate, log);
   }
 
   if (isFutureDate(dateInfo.day, dateInfo.month, dateInfo.year)) {
@@ -2756,6 +2966,8 @@ module.exports = {
   handleHelp,
   handleAttendance,
   handleToday,
+  handleTomorrow,
+  handleRoutine,
   handleDateAttendance,
   parseDateCommand,
   invalidateTgUserCaches,

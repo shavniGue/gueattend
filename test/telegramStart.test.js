@@ -68,6 +68,7 @@ Module.prototype.require = function (id) {
 
 const db = require('../src/db');
 const telegram = require('../src/telegram');
+if (!process.argv.includes('--second-instance')) process.env.TELEGRAM_POLLING = 'on';
 
 let failures = 0;
 function check(label, actual, expected) {

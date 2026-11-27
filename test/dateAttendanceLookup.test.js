@@ -314,33 +314,17 @@ async function run() {
   console.log('✓ PASS: Multi-user attendance isolation strictly verified');
 
   // ====================================================
-  // 6. Deletion Scheduling for Command & Bot Response (60s)
+  // 6. Deletion Scheduling disabled per user request
   // ====================================================
-  console.log('\n--- Group 6: 60-Second Auto-Delete Scheduling ---');
+  console.log('\n--- Group 6: Auto-Delete Permanently Disabled ---');
   const pendingDeletions = await db.listPendingDeletions();
-
-  // User B's incoming command (message_id 8002) must be scheduled for deletion
-  const cmdEntry = pendingDeletions.find((p) => p.chatId === '720002' && p.messageId === 8002);
-  assert(cmdEntry, 'User command message (8002) must be in scheduled deletions');
-  assert(
-    cmdEntry.deleteAt <= Date.now() + 61000 && cmdEntry.deleteAt >= Date.now() + 58000,
-    'Command message deleteAt must be ~60 seconds'
-  );
-
-  // User B's bot response must be scheduled for deletion
-  const botRespMsg = sentMessages[0];
-  const respEntry = pendingDeletions.find((p) => p.chatId === '720002' && p.messageId === botRespMsg.message_id);
-  assert(respEntry, 'Bot response message must be in scheduled deletions');
-  assert(
-    respEntry.deleteAt <= Date.now() + 61000 && respEntry.deleteAt >= Date.now() + 58000,
-    'Bot response message deleteAt must be ~60 seconds'
-  );
-  console.log('✓ PASS: Both command message and bot response scheduled for deletion at 60 seconds');
+  assert.strictEqual(pendingDeletions.length, 0, 'No deletions should be scheduled when auto-delete is disabled');
+  console.log('✓ PASS: Messages remain permanently without disappearing');
 
   // ====================================================
-  // 7. Invalid Date & Future Date Command Auto-Delete
+  // 7. Invalid Date & Future Date Command Handling
   // ====================================================
-  console.log('\n--- Group 7: Error Commands Auto-Delete ---');
+  console.log('\n--- Group 7: Error Commands Handling ---');
   sentMessages.length = 0;
   await telegram.handleUserMessage({
     chat: { id: 710001 },
@@ -349,10 +333,7 @@ async function run() {
   });
   assert.strictEqual(sentMessages.length, 1);
   assert(sentMessages[0].text.includes('Invalid Date'), 'Must report invalid date for April 31');
-
-  const pendingAfterInvalid = await db.listPendingDeletions();
-  assert(pendingAfterInvalid.some((p) => p.messageId === 8003), 'Invalid command must be scheduled for deletion');
-  assert(pendingAfterInvalid.some((p) => p.messageId === sentMessages[0].message_id), 'Invalid response must be scheduled for deletion');
+  console.log('✓ PASS: Invalid date correctly reported without auto-delete');
 
   // Future date command
   sentMessages.length = 0;

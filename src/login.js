@@ -381,4 +381,5 @@ module.exports = {
   locateCaptchaInput,
   clickLoginButton,
   captureCaptchaImage,
+  compositeCaptchaOnPortalBg,
 };

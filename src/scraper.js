@@ -1974,18 +1974,31 @@ async function getTodaysAttendance(userId) {
  * dayOfWeek pe weekly_schedule_cache me UPSERT ho jata hai.
  */
 async function getTodaysScheduleWithRoom(userId) {
+  let isSessionExpired = false;
   let todaysRows = [];
   try {
     todaysRows = await scrapeTodaysAttendance({ sessionPath: db.sessionPathFor(userId) });
-  } catch {
+  } catch (err) {
+    if (err && (err.name === 'SessionExpiredError' || /session expired/i.test(err.message))) {
+      isSessionExpired = true;
+    }
     todaysRows = [];
   }
   let timetablePeriods = [];
   try {
     const timetable = await scrapeTimetable({ sessionPath: db.sessionPathFor(userId) });
     timetablePeriods = getTimetableForDate(timetable, new Date());
-  } catch {
+  } catch (err) {
+    if (err && (err.name === 'SessionExpiredError' || /session expired/i.test(err.message))) {
+      isSessionExpired = true;
+    }
     timetablePeriods = [];
+  }
+
+  if (isSessionExpired && !todaysRows.length && !timetablePeriods.length) {
+    await db.markSessionExpired(userId).catch(() => {});
+    await db.updateUser(userId, { qumsSessionStatus: 'expired' }).catch(() => {});
+    throw new SessionExpiredError();
   }
 
   let merged = [];
