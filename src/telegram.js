@@ -871,9 +871,9 @@ async function handleUserMessage(msg, log = console) {
       const alerts = require('./alerts');
       const recUrl = typeof alerts.reconnectUrl === 'function' ? alerts.reconnectUrl() : 'https://gueattend.onrender.com/qums-setup?reconnect=1';
       const msgText = [
-        '❌ *Invalid GUE ID or Password*',
+        '❌ *Invalid GEU ID or Password*',
         '',
-        'Your saved GUE credentials were not accepted by the portal. Please update your password on the web setup page:',
+        'Your saved GEU credentials were not accepted by the portal. Please update your password on the web setup page:',
       ].join('\n');
       const keyboard = {
         inline_keyboard: [[{ text: '⚙️ Open GUE Setup', url: recUrl }]],
@@ -1405,7 +1405,7 @@ async function handleStart(chatId, payload, log = console) {
         '📅 /today — View today\'s class timetable & status (auto-deletes in 1 min)',
         '📚 /assignments — View pending assignments & deadlines',
         'ℹ️ /status — Check account connection status',
-        '🔄 /reconnect — Reconnect GUE session',
+        '🔄 /reconnect — Reconnect GEU session',
         '❓ /help — Detailed help & commands list',
         AUTO_DELETE_FOOTNOTE.trim(),
       ].join('\n');
@@ -1476,7 +1476,18 @@ async function handleStatus(chatId, log = console) {
     }
 
     const name = user.studentName || 'Student';
-    const qid = user.qumsQid || 'Not set';
+    let qid = user.qumsQid || 'Not set';
+    if ((qid.includes('@') || qid === 'Not set') && (user.qumsSessionPath || user.qumsSessionData)) {
+      const sp = user.qumsSessionPath || (await db.ensureQumsSessionOnDisk(user).catch(() => null)) || db.sessionPathFor(user.id);
+      const scraper = require('./scraper');
+      const actualId = scraper.extractGeuIdFromSession(sp);
+      if (actualId) {
+        qid = actualId;
+        user.qumsQid = actualId;
+        user.geuId = actualId;
+        await db.updateUser(user.id, { qumsQid: actualId, geuId: actualId }).catch(() => {});
+      }
+    }
     const sessionActive = user.qumsSessionStatus === 'active' && Boolean(user.qumsSessionPath && fs.existsSync(user.qumsSessionPath));
     const sessionStatusText = sessionActive
       ? 'Active & Monitored ✅'
@@ -1486,9 +1497,9 @@ async function handleStatus(chatId, log = console) {
       'ℹ️ *Account Status*',
       '',
       `👤 Student: ${name}`,
-      `🎓 GUE ID: ${qid}`,
+      `🎓 GEU ID: ${qid}`,
       `📡 Monitoring: ${sessionActive ? 'Active ✅' : 'Paused ⚠️'}`,
-      `🔐 GUE Session: ${sessionStatusText}`,
+      `🔐 GEU Session: ${sessionStatusText}`,
     ];
     if (!sessionActive && (user.qumsPasswordEncrypted || user.qumsQid)) {
       lines.push('');

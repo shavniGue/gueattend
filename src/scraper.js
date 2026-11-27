@@ -429,6 +429,50 @@ function getJwtExp(jwtToken) {
   return null;
 }
 
+/** Extract student/user ID from JWT token payload without secret verification. */
+function getJwtUserId(jwtToken) {
+  try {
+    const parts = String(jwtToken || '').split('.');
+    if (parts.length >= 2) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      const id = payload.userid || payload.userloginid || payload.uid;
+      if (id != null) {
+        const str = String(id).trim();
+        if (str && !str.includes('@')) return str;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Extract actual GEU Student ID from a session file, raw JSON string, or parsed session object.
+ * Returns the numeric/roll ID (e.g. '2510070038') or null if not found.
+ */
+function extractGeuIdFromSession(sessionSource) {
+  if (!sessionSource) return null;
+  try {
+    let cookies = [];
+    if (typeof sessionSource === 'string') {
+      const trimmed = sessionSource.trim();
+      if (trimmed.startsWith('{')) {
+        const parsed = JSON.parse(trimmed);
+        cookies = Array.isArray(parsed.cookies) ? parsed.cookies : [];
+      } else if (fs.existsSync(sessionSource)) {
+        const parsed = JSON.parse(fs.readFileSync(sessionSource, 'utf8'));
+        cookies = Array.isArray(parsed.cookies) ? parsed.cookies : [];
+      }
+    } else if (sessionSource && Array.isArray(sessionSource.cookies)) {
+      cookies = sessionSource.cookies;
+    }
+    const jwtCookie = cookies.find((c) => c && c.name === 'jwt');
+    if (jwtCookie && jwtCookie.value) {
+      return getJwtUserId(jwtCookie.value);
+    }
+  } catch {}
+  return null;
+}
+
 /** Parse a Set-Cookie header into a Playwright/storageState cookie object. */
 function parseSetCookie(cookieStr, domain = 'student.geu.ac.in') {
   if (!cookieStr || typeof cookieStr !== 'string') return null;
@@ -2461,6 +2505,8 @@ module.exports = {
   SessionExpiredError,
   NoSessionError,
   getJwtExp,
+  getJwtUserId,
+  extractGeuIdFromSession,
   refreshQumsToken,
 };
 

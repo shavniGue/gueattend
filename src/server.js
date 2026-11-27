@@ -1138,8 +1138,11 @@ async function startQumsLoginHandler(req, res) {
     if (finalQid && finalPassword) {
       try {
         const { encryptSecret } = require('./crypto');
+        const qidToSave = finalQid.includes('@') && req.appUser && req.appUser.qumsQid && !req.appUser.qumsQid.includes('@')
+          ? req.appUser.qumsQid
+          : finalQid;
         await db.updateUser(req.session.userId, {
-          qumsQid: finalQid,
+          qumsQid: qidToSave,
           qumsPasswordEncrypted: encryptSecret(finalPassword),
         });
       } catch (saveErr) {
@@ -1179,8 +1182,11 @@ app.post(['/api/user/save-geu-credentials', '/api/user/qums-credentials'], requi
       return res.status(400).json({ ok: false, error: 'GEU Student ID and password are required.' });
     }
     const { encryptSecret } = require('./crypto');
+    const qidToSave = finalQid.includes('@') && req.appUser && req.appUser.qumsQid && !req.appUser.qumsQid.includes('@')
+      ? req.appUser.qumsQid
+      : finalQid;
     await db.updateUser(req.session.userId, {
-      qumsQid: finalQid,
+      qumsQid: qidToSave,
       qumsPasswordEncrypted: encryptSecret(finalPassword),
     });
     res.json({ ok: true, message: 'GEU ERP credentials saved securely.' });
@@ -1199,8 +1205,11 @@ async function submitQumsCaptchaHandler(req, res) {
     if (finalPassword && req.session && req.session.userId) {
       try {
         const { encryptSecret } = require('./crypto');
+        const qidToSave = finalQid && finalQid.includes('@') && req.appUser && req.appUser.qumsQid && !req.appUser.qumsQid.includes('@')
+          ? req.appUser.qumsQid
+          : finalQid;
         await db.updateUser(req.session.userId, {
-          ...(finalQid ? { qumsQid: finalQid } : {}),
+          ...(qidToSave ? { qumsQid: qidToSave } : {}),
           qumsPasswordEncrypted: encryptSecret(finalPassword),
         });
       } catch (saveErr) {

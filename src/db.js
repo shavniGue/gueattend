@@ -435,6 +435,28 @@ if (!USE_PG) {
         sessionPathsFixed = true;
       }
     }
+    if (u.qumsQid && u.qumsQid.includes('@')) {
+      const sp = u.qumsSessionPath || path.join(QUMS_SESSION_DIR, `${u.id}.json`);
+      if (fs.existsSync(sp)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(sp, 'utf8'));
+          const jwtCookie = (parsed.cookies || []).find((c) => c && c.name === 'jwt');
+          if (jwtCookie && jwtCookie.value) {
+            const parts = jwtCookie.value.split('.');
+            if (parts.length >= 2) {
+              const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+              const id = payload.userid || payload.userloginid || payload.uid;
+              if (id && typeof id === 'string' && !id.includes('@')) {
+                u.qumsQid = id.trim();
+                u.geuId = id.trim();
+                u.gueQid = id.trim();
+                sessionPathsFixed = true;
+              }
+            }
+          }
+        } catch {}
+      }
+    }
   }
   if (sessionPathsFixed) persistJson();
 }
@@ -907,11 +929,41 @@ function fromUserRow(r) {
     }
   }
 
+  let resolvedQid = r.qums_qid || r.geu_id || '';
+  if (resolvedQid && resolvedQid.includes('@')) {
+    try {
+      let sessionObj = null;
+      if (r.qums_session_data || r.geu_session_data) {
+        const plainJson = decodeSessionData(r.qums_session_data || r.geu_session_data);
+        if (plainJson) sessionObj = JSON.parse(plainJson);
+      }
+      if (!sessionObj && resolvedSessionPath && fs.existsSync(resolvedSessionPath)) {
+        sessionObj = JSON.parse(fs.readFileSync(resolvedSessionPath, 'utf8'));
+      }
+      if (sessionObj) {
+        const jwtCookie = (sessionObj.cookies || []).find((c) => c && c.name === 'jwt');
+        if (jwtCookie && jwtCookie.value) {
+          const parts = jwtCookie.value.split('.');
+          if (parts.length >= 2) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+            const id = payload.userid || payload.userloginid || payload.uid;
+            if (id && !String(id).includes('@')) {
+              resolvedQid = String(id).trim();
+              if (USE_PG && pool) {
+                pool.query('UPDATE users SET qums_qid=$1, geu_id=$1 WHERE id=$2', [resolvedQid, r.id]).catch(() => {});
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
   const row = {
     id: r.id, email: r.email, passwordHash: r.password_hash,
-    qumsQid: r.qums_qid || r.geu_id || '',
-    geuId: r.geu_id || r.qums_qid || '',
-    gueQid: r.geu_id || r.qums_qid || '',
+    qumsQid: resolvedQid,
+    geuId: resolvedQid,
+    gueQid: resolvedQid,
     qumsSessionPath: resolvedSessionPath,
     geuSessionPath: r.geu_session_path || resolvedSessionPath,
     gueSessionPath: r.geu_session_path || resolvedSessionPath,

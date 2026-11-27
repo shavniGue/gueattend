@@ -397,6 +397,12 @@ const MIGRATIONS = [
        ON CONFLICT (user_id, geu_id) DO NOTHING`,
     ],
   },
+  {
+    id: '025_heal_geu_email_qid',
+    statements: [
+      `UPDATE users SET qums_qid = '2510070038', geu_id = '2510070038' WHERE email = 'shavnikumarigue@gmail.com' AND (qums_qid LIKE '%@%' OR qums_qid = '' OR qums_qid IS NULL)`,
+    ],
+  },
 ];
 
 /**

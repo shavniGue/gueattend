@@ -762,8 +762,15 @@ async function completeQumsSetup(userId, qid, { password, confirmSwitch = false 
     }
   } catch {}
 
+  const scraper = require('./scraper');
+  const actualStudentId = scraper.extractGeuIdFromSession(sessionPath);
+  const finalQid = (actualStudentId && !actualStudentId.includes('@'))
+    ? actualStudentId
+    : String(qid || '').trim();
+
   const patch = {
-    qumsQid: String(qid || '').trim(),
+    qumsQid: finalQid,
+    geuId: finalQid,
     qumsSessionPath: sessionPath,
     qumsSessionStatus: 'active',
   };
