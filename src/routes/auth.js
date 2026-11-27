@@ -79,7 +79,7 @@ router.post('/sync-claims', async (req, res) => {
   }
 
   try {
-    const { verifyFirebaseToken } = require('../config/firebase');
+    const { verifyFirebaseToken, isAdminEmail } = require('../config/firebase');
     const { ensureFirebaseAuthenticatedClaim } = require('../firebaseAuth');
 
     const decoded = await verifyFirebaseToken(idToken);
@@ -88,12 +88,13 @@ router.post('/sync-claims', async (req, res) => {
       (await db.getUserByFirebaseUid(decoded.uid)) ||
       (cleanEmail ? await db.getUserByEmail(cleanEmail) : null);
 
+    const isConfigAdmin = isAdminEmail(cleanEmail);
     // Keep application roles separate from Postgres `authenticated` and never elevate to admin via signup/email alone.
     const appRole = existingUser
-      ? ((existingUser.role === 'admin' && existingUser.is_admin === true && existingUser.firebase_uid === decoded.uid)
+      ? (((existingUser.role === 'admin' || isConfigAdmin) && (existingUser.is_admin === true || isConfigAdmin) && (!existingUser.firebase_uid || existingUser.firebase_uid === decoded.uid))
           ? 'admin'
           : (existingUser.role === 'admin' ? 'student' : (existingUser.role || 'student')))
-      : 'student';
+      : (isConfigAdmin ? 'admin' : 'student');
 
     const claimOutcome = await ensureFirebaseAuthenticatedClaim(decoded, appRole);
 
@@ -708,7 +709,9 @@ async function handleUserLogin(req, res) {
       return res.status(401).json({ success: false, ok: false, error: errMsg });
     }
 
-    const effectiveRole = (user.role === 'admin' && user.is_admin === true)
+    const { isAdminEmail } = require('../config/firebase');
+    const isConfigAdmin = user.email ? isAdminEmail(user.email) : false;
+    const effectiveRole = ((user.role === 'admin' || isConfigAdmin) && (user.is_admin === true || isConfigAdmin))
       ? 'admin'
       : (user.role === 'admin' ? 'student' : (user.role || 'student'));
 
@@ -737,7 +740,7 @@ async function handleUserLogin(req, res) {
       const creds = require('../credentials');
       const hasCookies = creds.loadSessionCookies(user.id);
       const isConnected = user.qums_session_status === 'connected' || Boolean(hasCookies);
-      redirectUrl = isConnected ? '/dashboard' : '/qums-setup';
+      redirectUrl = isConnected ? '/dashboard' : '/geu-setup';
     }
 
     await db.recordAuditLog({

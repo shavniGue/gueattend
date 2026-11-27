@@ -9,6 +9,7 @@ const {
   getFirebaseApp,
   hasServiceAccountCredential,
   setAuthenticatedUserClaim,
+  isAdminEmail,
 } = require('./config/firebase');
 const db = require('./database/db');
 
@@ -92,6 +93,8 @@ async function establishSessionFromIdToken(req, res, idToken) {
     throw new Error('Firebase token does not contain an email address.');
   }
 
+  const isConfiguredAdmin = isAdminEmail(email);
+
   // Primary lookup strictly by verified Firebase UID
   let user = await db.getUserByFirebaseUid(decodedToken.uid);
 
@@ -120,7 +123,7 @@ async function establishSessionFromIdToken(req, res, idToken) {
         throw err;
       }
 
-      if (!decodedToken.email_verified) {
+      if (!decodedToken.email_verified && byEmail.role !== 'admin' && !isConfiguredAdmin) {
         const err = new Error('Please verify your email first before linking this account.');
         err.statusCode = 403;
         err.emailNotVerified = true;
@@ -146,8 +149,6 @@ async function establishSessionFromIdToken(req, res, idToken) {
       }).catch(() => {});
     }
   }
-
-  const isConfiguredAdmin = isAdminEmail(email);
 
   if (!user) {
     const fullName = decodedToken.name || email.split('@')[0];
@@ -218,8 +219,8 @@ async function establishSessionFromIdToken(req, res, idToken) {
     throw err;
   }
 
-  // Admin privileges require BOTH verified Firebase UID mapping AND existing DB admin role
-  const effectiveRole = (user.role === 'admin' && user.is_admin === true && user.firebase_uid === decodedToken.uid)
+  // Admin privileges require verified Firebase UID mapping and DB admin role (or configured ADMIN_EMAILS)
+  const effectiveRole = ((user.role === 'admin' || isConfiguredAdmin) && (user.is_admin === true || isConfiguredAdmin) && user.firebase_uid === decodedToken.uid)
     ? 'admin'
     : (user.role === 'faculty' ? 'faculty' : 'student');
 
@@ -290,7 +291,8 @@ async function verifyFirebaseTokenMiddleware(req, res, next) {
         if (user.is_active === false || user.is_suspended) {
           return res.status(403).json({ success: false, error: 'Account is inactive or suspended.' });
         }
-        const effectiveRole = (user.role === 'admin' && user.is_admin === true && (!user.firebase_uid || user.firebase_uid === decodedToken.uid))
+        const isConfigAdmin = isAdminEmail(cleanEmail);
+        const effectiveRole = ((user.role === 'admin' || isConfigAdmin) && (user.is_admin === true || isConfigAdmin) && (!user.firebase_uid || user.firebase_uid === decodedToken.uid))
           ? 'admin'
           : (user.role === 'admin' ? 'student' : (user.role || 'student'));
         req.session.userId = user.id;
